@@ -8,3 +8,5 @@ and checks each one against the statement's own totals and balances. Open it in 
 - `tests/`: unit tests. Run `bash tests/run.sh` (macOS) or `node tests/run-node.js`.
   `tests/README.md` also describes real statement batches (`../test-statements/...`); those hold customer
   documents and are not in this repo.
+
+Handoff notes, status and open items: `HANDOFF.md`.
