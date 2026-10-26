@@ -1,0 +1,39 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>
+endobj
+2 0 obj
+<< /Length 627 >>
+stream
+BT /F1 9 Tf
+1 0 0 1 40.00 740.00 Tm (STATEMENT PERIOD 01/01/26 THRU 01/31/26) Tj
+1 0 0 1 40.00 716.00 Tm (DATE      DESCRIPTION                    WITHDRAWALS     DEPOSITS      BALANCE) Tj
+1 0 0 1 40.00 704.00 Tm (01/01/26  BALANCE FORWARD                                              1,000.00) Tj
+1 0 0 1 40.00 692.00 Tm (01/05/26  DEPOSIT                                          250.00      1,250.00) Tj
+1 0 0 1 40.00 680.00 Tm (01/06/26  POS PURCHASE STARBUCKS             25.00                     1,225.00) Tj
+1 0 0 1 40.00 668.00 Tm (01/31/26  ENDING BALANCE                                               1,225.00) Tj
+ET
+endstream
+endobj
+3 0 obj
+<< /Type /Page /Parent 4 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 2 0 R >>
+endobj
+4 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+5 0 obj
+<< /Type /Catalog /Pages 4 0 R >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000104 00000 n 
+0000000782 00000 n 
+0000000908 00000 n 
+0000000965 00000 n 
+trailer
+<< /Size 6 /Root 5 0 R >>
+startxref
+1014
+%%EOF

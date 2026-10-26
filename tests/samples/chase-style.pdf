@@ -1,0 +1,80 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+2 0 obj
+<< /Length 1931 >>
+stream
+BT /F1 9 Tf
+1 0 0 1 300.00 740.00 Tm (January 01, 2026 through January 31, 2026) Tj
+1 0 0 1 300.00 726.00 Tm (Account Number: 000000123456789) Tj
+1 0 0 1 50.00 712.00 Tm (CHECKING SUMMARY) Tj
+1 0 0 1 50.00 698.00 Tm (Beginning Balance) Tj
+1 0 0 1 459.97 698.00 Tm ($1,000.00) Tj
+1 0 0 1 50.00 684.00 Tm (Deposits and Additions) Tj
+1 0 0 1 300.00 684.00 Tm (2) Tj
+1 0 0 1 472.48 684.00 Tm (300.00) Tj
+1 0 0 1 50.00 670.00 Tm (Checks Paid) Tj
+1 0 0 1 300.00 670.00 Tm (1) Tj
+1 0 0 1 477.48 670.00 Tm (50.00) Tj
+1 0 0 1 50.00 656.00 Tm (Ending Balance) Tj
+1 0 0 1 459.97 656.00 Tm ($1,250.00) Tj
+1 0 0 1 50.00 642.00 Tm (DEPOSITS AND ADDITIONS) Tj
+1 0 0 1 50.00 628.00 Tm (DATE) Tj
+1 0 0 1 100.00 628.00 Tm (DESCRIPTION) Tj
+1 0 0 1 467.60 628.00 Tm (AMOUNT) Tj
+1 0 0 1 50.00 614.00 Tm (01/05) Tj
+1 0 0 1 100.00 614.00 Tm (Deposit) Tj
+1 0 0 1 472.48 614.00 Tm (100.00) Tj
+1 0 0 1 50.00 600.00 Tm (01/12) Tj
+1 0 0 1 100.00 600.00 Tm (ACH Credit Stripe Transfer) Tj
+1 0 0 1 472.48 600.00 Tm (200.00) Tj
+1 0 0 1 50.00 586.00 Tm (Total Deposits and Additions) Tj
+1 0 0 1 467.47 586.00 Tm ($300.00) Tj
+1 0 0 1 50.00 572.00 Tm (CHECKS PAID) Tj
+1 0 0 1 50.00 558.00 Tm (CHECK NO.) Tj
+1 0 0 1 120.00 558.00 Tm (DESCRIPTION) Tj
+1 0 0 1 380.00 558.00 Tm (DATE PAID) Tj
+1 0 0 1 467.60 558.00 Tm (AMOUNT) Tj
+1 0 0 1 50.00 544.00 Tm (1001) Tj
+1 0 0 1 80.00 544.00 Tm (^) Tj
+1 0 0 1 380.00 544.00 Tm (01/15) Tj
+1 0 0 1 477.48 544.00 Tm (50.00) Tj
+1 0 0 1 50.00 530.00 Tm (Total Checks Paid) Tj
+1 0 0 1 472.48 530.00 Tm ($50.00) Tj
+1 0 0 1 50.00 516.00 Tm (DAILY ENDING BALANCE) Tj
+1 0 0 1 50.00 502.00 Tm (DATE) Tj
+1 0 0 1 120.00 502.00 Tm (AMOUNT) Tj
+1 0 0 1 250.00 502.00 Tm (DATE) Tj
+1 0 0 1 320.00 502.00 Tm (AMOUNT) Tj
+1 0 0 1 50.00 488.00 Tm (01/05) Tj
+1 0 0 1 120.00 488.00 Tm (1,100.00) Tj
+1 0 0 1 250.00 488.00 Tm (01/12) Tj
+1 0 0 1 320.00 488.00 Tm (1,300.00) Tj
+1 0 0 1 50.00 474.00 Tm (01/15) Tj
+1 0 0 1 120.00 474.00 Tm (1,250.00) Tj
+ET
+endstream
+endobj
+3 0 obj
+<< /Type /Page /Parent 4 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 2 0 R >>
+endobj
+4 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+5 0 obj
+<< /Type /Catalog /Pages 4 0 R >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000106 00000 n 
+0000002089 00000 n 
+0000002215 00000 n 
+0000002272 00000 n 
+trailer
+<< /Size 6 /Root 5 0 R >>
+startxref
+2321
+%%EOF

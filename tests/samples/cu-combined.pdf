@@ -1,0 +1,87 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+2 0 obj
+<< /Length 1132 >>
+stream
+BT /F1 9 Tf
+1 0 0 1 50.00 740.00 Tm (Lakeside Community Credit Union) Tj
+1 0 0 1 50.00 726.00 Tm (Statement Period: 01/01/2026 - 01/31/2026) Tj
+1 0 0 1 50.00 712.00 Tm (Member Number 0000123456) Tj
+1 0 0 1 50.00 684.00 Tm (Share Draft Checking) Tj
+1 0 0 1 50.00 670.00 Tm (Date) Tj
+1 0 0 1 110.00 670.00 Tm (Description) Tj
+1 0 0 1 340.60 670.00 Tm (Withdrawals) Tj
+1 0 0 1 436.80 670.00 Tm (Deposits) Tj
+1 0 0 1 522.20 670.00 Tm (Balance) Tj
+1 0 0 1 50.00 656.00 Tm (01/01/2026) Tj
+1 0 0 1 110.00 656.00 Tm (Beginning Balance) Tj
+1 0 0 1 524.97 656.00 Tm (1,000.00) Tj
+1 0 0 1 50.00 642.00 Tm (01/05/2026) Tj
+1 0 0 1 110.00 642.00 Tm (Deposit Shared Branch) Tj
+1 0 0 1 447.47 642.00 Tm (2500.00) Tj
+1 0 0 1 524.97 642.00 Tm (3,500.00) Tj
+1 0 0 1 50.00 628.00 Tm (01/06/2026) Tj
+1 0 0 1 110.00 628.00 Tm (POS Purchase Starbucks #1234) Tj
+1 0 0 1 377.48 628.00 Tm (25.00) Tj
+1 0 0 1 524.97 628.00 Tm (3,475.00) Tj
+1 0 0 1 50.00 614.00 Tm (01/09/2026) Tj
+1 0 0 1 110.00 614.00 Tm (ACH Debit Acme Funding LLC) Tj
+1 0 0 1 364.97 614.00 Tm (1,500.00) Tj
+1 0 0 1 524.97 614.00 Tm (1,975.00) Tj
+1 0 0 1 450.00 600.00 Tm (Page 1 of 2) Tj
+ET
+endstream
+endobj
+3 0 obj
+<< /Length 703 >>
+stream
+BT /F1 9 Tf
+1 0 0 1 50.00 740.00 Tm (Date) Tj
+1 0 0 1 110.00 740.00 Tm (Description) Tj
+1 0 0 1 340.60 740.00 Tm (Withdrawals) Tj
+1 0 0 1 436.80 740.00 Tm (Deposits) Tj
+1 0 0 1 522.20 740.00 Tm (Balance) Tj
+1 0 0 1 50.00 726.00 Tm (01/16/2026) Tj
+1 0 0 1 110.00 726.00 Tm (ACH Credit Stripe Payout) Tj
+1 0 0 1 452.48 726.00 Tm (812.40) Tj
+1 0 0 1 524.97 726.00 Tm (2,787.40) Tj
+1 0 0 1 50.00 712.00 Tm (01/20/2026) Tj
+1 0 0 1 110.00 712.00 Tm (Check 1001) Tj
+1 0 0 1 372.48 712.00 Tm (300.00) Tj
+1 0 0 1 524.97 712.00 Tm (2,487.40) Tj
+1 0 0 1 50.00 698.00 Tm (01/31/2026) Tj
+1 0 0 1 110.00 698.00 Tm (Ending Balance) Tj
+1 0 0 1 524.97 698.00 Tm (2,487.40) Tj
+1 0 0 1 450.00 684.00 Tm (Page 2 of 2) Tj
+ET
+endstream
+endobj
+4 0 obj
+<< /Type /Page /Parent 6 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 2 0 R >>
+endobj
+5 0 obj
+<< /Type /Page /Parent 6 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 3 0 R >>
+endobj
+6 0 obj
+<< /Type /Pages /Kids [4 0 R 5 0 R] /Count 2 >>
+endobj
+7 0 obj
+<< /Type /Catalog /Pages 6 0 R >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000106 00000 n 
+0000001290 00000 n 
+0000002044 00000 n 
+0000002170 00000 n 
+0000002296 00000 n 
+0000002359 00000 n 
+trailer
+<< /Size 8 /Root 7 0 R >>
+startxref
+2408
+%%EOF
