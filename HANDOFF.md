@@ -45,7 +45,8 @@ The repo holds no customer statements. `tests/samples/` has synthetic files only
   (git-ignored). Stop autostart: `launchctl bootout gui/$(id -u)/local.exparsed.macocr`.
 - Unit tests: `bash tests/run.sh` in this repo, or `bash test-statements/tests/run.sh exparsed.html`
   in the vault folder. Uses macOS JavaScriptCore, no node needed. `node tests/run-node.js` also works.
-  Current result: 231 passed, 0 failed.
+  Current result: 231 passed, 0 failed (reported on the Mac). `node tests/run-node.js` gives 212 passed,
+  0 failed on Linux on 2026-10-27; the 19-check gap is not yet explained. Confirm with `bash tests/run.sh` on the Mac.
 - Run the unit tests after every change to `exparsed.html`.
 
 ## How the page reads a file
@@ -135,25 +136,27 @@ Tests for these are E13 to E15 in `tests/edge.js`.
 - The FUNDED set (about 7,300 files) was not rerun after this round. Many of its files are applications,
   IDs, credit reports and contracts.
 
-## Test harness (not in the repo)
+## Batch harness
 
-The batch runs used a local harness in the Claude session scratchpad:
-`/private/tmp/claude-501/-Users-springfunding-JuniMyAgentVault-03-Agent-Wiki-pdf-vision-ocr/926417a5-725d-41c0-9db0-152f7581fc1c/scratchpad/run`.
-That folder is temporary and may be gone. What it did:
+`tests/batch/run.js` replaces the old scratchpad harness (`serve.py`, `hook.js`, `supervise.py`, `inx*.py`).
+It loads a copy of `exparsed.html` with one hook added inside the main script, opens it from `file://` in
+headless Chrome, and calls the page's real path (`readFileContent`, the account and statement split,
+`lgFileLedger`) for each file. Output is one JSON line per ledger. No local port is opened, so the
+Claude Code sandbox needs no `allowLocalBinding`. Needs Playwright (`npm i playwright`).
 
-- `serve.py` served the page with `hook.js` injected and the test files under `/funded/<name>`.
-  `ONLY=<list>` limited the run to listed files. Results were appended as JSON lines.
-- `hook.js` called `readFileContent` (the page's real path, including the account split) and reported
-  one result per child ledger. With `&ocr=1` it ran `doOcrMac` on scans first.
-- `supervise.py` ran 4 headless Chrome workers through the Chrome DevTools Protocol.
-- `inx.py` / `inxo.py` ran JavaScript in the page for single-file checks (`inxo.py` with OCR).
-- Inside the Claude Code sandbox, binding a local port fails with EPERM. Those commands ran outside the
-  sandbox, or set `sandbox.network.allowLocalBinding: true`.
+```
+node tests/batch/run.js "<desktop set dir>" ~/exparsed-results/desktop.jsonl --workers 4
+node tests/batch/run.js "<dir>" out.jsonl --ocr          # needs-ocr PDFs go to the Mac OCR server first
+node tests/batch/run.js "<dir>" out.jsonl --only list.txt # only the listed files (relative path or name)
+node tests/batch/run.js compare old.jsonl new.jsonl      # status counts, files that got worse; exit 1 if any
+```
+
+A rerun skips files already in the output file. Keep result files outside the repo: they hold customer file
+names. Before trusting a FUNDED run, rerun the Desktop set and check it matches the table above.
 
 ## Suggested next steps
 
 1. Look at the 9 partial files, biggest bank groups first.
 2. Fix the upside-down check in `Bank_Statement_5`.
 3. Rerun the FUNDED set and compare against the last FUNDED results.
-4. Commit the harness (`serve.py`, `hook.js`, `supervise.py`, `inx*.py`) to this repo so batch runs
-   can be repeated.
+4. Find the 19 unit checks `run-node.js` does not run (212 against 231 on the Mac).
