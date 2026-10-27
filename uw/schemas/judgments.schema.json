@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:uw:judgments:1",
+  "title": "LLM judgments (engine input)",
+  "description": "The only thing the LLM produces. Use as the structured-output schema for the call made with prompts/judge.md. engine/uw.py re-checks everything here and also verifies evidence quotes against source text.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ledger_sha256", "answers"],
+  "properties": {
+    "ledger_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "answers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["question_id"],
+        "properties": {
+          "question_id": {"type": "string", "pattern": "^Q-(credit|debit|core)-[0-9a-f]{10}$"},
+          "tag": {"type": "string", "description": "credit: a credit tag or unsure. debit_group: MCA, a debit tag, AMBIGUOUS_<LABEL> or unsure."},
+          "funder": {"type": "string", "maxLength": 40},
+          "evidence": {"$ref": "#/$defs/evidence"},
+          "terminated": {"$ref": "#/$defs/evidence"},
+          "text": {"type": "string", "maxLength": 240},
+          "reason": {"type": "string", "maxLength": 300}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "quote"],
+      "properties": {
+        "kind": {"enum": ["bank_text", "sender_identified", "document"]},
+        "quote": {"type": "string", "minLength": 3, "description": "Verbatim substring of the transaction description, or of the document when kind is document."},
+        "doc_id": {"type": "string"}
+      }
+    }
+  }
+}

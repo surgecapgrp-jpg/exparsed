@@ -47,6 +47,8 @@ The repo holds no customer statements. `tests/samples/` has synthetic files only
   in the vault folder. Uses macOS JavaScriptCore, no node needed. `node tests/run-node.js` also works.
   Current result: 231 passed, 0 failed.
 - Run the unit tests after every change to `exparsed.html`.
+- Underwriting: `python3 uw/server.py`, then the Underwrite button in the export menu. Tests:
+  `python3 -m unittest discover -s uw/tests`. Details, providers and the privacy note: `uw/README.md`.
 
 ## How the page reads a file
 

@@ -393,6 +393,7 @@
               <button class="act" id="downloadAllJson" type="button">All JSON</button>
               <button class="act" id="downloadAllPdf" type="button">All PDF</button>
               <button class="act" id="downloadLedger" type="button" title="Verified transaction rows + integrity checks + provenance, for the underwriting prompt">Ledger JSON</button>
+              <button class="act" id="underwrite" type="button" title="Send every loaded file to the local underwriting server (uw/server.py) and open its report and chat">Underwrite</button>
               <button class="act" id="downloadIntegrity" type="button" title="Plain-text reconciliation and provenance report">Integrity report</button>
             </div>
           </div>
@@ -510,7 +511,7 @@
         $orApiKey=el('orApiKey'), $orModel=el('orModel'), $orModelFilter=el('orModelFilter'), $orEngine=el('orEngine'), $orKeystate=el('orKeystate'),
         $macUrl=el('macUrl'), $macKeystate=el('macKeystate'),
         $optOcr=el('optOcr'), $optRedact=el('optRedact'), $optCompactDesc=el('optCompactDesc'),
-        $dlLedger=el('downloadLedger'), $dlIntegrity=el('downloadIntegrity'),
+        $dlLedger=el('downloadLedger'), $underwrite=el('underwrite'), $dlIntegrity=el('downloadIntegrity'),
         $reviewRedact=el('reviewRedact'), $redactPanel=el('redactPanel'), $redactSummary=el('redactSummary'),
         $redactCloseBtn=el('redactCloseBtn'), $redactLines=el('redactLines');
 
@@ -5545,7 +5546,7 @@
       // the five separate disabled-assignment chains above, which is how those chains drift.
       if($dlPdf) $dlPdf.disabled=$download.disabled;
       if($dlAllPdf) $dlAllPdf.disabled=$dlAll.disabled;
-      if($dlLedger) $dlLedger.disabled=$dlAll.disabled;
+      if($dlLedger) $dlLedger.disabled=$underwrite.disabled=$dlAll.disabled;
       if($dlIntegrity) $dlIntegrity.disabled=$dlAll.disabled;
       if($exportBtn) $exportBtn.disabled = $download.disabled && $dlAll.disabled;
     }
@@ -6584,6 +6585,18 @@
     $dlPdf.addEventListener('click',function(){ var f=selectedFile(); if(f) savePdf(pdfBanner(f.name,0)+fileMarkdownFinal(f), baseName(f)+'.pdf'); });
     $dlAllPdf.addEventListener('click',function(){ var d=doneFiles(); if(d.length) savePdf(pdfBanner('Combined extraction', d.length)+combinedMarkdown(d), 'converted.pdf'); });
     $dlLedger.addEventListener('click',function(){ var d=doneFiles(); if(d.length) saveText(JSON.stringify(lgLedgerExport(d),null,1),'ledger.json','application/json;charset=utf-8'); });
+    // Every loaded file goes to uw/server.py as one ledger; its page shows the ten tables and the chat.
+    // The tab opens before the request so the popup blocker treats it as part of the click.
+    var UW_URL='http://127.0.0.1:8092';
+    $underwrite.addEventListener('click',function(){
+      var d=doneFiles(); if(!d.length) return;
+      var w=window.open('about:blank','_blank');
+      fetch(UW_URL+'/runs',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(lgLedgerExport(d)) })
+        .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||('HTTP '+r.status)); return j; }); })
+        .then(function(j){ if(w) w.location.href=j.url; else window.open(j.url,'_blank'); })
+        .catch(function(e){ if(w) w.close();
+          alert(/fetch/i.test(e.message) ? 'The underwriting server is not running. Start it in Terminal:\n  python3 uw/server.py\n(from the exparsed folder), then press Underwrite again.' : 'Underwriting failed: '+e.message); });
+    });
     $dlIntegrity.addEventListener('click',function(){ var d=doneFiles(); if(d.length) saveText(lgIntegrityReport(d),'integrity-report.txt','text/plain;charset=utf-8'); });
 
     /* ============ NEW BATCH ============ */

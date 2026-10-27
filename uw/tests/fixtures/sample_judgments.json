@@ -1,0 +1,53 @@
+{
+ "ledger_sha256": "df5f028ae65143ede30e4afe5f3c57a2b1f37852f9ca14cbd2985af4d1080542",
+ "answers": [
+  {
+   "question_id": "Q-credit-8cb193e121",
+   "tag": "STRIP_FUNDING",
+   "evidence": {
+    "kind": "document",
+    "doc_id": "DOC-1",
+    "quote": "disbursed by wire on 09/01/2026 via JKL Holdings"
+   },
+   "reason": "DOC-1 funding agreement names this wire and amount."
+  },
+  {
+   "question_id": "Q-debit-9a8452dee1",
+   "tag": "MCA",
+   "funder": "CFG Merchant Solutions",
+   "reason": "Fixed weekly remittance; DOC-1 is its MCA agreement."
+  },
+  {
+   "question_id": "Q-debit-8caf1d6083",
+   "tag": "MCA",
+   "funder": "RapidFund LLC",
+   "reason": "Fixed daily debit to a funder name."
+  },
+  {
+   "question_id": "Q-debit-d638642e78",
+   "tag": "MCA",
+   "funder": "BlueOak ADV",
+   "reason": "Fixed weekly debit after BLUEOAK funding credit."
+  },
+  {
+   "question_id": "Q-debit-94b61a9c43",
+   "tag": "MCA",
+   "funder": "SunCap Funding",
+   "reason": "Fixed daily debit; stopped 06/26."
+  },
+  {
+   "question_id": "Q-debit-d4fa054f58",
+   "tag": "DIRECT_COST",
+   "reason": "Weekly food distributor for a restaurant."
+  },
+  {
+   "question_id": "Q-debit-ec5b391d26",
+   "tag": "AMBIGUOUS_CARD_PAYMENT",
+   "reason": "Card payment; underlying spend unknown."
+  },
+  {
+   "question_id": "Q-core-d6ff743dda",
+   "text": "Restaurant earning mostly card sales through Square, plus a weekly wholesale customer (Acme Distributing)."
+  }
+ ]
+}

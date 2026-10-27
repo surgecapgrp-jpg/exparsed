@@ -1,0 +1,3281 @@
+{
+ "schema": "uw-ledger/1",
+ "business_name": "Sample Bistro LLC",
+ "owner_names": [
+  "Jane Doe"
+ ],
+ "holidays": [
+  "2026-06-19",
+  "2026-07-03",
+  "2026-09-07"
+ ],
+ "accounts": [
+  {
+   "account_id": "OP",
+   "name": "Operating",
+   "last4": "1234",
+   "integrity": "Pass",
+   "statements": [
+    {
+     "start": "2026-06-01",
+     "end": "2026-06-30"
+    },
+    {
+     "start": "2026-07-01",
+     "end": "2026-07-31"
+    },
+    {
+     "start": "2026-08-01",
+     "end": "2026-08-31"
+    },
+    {
+     "start": "2026-09-01",
+     "end": "2026-09-30"
+    }
+   ]
+  },
+  {
+   "account_id": "SAV",
+   "name": "Savings",
+   "last4": "5678",
+   "integrity": "Pass",
+   "statements": [
+    {
+     "start": "2026-06-01",
+     "end": "2026-06-30"
+    },
+    {
+     "start": "2026-07-01",
+     "end": "2026-07-31"
+    },
+    {
+     "start": "2026-08-01",
+     "end": "2026-08-31"
+    },
+    {
+     "start": "2026-09-01",
+     "end": "2026-09-30"
+    }
+   ]
+  }
+ ],
+ "documents": [
+  {
+   "doc_id": "DOC-1",
+   "kind": "funding_agreement",
+   "text": "Merchant cash advance agreement between CFG Merchant Solutions and Sample Bistro LLC. Purchase price $30,000.00 disbursed by wire on 09/01/2026 via JKL Holdings, CFG's funding agent. Weekly remittance $900."
+  }
+ ],
+ "transactions": [
+  {
+   "txn_id": "T00001",
+   "account_id": "OP",
+   "date": "2026-06-01",
+   "amount": "1512.22",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260601",
+   "balance": "16512.22",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00002",
+   "account_id": "OP",
+   "date": "2026-06-01",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "16062.22",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00003",
+   "account_id": "OP",
+   "date": "2026-06-01",
+   "amount": "300.00",
+   "direction": "debit",
+   "description": "SUNCAP FUNDING DEBIT",
+   "balance": "15762.22",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00004",
+   "account_id": "OP",
+   "date": "2026-06-01",
+   "amount": "4500.00",
+   "direction": "debit",
+   "description": "ACH DEBIT OAKWOOD PROPERTY MGMT RENT",
+   "balance": "11262.22",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00005",
+   "account_id": "OP",
+   "date": "2026-06-02",
+   "amount": "1558.75",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260602",
+   "balance": "12820.97",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00006",
+   "account_id": "OP",
+   "date": "2026-06-02",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "12370.97",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00007",
+   "account_id": "OP",
+   "date": "2026-06-02",
+   "amount": "300.00",
+   "direction": "debit",
+   "description": "SUNCAP FUNDING DEBIT",
+   "balance": "12070.97",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00008",
+   "account_id": "OP",
+   "date": "2026-06-03",
+   "amount": "1347.47",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260603",
+   "balance": "13418.44",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00009",
+   "account_id": "OP",
+   "date": "2026-06-03",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "12968.44",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00010",
+   "account_id": "OP",
+   "date": "2026-06-03",
+   "amount": "300.00",
+   "direction": "debit",
+   "description": "SUNCAP FUNDING DEBIT",
+   "balance": "12668.44",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00011",
+   "account_id": "OP",
+   "date": "2026-06-03",
+   "amount": "2038.23",
+   "direction": "debit",
+   "description": "SYSCO FOODS ACH DEBIT",
+   "balance": "10630.21",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00012",
+   "account_id": "OP",
+   "date": "2026-06-04",
+   "amount": "1539.65",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260604",
+   "balance": "12169.86",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00013",
+   "account_id": "OP",
+   "date": "2026-06-04",
+   "amount": "881.93",
+   "direction": "credit",
+   "description": "MOBILE DEPOSIT",
+   "balance": "13051.79",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00014",
+   "account_id": "OP",
+   "date": "2026-06-04",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "12601.79",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00015",
+   "account_id": "OP",
+   "date": "2026-06-04",
+   "amount": "300.00",
+   "direction": "debit",
+   "description": "SUNCAP FUNDING DEBIT",
+   "balance": "12301.79",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00016",
+   "account_id": "OP",
+   "date": "2026-06-04",
+   "amount": "186.27",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 4517",
+   "balance": "12115.52",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00017",
+   "account_id": "OP",
+   "date": "2026-06-05",
+   "amount": "1324.57",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260605",
+   "balance": "13440.09",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00018",
+   "account_id": "OP",
+   "date": "2026-06-05",
+   "amount": "4000.00",
+   "direction": "credit",
+   "description": "ACH CREDIT ACME DISTRIBUTING PPD ID 99887766",
+   "balance": "17440.09",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00019",
+   "account_id": "OP",
+   "date": "2026-06-05",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "16990.09",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00020",
+   "account_id": "OP",
+   "date": "2026-06-05",
+   "amount": "300.00",
+   "direction": "debit",
+   "description": "SUNCAP FUNDING DEBIT",
+   "balance": "16690.09",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00021",
+   "account_id": "OP",
+   "date": "2026-06-05",
+   "amount": "157.02",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 2144",
+   "balance": "16533.07",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00022",
+   "account_id": "OP",
+   "date": "2026-06-05",
+   "amount": "5500.00",
+   "direction": "debit",
+   "description": "GUSTO PAYROLL ACH DEBIT",
+   "balance": "11033.07",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00023",
+   "account_id": "OP",
+   "date": "2026-06-08",
+   "amount": "1457.72",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260608",
+   "balance": "12490.79",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00024",
+   "account_id": "OP",
+   "date": "2026-06-08",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "12040.79",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00025",
+   "account_id": "OP",
+   "date": "2026-06-08",
+   "amount": "300.00",
+   "direction": "debit",
+   "description": "SUNCAP FUNDING DEBIT",
+   "balance": "11740.79",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00026",
+   "account_id": "OP",
+   "date": "2026-06-08",
+   "amount": "159.10",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 1968",
+   "balance": "11581.69",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00027",
+   "account_id": "OP",
+   "date": "2026-06-09",
+   "amount": "1841.88",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260609",
+   "balance": "13423.57",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00028",
+   "account_id": "OP",
+   "date": "2026-06-09",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "12973.57",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00029",
+   "account_id": "OP",
+   "date": "2026-06-09",
+   "amount": "300.00",
+   "direction": "debit",
+   "description": "SUNCAP FUNDING DEBIT",
+   "balance": "12673.57",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00030",
+   "account_id": "OP",
+   "date": "2026-06-10",
+   "amount": "1446.30",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260610",
+   "balance": "14119.87",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00031",
+   "account_id": "OP",
+   "date": "2026-06-10",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "13669.87",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00032",
+   "account_id": "OP",
+   "date": "2026-06-10",
+   "amount": "300.00",
+   "direction": "debit",
+   "description": "SUNCAP FUNDING DEBIT",
+   "balance": "13369.87",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00033",
+   "account_id": "OP",
+   "date": "2026-06-10",
+   "amount": "1913.28",
+   "direction": "debit",
+   "description": "SYSCO FOODS ACH DEBIT",
+   "balance": "11456.59",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00034",
+   "account_id": "OP",
+   "date": "2026-06-10",
+   "amount": "650.00",
+   "direction": "debit",
+   "description": "CITY ELECTRIC CO",
+   "balance": "10806.59",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00035",
+   "account_id": "OP",
+   "date": "2026-06-11",
+   "amount": "1340.54",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260611",
+   "balance": "12147.13",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00036",
+   "account_id": "OP",
+   "date": "2026-06-11",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "11697.13",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00037",
+   "account_id": "OP",
+   "date": "2026-06-11",
+   "amount": "300.00",
+   "direction": "debit",
+   "description": "SUNCAP FUNDING DEBIT",
+   "balance": "11397.13",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00038",
+   "account_id": "OP",
+   "date": "2026-06-12",
+   "amount": "1559.96",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260612",
+   "balance": "12957.09",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00039",
+   "account_id": "OP",
+   "date": "2026-06-12",
+   "amount": "4000.00",
+   "direction": "credit",
+   "description": "ACH CREDIT ACME DISTRIBUTING PPD ID 99887766",
+   "balance": "16957.09",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00040",
+   "account_id": "OP",
+   "date": "2026-06-12",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "16507.09",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00041",
+   "account_id": "OP",
+   "date": "2026-06-12",
+   "amount": "300.00",
+   "direction": "debit",
+   "description": "SUNCAP FUNDING DEBIT",
+   "balance": "16207.09",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00042",
+   "account_id": "OP",
+   "date": "2026-06-12",
+   "amount": "92.44",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 1763",
+   "balance": "16114.65",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00043",
+   "account_id": "OP",
+   "date": "2026-06-12",
+   "amount": "220.00",
+   "direction": "debit",
+   "description": "COMCAST BUSINESS",
+   "balance": "15894.65",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00044",
+   "account_id": "OP",
+   "date": "2026-06-15",
+   "amount": "1664.81",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260615",
+   "balance": "17559.46",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00045",
+   "account_id": "OP",
+   "date": "2026-06-15",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "17109.46",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00046",
+   "account_id": "OP",
+   "date": "2026-06-15",
+   "amount": "300.00",
+   "direction": "debit",
+   "description": "SUNCAP FUNDING DEBIT",
+   "balance": "16809.46",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00047",
+   "account_id": "OP",
+   "date": "2026-06-15",
+   "amount": "380.00",
+   "direction": "debit",
+   "description": "NEXT INSURANCE PREM",
+   "balance": "16429.46",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00048",
+   "account_id": "OP",
+   "date": "2026-06-15",
+   "amount": "2100.00",
+   "direction": "debit",
+   "description": "IRS USATAXPYMT",
+   "balance": "14329.46",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00049",
+   "account_id": "OP",
+   "date": "2026-06-16",
+   "amount": "1489.79",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260616",
+   "balance": "15819.25",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00050",
+   "account_id": "OP",
+   "date": "2026-06-16",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "15369.25",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00051",
+   "account_id": "OP",
+   "date": "2026-06-16",
+   "amount": "300.00",
+   "direction": "debit",
+   "description": "SUNCAP FUNDING DEBIT",
+   "balance": "15069.25",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00052",
+   "account_id": "OP",
+   "date": "2026-06-17",
+   "amount": "1654.34",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260617",
+   "balance": "16723.59",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00053",
+   "account_id": "OP",
+   "date": "2026-06-17",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "16273.59",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00054",
+   "account_id": "OP",
+   "date": "2026-06-17",
+   "amount": "300.00",
+   "direction": "debit",
+   "description": "SUNCAP FUNDING DEBIT",
+   "balance": "15973.59",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00055",
+   "account_id": "OP",
+   "date": "2026-06-17",
+   "amount": "1577.19",
+   "direction": "debit",
+   "description": "SYSCO FOODS ACH DEBIT",
+   "balance": "14396.40",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00056",
+   "account_id": "OP",
+   "date": "2026-06-18",
+   "amount": "1667.17",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260618",
+   "balance": "16063.57",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00057",
+   "account_id": "OP",
+   "date": "2026-06-18",
+   "amount": "1034.85",
+   "direction": "credit",
+   "description": "MOBILE DEPOSIT",
+   "balance": "17098.42",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00058",
+   "account_id": "OP",
+   "date": "2026-06-18",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "16648.42",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00059",
+   "account_id": "OP",
+   "date": "2026-06-18",
+   "amount": "300.00",
+   "direction": "debit",
+   "description": "SUNCAP FUNDING DEBIT",
+   "balance": "16348.42",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00060",
+   "account_id": "OP",
+   "date": "2026-06-19",
+   "amount": "5500.00",
+   "direction": "debit",
+   "description": "GUSTO PAYROLL ACH DEBIT",
+   "balance": "10848.42",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00061",
+   "account_id": "OP",
+   "date": "2026-06-20",
+   "amount": "2000.00",
+   "direction": "debit",
+   "description": "ZELLE TO JANE DOE",
+   "balance": "8848.42",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00062",
+   "account_id": "OP",
+   "date": "2026-06-21",
+   "amount": "3000.00",
+   "direction": "debit",
+   "description": "AMEX EPAYMENT",
+   "balance": "5848.42",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00063",
+   "account_id": "OP",
+   "date": "2026-06-22",
+   "amount": "1367.53",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260622",
+   "balance": "7215.95",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00064",
+   "account_id": "OP",
+   "date": "2026-06-22",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "6765.95",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00065",
+   "account_id": "OP",
+   "date": "2026-06-22",
+   "amount": "300.00",
+   "direction": "debit",
+   "description": "SUNCAP FUNDING DEBIT",
+   "balance": "6465.95",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00066",
+   "account_id": "OP",
+   "date": "2026-06-23",
+   "amount": "1718.71",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260623",
+   "balance": "8184.66",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00067",
+   "account_id": "OP",
+   "date": "2026-06-23",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "7734.66",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00068",
+   "account_id": "OP",
+   "date": "2026-06-23",
+   "amount": "300.00",
+   "direction": "debit",
+   "description": "SUNCAP FUNDING DEBIT",
+   "balance": "7434.66",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00069",
+   "account_id": "OP",
+   "date": "2026-06-23",
+   "amount": "51.92",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 9974",
+   "balance": "7382.74",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00070",
+   "account_id": "OP",
+   "date": "2026-06-24",
+   "amount": "1766.68",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260624",
+   "balance": "9149.42",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00071",
+   "account_id": "OP",
+   "date": "2026-06-24",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "8699.42",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00072",
+   "account_id": "OP",
+   "date": "2026-06-24",
+   "amount": "300.00",
+   "direction": "debit",
+   "description": "SUNCAP FUNDING DEBIT",
+   "balance": "8399.42",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00073",
+   "account_id": "OP",
+   "date": "2026-06-24",
+   "amount": "1541.14",
+   "direction": "debit",
+   "description": "SYSCO FOODS ACH DEBIT",
+   "balance": "6858.28",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00074",
+   "account_id": "OP",
+   "date": "2026-06-25",
+   "amount": "1705.67",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260625",
+   "balance": "8563.95",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00075",
+   "account_id": "OP",
+   "date": "2026-06-25",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "8113.95",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00076",
+   "account_id": "OP",
+   "date": "2026-06-25",
+   "amount": "300.00",
+   "direction": "debit",
+   "description": "SUNCAP FUNDING DEBIT",
+   "balance": "7813.95",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00077",
+   "account_id": "OP",
+   "date": "2026-06-25",
+   "amount": "242.95",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 9711",
+   "balance": "7571.00",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00078",
+   "account_id": "OP",
+   "date": "2026-06-26",
+   "amount": "1580.22",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260626",
+   "balance": "9151.22",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00079",
+   "account_id": "OP",
+   "date": "2026-06-26",
+   "amount": "4000.00",
+   "direction": "credit",
+   "description": "ACH CREDIT ACME DISTRIBUTING PPD ID 99887766",
+   "balance": "13151.22",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00080",
+   "account_id": "OP",
+   "date": "2026-06-26",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "12701.22",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00081",
+   "account_id": "OP",
+   "date": "2026-06-26",
+   "amount": "300.00",
+   "direction": "debit",
+   "description": "SUNCAP FUNDING DEBIT",
+   "balance": "12401.22",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00082",
+   "account_id": "SAV",
+   "date": "2026-06-28",
+   "amount": "2.10",
+   "direction": "credit",
+   "description": "INTEREST PAYMENT",
+   "balance": "40002.10",
+   "source_ref": "SAV-202606.pdf"
+  },
+  {
+   "txn_id": "T00083",
+   "account_id": "OP",
+   "date": "2026-06-29",
+   "amount": "1605.13",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260629",
+   "balance": "14006.35",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00084",
+   "account_id": "OP",
+   "date": "2026-06-29",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "13556.35",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00085",
+   "account_id": "OP",
+   "date": "2026-06-30",
+   "amount": "1596.99",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260630",
+   "balance": "15153.34",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00086",
+   "account_id": "OP",
+   "date": "2026-06-30",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "14703.34",
+   "source_ref": "OP-202606.pdf"
+  },
+  {
+   "txn_id": "T00087",
+   "account_id": "OP",
+   "date": "2026-07-01",
+   "amount": "1462.80",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260701",
+   "balance": "16166.14",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00088",
+   "account_id": "OP",
+   "date": "2026-07-01",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "15716.14",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00089",
+   "account_id": "OP",
+   "date": "2026-07-01",
+   "amount": "2020.60",
+   "direction": "debit",
+   "description": "SYSCO FOODS ACH DEBIT",
+   "balance": "13695.54",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00090",
+   "account_id": "OP",
+   "date": "2026-07-01",
+   "amount": "275.53",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 4999",
+   "balance": "13420.01",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00091",
+   "account_id": "OP",
+   "date": "2026-07-01",
+   "amount": "4500.00",
+   "direction": "debit",
+   "description": "ACH DEBIT OAKWOOD PROPERTY MGMT RENT",
+   "balance": "8920.01",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00092",
+   "account_id": "OP",
+   "date": "2026-07-02",
+   "amount": "1353.64",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260702",
+   "balance": "10273.65",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00093",
+   "account_id": "OP",
+   "date": "2026-07-02",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "9823.65",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00094",
+   "account_id": "OP",
+   "date": "2026-07-03",
+   "amount": "5500.00",
+   "direction": "debit",
+   "description": "GUSTO PAYROLL ACH DEBIT",
+   "balance": "4323.65",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00095",
+   "account_id": "OP",
+   "date": "2026-07-06",
+   "amount": "1644.19",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260706",
+   "balance": "5967.84",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00096",
+   "account_id": "OP",
+   "date": "2026-07-06",
+   "amount": "824.47",
+   "direction": "credit",
+   "description": "MOBILE DEPOSIT",
+   "balance": "6792.31",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00097",
+   "account_id": "OP",
+   "date": "2026-07-06",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "6342.31",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00098",
+   "account_id": "OP",
+   "date": "2026-07-07",
+   "amount": "1778.04",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260707",
+   "balance": "8120.35",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00099",
+   "account_id": "OP",
+   "date": "2026-07-07",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "7670.35",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00100",
+   "account_id": "OP",
+   "date": "2026-07-08",
+   "amount": "1699.08",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260708",
+   "balance": "9369.43",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00101",
+   "account_id": "OP",
+   "date": "2026-07-08",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "8919.43",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00102",
+   "account_id": "OP",
+   "date": "2026-07-08",
+   "amount": "1547.97",
+   "direction": "debit",
+   "description": "SYSCO FOODS ACH DEBIT",
+   "balance": "7371.46",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00103",
+   "account_id": "OP",
+   "date": "2026-07-08",
+   "amount": "157.01",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 3702",
+   "balance": "7214.45",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00104",
+   "account_id": "OP",
+   "date": "2026-07-09",
+   "amount": "1796.19",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260709",
+   "balance": "9010.64",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00105",
+   "account_id": "OP",
+   "date": "2026-07-09",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "8560.64",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00106",
+   "account_id": "OP",
+   "date": "2026-07-09",
+   "amount": "180.22",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 7909",
+   "balance": "8380.42",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00107",
+   "account_id": "OP",
+   "date": "2026-07-10",
+   "amount": "1325.69",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260710",
+   "balance": "9706.11",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00108",
+   "account_id": "OP",
+   "date": "2026-07-10",
+   "amount": "4000.00",
+   "direction": "credit",
+   "description": "ACH CREDIT ACME DISTRIBUTING PPD ID 99887766",
+   "balance": "13706.11",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00109",
+   "account_id": "OP",
+   "date": "2026-07-10",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "13256.11",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00110",
+   "account_id": "OP",
+   "date": "2026-07-10",
+   "amount": "650.00",
+   "direction": "debit",
+   "description": "CITY ELECTRIC CO",
+   "balance": "12606.11",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00111",
+   "account_id": "OP",
+   "date": "2026-07-12",
+   "amount": "220.00",
+   "direction": "debit",
+   "description": "COMCAST BUSINESS",
+   "balance": "12386.11",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00112",
+   "account_id": "OP",
+   "date": "2026-07-13",
+   "amount": "1350.86",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260713",
+   "balance": "13736.97",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00113",
+   "account_id": "OP",
+   "date": "2026-07-13",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "13286.97",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00114",
+   "account_id": "OP",
+   "date": "2026-07-14",
+   "amount": "1675.53",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260714",
+   "balance": "14962.50",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00115",
+   "account_id": "OP",
+   "date": "2026-07-14",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "14512.50",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00116",
+   "account_id": "OP",
+   "date": "2026-07-15",
+   "amount": "1836.31",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260715",
+   "balance": "16348.81",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00117",
+   "account_id": "OP",
+   "date": "2026-07-15",
+   "amount": "5000.00",
+   "direction": "credit",
+   "description": "ONLINE TRANSFER FROM SAV XXXXXX5678",
+   "balance": "21348.81",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00118",
+   "account_id": "OP",
+   "date": "2026-07-15",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "20898.81",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00119",
+   "account_id": "OP",
+   "date": "2026-07-15",
+   "amount": "1705.61",
+   "direction": "debit",
+   "description": "SYSCO FOODS ACH DEBIT",
+   "balance": "19193.20",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00120",
+   "account_id": "OP",
+   "date": "2026-07-15",
+   "amount": "134.74",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 9137",
+   "balance": "19058.46",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00121",
+   "account_id": "OP",
+   "date": "2026-07-15",
+   "amount": "380.00",
+   "direction": "debit",
+   "description": "NEXT INSURANCE PREM",
+   "balance": "18678.46",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00122",
+   "account_id": "SAV",
+   "date": "2026-07-15",
+   "amount": "5000.00",
+   "direction": "debit",
+   "description": "ONLINE TRANSFER TO CHK XXXXXX1234",
+   "balance": "35002.10",
+   "source_ref": "SAV-202607.pdf"
+  },
+  {
+   "txn_id": "T00123",
+   "account_id": "OP",
+   "date": "2026-07-16",
+   "amount": "1680.04",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260716",
+   "balance": "20358.50",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00124",
+   "account_id": "OP",
+   "date": "2026-07-16",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "19908.50",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00125",
+   "account_id": "OP",
+   "date": "2026-07-17",
+   "amount": "1345.06",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260717",
+   "balance": "21253.56",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00126",
+   "account_id": "OP",
+   "date": "2026-07-17",
+   "amount": "4000.00",
+   "direction": "credit",
+   "description": "ACH CREDIT ACME DISTRIBUTING PPD ID 99887766",
+   "balance": "25253.56",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00127",
+   "account_id": "OP",
+   "date": "2026-07-17",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "24803.56",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00128",
+   "account_id": "OP",
+   "date": "2026-07-17",
+   "amount": "5500.00",
+   "direction": "debit",
+   "description": "GUSTO PAYROLL ACH DEBIT",
+   "balance": "19303.56",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00129",
+   "account_id": "OP",
+   "date": "2026-07-20",
+   "amount": "1476.90",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260720",
+   "balance": "20780.46",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00130",
+   "account_id": "OP",
+   "date": "2026-07-20",
+   "amount": "810.70",
+   "direction": "credit",
+   "description": "MOBILE DEPOSIT",
+   "balance": "21591.16",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00131",
+   "account_id": "OP",
+   "date": "2026-07-20",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "21141.16",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00132",
+   "account_id": "OP",
+   "date": "2026-07-20",
+   "amount": "2000.00",
+   "direction": "debit",
+   "description": "ZELLE TO JANE DOE",
+   "balance": "19141.16",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00133",
+   "account_id": "OP",
+   "date": "2026-07-21",
+   "amount": "1342.59",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260721",
+   "balance": "20483.75",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00134",
+   "account_id": "OP",
+   "date": "2026-07-21",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "20033.75",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00135",
+   "account_id": "OP",
+   "date": "2026-07-21",
+   "amount": "249.86",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 6072",
+   "balance": "19783.89",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00136",
+   "account_id": "OP",
+   "date": "2026-07-21",
+   "amount": "3000.00",
+   "direction": "debit",
+   "description": "AMEX EPAYMENT",
+   "balance": "16783.89",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00137",
+   "account_id": "OP",
+   "date": "2026-07-22",
+   "amount": "1724.10",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260722",
+   "balance": "18507.99",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00138",
+   "account_id": "OP",
+   "date": "2026-07-22",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "18057.99",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00139",
+   "account_id": "OP",
+   "date": "2026-07-22",
+   "amount": "1878.76",
+   "direction": "debit",
+   "description": "SYSCO FOODS ACH DEBIT",
+   "balance": "16179.23",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00140",
+   "account_id": "OP",
+   "date": "2026-07-23",
+   "amount": "1838.65",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260723",
+   "balance": "18017.88",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00141",
+   "account_id": "OP",
+   "date": "2026-07-23",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "17567.88",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00142",
+   "account_id": "OP",
+   "date": "2026-07-24",
+   "amount": "1769.64",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260724",
+   "balance": "19337.52",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00143",
+   "account_id": "OP",
+   "date": "2026-07-24",
+   "amount": "4000.00",
+   "direction": "credit",
+   "description": "ACH CREDIT ACME DISTRIBUTING PPD ID 99887766",
+   "balance": "23337.52",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00144",
+   "account_id": "OP",
+   "date": "2026-07-24",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "22887.52",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00145",
+   "account_id": "OP",
+   "date": "2026-07-27",
+   "amount": "1738.20",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260727",
+   "balance": "24625.72",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00146",
+   "account_id": "OP",
+   "date": "2026-07-27",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "24175.72",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00147",
+   "account_id": "OP",
+   "date": "2026-07-27",
+   "amount": "171.28",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 6823",
+   "balance": "24004.44",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00148",
+   "account_id": "OP",
+   "date": "2026-07-28",
+   "amount": "1410.13",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260728",
+   "balance": "25414.57",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00149",
+   "account_id": "OP",
+   "date": "2026-07-28",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "24964.57",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00150",
+   "account_id": "SAV",
+   "date": "2026-07-28",
+   "amount": "2.10",
+   "direction": "credit",
+   "description": "INTEREST PAYMENT",
+   "balance": "35004.20",
+   "source_ref": "SAV-202607.pdf"
+  },
+  {
+   "txn_id": "T00151",
+   "account_id": "OP",
+   "date": "2026-07-29",
+   "amount": "1623.54",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260729",
+   "balance": "26588.11",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00152",
+   "account_id": "OP",
+   "date": "2026-07-29",
+   "amount": "40000.00",
+   "direction": "credit",
+   "description": "WIRE IN RAPIDFUND LLC REF 55512",
+   "balance": "66588.11",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00153",
+   "account_id": "OP",
+   "date": "2026-07-29",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "66138.11",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00154",
+   "account_id": "OP",
+   "date": "2026-07-29",
+   "amount": "1538.63",
+   "direction": "debit",
+   "description": "SYSCO FOODS ACH DEBIT",
+   "balance": "64599.48",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00155",
+   "account_id": "OP",
+   "date": "2026-07-29",
+   "amount": "114.18",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 3119",
+   "balance": "64485.30",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00156",
+   "account_id": "OP",
+   "date": "2026-07-30",
+   "amount": "1783.89",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260730",
+   "balance": "66269.19",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00157",
+   "account_id": "OP",
+   "date": "2026-07-30",
+   "amount": "450.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "65819.19",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00158",
+   "account_id": "OP",
+   "date": "2026-07-30",
+   "amount": "148.10",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 9134",
+   "balance": "65671.09",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00159",
+   "account_id": "OP",
+   "date": "2026-07-31",
+   "amount": "1352.80",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260731",
+   "balance": "67023.89",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00160",
+   "account_id": "OP",
+   "date": "2026-07-31",
+   "amount": "4000.00",
+   "direction": "credit",
+   "description": "ACH CREDIT ACME DISTRIBUTING PPD ID 99887766",
+   "balance": "71023.89",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00161",
+   "account_id": "OP",
+   "date": "2026-07-31",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "70498.89",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00162",
+   "account_id": "OP",
+   "date": "2026-07-31",
+   "amount": "151.61",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 5552",
+   "balance": "70347.28",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00163",
+   "account_id": "OP",
+   "date": "2026-07-31",
+   "amount": "5500.00",
+   "direction": "debit",
+   "description": "GUSTO PAYROLL ACH DEBIT",
+   "balance": "64847.28",
+   "source_ref": "OP-202607.pdf"
+  },
+  {
+   "txn_id": "T00164",
+   "account_id": "OP",
+   "date": "2026-08-03",
+   "amount": "1878.93",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260803",
+   "balance": "66726.21",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00165",
+   "account_id": "OP",
+   "date": "2026-08-03",
+   "amount": "589.73",
+   "direction": "credit",
+   "description": "MOBILE DEPOSIT",
+   "balance": "67315.94",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00166",
+   "account_id": "OP",
+   "date": "2026-08-03",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "66790.94",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00167",
+   "account_id": "OP",
+   "date": "2026-08-03",
+   "amount": "4500.00",
+   "direction": "debit",
+   "description": "ACH DEBIT OAKWOOD PROPERTY MGMT RENT",
+   "balance": "62290.94",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00168",
+   "account_id": "OP",
+   "date": "2026-08-04",
+   "amount": "1866.22",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260804",
+   "balance": "64157.16",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00169",
+   "account_id": "OP",
+   "date": "2026-08-04",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "63632.16",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00170",
+   "account_id": "OP",
+   "date": "2026-08-05",
+   "amount": "1762.94",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260805",
+   "balance": "65395.10",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00171",
+   "account_id": "OP",
+   "date": "2026-08-05",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "64870.10",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00172",
+   "account_id": "OP",
+   "date": "2026-08-05",
+   "amount": "1772.16",
+   "direction": "debit",
+   "description": "SYSCO FOODS ACH DEBIT",
+   "balance": "63097.94",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00173",
+   "account_id": "OP",
+   "date": "2026-08-06",
+   "amount": "1747.42",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260806",
+   "balance": "64845.36",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00174",
+   "account_id": "OP",
+   "date": "2026-08-06",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "64320.36",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00175",
+   "account_id": "OP",
+   "date": "2026-08-07",
+   "amount": "1451.22",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260807",
+   "balance": "65771.58",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00176",
+   "account_id": "OP",
+   "date": "2026-08-07",
+   "amount": "4000.00",
+   "direction": "credit",
+   "description": "ACH CREDIT ACME DISTRIBUTING PPD ID 99887766",
+   "balance": "69771.58",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00177",
+   "account_id": "OP",
+   "date": "2026-08-07",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "69246.58",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00178",
+   "account_id": "OP",
+   "date": "2026-08-07",
+   "amount": "77.74",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 3478",
+   "balance": "69168.84",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00179",
+   "account_id": "OP",
+   "date": "2026-08-10",
+   "amount": "1452.01",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260810",
+   "balance": "70620.85",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00180",
+   "account_id": "OP",
+   "date": "2026-08-10",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "70095.85",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00181",
+   "account_id": "OP",
+   "date": "2026-08-10",
+   "amount": "650.00",
+   "direction": "debit",
+   "description": "CITY ELECTRIC CO",
+   "balance": "69445.85",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00182",
+   "account_id": "OP",
+   "date": "2026-08-11",
+   "amount": "1307.90",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260811",
+   "balance": "70753.75",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00183",
+   "account_id": "OP",
+   "date": "2026-08-11",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "70228.75",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00184",
+   "account_id": "OP",
+   "date": "2026-08-12",
+   "amount": "1686.08",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260812",
+   "balance": "71914.83",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00185",
+   "account_id": "OP",
+   "date": "2026-08-12",
+   "amount": "25000.00",
+   "direction": "credit",
+   "description": "ACH CREDIT BLUEOAK ADV FUNDING",
+   "balance": "96914.83",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00186",
+   "account_id": "OP",
+   "date": "2026-08-12",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "96389.83",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00187",
+   "account_id": "OP",
+   "date": "2026-08-12",
+   "amount": "1619.50",
+   "direction": "debit",
+   "description": "SYSCO FOODS ACH DEBIT",
+   "balance": "94770.33",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00188",
+   "account_id": "OP",
+   "date": "2026-08-12",
+   "amount": "21.34",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 3386",
+   "balance": "94748.99",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00189",
+   "account_id": "OP",
+   "date": "2026-08-12",
+   "amount": "220.00",
+   "direction": "debit",
+   "description": "COMCAST BUSINESS",
+   "balance": "94528.99",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00190",
+   "account_id": "OP",
+   "date": "2026-08-13",
+   "amount": "1574.56",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260813",
+   "balance": "96103.55",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00191",
+   "account_id": "OP",
+   "date": "2026-08-13",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "95578.55",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00192",
+   "account_id": "OP",
+   "date": "2026-08-13",
+   "amount": "98000.00",
+   "direction": "debit",
+   "description": "CHECK 1043",
+   "balance": "-2421.45",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00193",
+   "account_id": "OP",
+   "date": "2026-08-14",
+   "amount": "1699.64",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260814",
+   "balance": "-721.81",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00194",
+   "account_id": "OP",
+   "date": "2026-08-14",
+   "amount": "4000.00",
+   "direction": "credit",
+   "description": "ACH CREDIT ACME DISTRIBUTING PPD ID 99887766",
+   "balance": "3278.19",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00195",
+   "account_id": "OP",
+   "date": "2026-08-14",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "2753.19",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00196",
+   "account_id": "OP",
+   "date": "2026-08-14",
+   "amount": "5500.00",
+   "direction": "debit",
+   "description": "GUSTO PAYROLL ACH DEBIT",
+   "balance": "-2746.81",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00197",
+   "account_id": "OP",
+   "date": "2026-08-14",
+   "amount": "35.00",
+   "direction": "debit",
+   "description": "OVERDRAFT FEE",
+   "balance": "-2781.81",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00198",
+   "account_id": "OP",
+   "date": "2026-08-15",
+   "amount": "380.00",
+   "direction": "debit",
+   "description": "NEXT INSURANCE PREM",
+   "balance": "-3161.81",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00199",
+   "account_id": "OP",
+   "date": "2026-08-17",
+   "amount": "1382.24",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260817",
+   "balance": "-1779.57",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00200",
+   "account_id": "OP",
+   "date": "2026-08-17",
+   "amount": "952.52",
+   "direction": "credit",
+   "description": "MOBILE DEPOSIT",
+   "balance": "-827.05",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00201",
+   "account_id": "OP",
+   "date": "2026-08-17",
+   "amount": "5500.00",
+   "direction": "credit",
+   "description": "GUSTO PAYROLL RETURN R01",
+   "balance": "4672.95",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00202",
+   "account_id": "OP",
+   "date": "2026-08-17",
+   "amount": "15000.00",
+   "direction": "credit",
+   "description": "ONLINE TRANSFER FROM SAV XXXXXX5678",
+   "balance": "19672.95",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00203",
+   "account_id": "OP",
+   "date": "2026-08-17",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "19147.95",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00204",
+   "account_id": "OP",
+   "date": "2026-08-17",
+   "amount": "1200.00",
+   "direction": "debit",
+   "description": "BLUEOAK ADV ACH DEBIT",
+   "balance": "17947.95",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00205",
+   "account_id": "OP",
+   "date": "2026-08-17",
+   "amount": "35.00",
+   "direction": "debit",
+   "description": "NSF RETURNED ITEM FEE",
+   "balance": "17912.95",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00206",
+   "account_id": "SAV",
+   "date": "2026-08-17",
+   "amount": "15000.00",
+   "direction": "debit",
+   "description": "ONLINE TRANSFER TO CHK XXXXXX1234",
+   "balance": "20004.20",
+   "source_ref": "SAV-202608.pdf"
+  },
+  {
+   "txn_id": "T00207",
+   "account_id": "OP",
+   "date": "2026-08-18",
+   "amount": "1704.74",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260818",
+   "balance": "19617.69",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00208",
+   "account_id": "OP",
+   "date": "2026-08-18",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "19092.69",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00209",
+   "account_id": "OP",
+   "date": "2026-08-18",
+   "amount": "5500.00",
+   "direction": "debit",
+   "description": "GUSTO PAYROLL ACH DEBIT",
+   "balance": "13592.69",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00210",
+   "account_id": "OP",
+   "date": "2026-08-19",
+   "amount": "1784.82",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260819",
+   "balance": "15377.51",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00211",
+   "account_id": "OP",
+   "date": "2026-08-19",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "14852.51",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00212",
+   "account_id": "OP",
+   "date": "2026-08-19",
+   "amount": "1535.38",
+   "direction": "debit",
+   "description": "SYSCO FOODS ACH DEBIT",
+   "balance": "13317.13",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00213",
+   "account_id": "OP",
+   "date": "2026-08-20",
+   "amount": "1870.80",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260820",
+   "balance": "15187.93",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00214",
+   "account_id": "OP",
+   "date": "2026-08-20",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "14662.93",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00215",
+   "account_id": "OP",
+   "date": "2026-08-20",
+   "amount": "2000.00",
+   "direction": "debit",
+   "description": "ZELLE TO JANE DOE",
+   "balance": "12662.93",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00216",
+   "account_id": "OP",
+   "date": "2026-08-21",
+   "amount": "1873.12",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260821",
+   "balance": "14536.05",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00217",
+   "account_id": "OP",
+   "date": "2026-08-21",
+   "amount": "4000.00",
+   "direction": "credit",
+   "description": "ACH CREDIT ACME DISTRIBUTING PPD ID 99887766",
+   "balance": "18536.05",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00218",
+   "account_id": "OP",
+   "date": "2026-08-21",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "18011.05",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00219",
+   "account_id": "OP",
+   "date": "2026-08-21",
+   "amount": "3000.00",
+   "direction": "debit",
+   "description": "AMEX EPAYMENT",
+   "balance": "15011.05",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00220",
+   "account_id": "OP",
+   "date": "2026-08-24",
+   "amount": "1666.52",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260824",
+   "balance": "16677.57",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00221",
+   "account_id": "OP",
+   "date": "2026-08-24",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "16152.57",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00222",
+   "account_id": "OP",
+   "date": "2026-08-24",
+   "amount": "1200.00",
+   "direction": "debit",
+   "description": "BLUEOAK ADV ACH DEBIT",
+   "balance": "14952.57",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00223",
+   "account_id": "OP",
+   "date": "2026-08-25",
+   "amount": "1561.47",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260825",
+   "balance": "16514.04",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00224",
+   "account_id": "OP",
+   "date": "2026-08-25",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "15989.04",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00225",
+   "account_id": "OP",
+   "date": "2026-08-26",
+   "amount": "1615.57",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260826",
+   "balance": "17604.61",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00226",
+   "account_id": "OP",
+   "date": "2026-08-26",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "17079.61",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00227",
+   "account_id": "OP",
+   "date": "2026-08-26",
+   "amount": "1915.68",
+   "direction": "debit",
+   "description": "SYSCO FOODS ACH DEBIT",
+   "balance": "15163.93",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00228",
+   "account_id": "OP",
+   "date": "2026-08-27",
+   "amount": "1424.91",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260827",
+   "balance": "16588.84",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00229",
+   "account_id": "OP",
+   "date": "2026-08-27",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "16063.84",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00230",
+   "account_id": "OP",
+   "date": "2026-08-27",
+   "amount": "88.40",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 8219",
+   "balance": "15975.44",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00231",
+   "account_id": "OP",
+   "date": "2026-08-28",
+   "amount": "1406.36",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260828",
+   "balance": "17381.80",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00232",
+   "account_id": "OP",
+   "date": "2026-08-28",
+   "amount": "4000.00",
+   "direction": "credit",
+   "description": "ACH CREDIT ACME DISTRIBUTING PPD ID 99887766",
+   "balance": "21381.80",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00233",
+   "account_id": "OP",
+   "date": "2026-08-28",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "20856.80",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00234",
+   "account_id": "OP",
+   "date": "2026-08-28",
+   "amount": "216.84",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 1861",
+   "balance": "20639.96",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00235",
+   "account_id": "OP",
+   "date": "2026-08-28",
+   "amount": "5500.00",
+   "direction": "debit",
+   "description": "GUSTO PAYROLL ACH DEBIT",
+   "balance": "15139.96",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00236",
+   "account_id": "SAV",
+   "date": "2026-08-28",
+   "amount": "2.10",
+   "direction": "credit",
+   "description": "INTEREST PAYMENT",
+   "balance": "20006.30",
+   "source_ref": "SAV-202608.pdf"
+  },
+  {
+   "txn_id": "T00237",
+   "account_id": "OP",
+   "date": "2026-08-31",
+   "amount": "1367.09",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260831",
+   "balance": "16507.05",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00238",
+   "account_id": "OP",
+   "date": "2026-08-31",
+   "amount": "500.15",
+   "direction": "credit",
+   "description": "MOBILE DEPOSIT",
+   "balance": "17007.20",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00239",
+   "account_id": "OP",
+   "date": "2026-08-31",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "16482.20",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00240",
+   "account_id": "OP",
+   "date": "2026-08-31",
+   "amount": "1200.00",
+   "direction": "debit",
+   "description": "BLUEOAK ADV ACH DEBIT",
+   "balance": "15282.20",
+   "source_ref": "OP-202608.pdf"
+  },
+  {
+   "txn_id": "T00241",
+   "account_id": "OP",
+   "date": "2026-09-01",
+   "amount": "1651.67",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260901",
+   "balance": "16933.87",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00242",
+   "account_id": "OP",
+   "date": "2026-09-01",
+   "amount": "30000.00",
+   "direction": "credit",
+   "description": "WIRE IN ORIG JKL HOLDINGS REF 777",
+   "balance": "46933.87",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00243",
+   "account_id": "OP",
+   "date": "2026-09-01",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "46408.87",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00244",
+   "account_id": "OP",
+   "date": "2026-09-01",
+   "amount": "139.14",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 1417",
+   "balance": "46269.73",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00245",
+   "account_id": "OP",
+   "date": "2026-09-01",
+   "amount": "4500.00",
+   "direction": "debit",
+   "description": "ACH DEBIT OAKWOOD PROPERTY MGMT RENT",
+   "balance": "41769.73",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00246",
+   "account_id": "OP",
+   "date": "2026-09-02",
+   "amount": "1346.08",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260902",
+   "balance": "43115.81",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00247",
+   "account_id": "OP",
+   "date": "2026-09-02",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "42590.81",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00248",
+   "account_id": "OP",
+   "date": "2026-09-02",
+   "amount": "2073.00",
+   "direction": "debit",
+   "description": "SYSCO FOODS ACH DEBIT",
+   "balance": "40517.81",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00249",
+   "account_id": "OP",
+   "date": "2026-09-02",
+   "amount": "143.28",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 3433",
+   "balance": "40374.53",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00250",
+   "account_id": "OP",
+   "date": "2026-09-03",
+   "amount": "1715.76",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260903",
+   "balance": "42090.29",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00251",
+   "account_id": "OP",
+   "date": "2026-09-03",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "41565.29",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00252",
+   "account_id": "OP",
+   "date": "2026-09-03",
+   "amount": "900.00",
+   "direction": "debit",
+   "description": "CFG MERCHANT SOLUTIONS ACH DEBIT",
+   "balance": "40665.29",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00253",
+   "account_id": "OP",
+   "date": "2026-09-03",
+   "amount": "133.83",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 6966",
+   "balance": "40531.46",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00254",
+   "account_id": "OP",
+   "date": "2026-09-04",
+   "amount": "1610.73",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260904",
+   "balance": "42142.19",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00255",
+   "account_id": "OP",
+   "date": "2026-09-04",
+   "amount": "4000.00",
+   "direction": "credit",
+   "description": "ACH CREDIT ACME DISTRIBUTING PPD ID 99887766",
+   "balance": "46142.19",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00256",
+   "account_id": "OP",
+   "date": "2026-09-04",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "45617.19",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00257",
+   "account_id": "OP",
+   "date": "2026-09-04",
+   "amount": "298.17",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 8996",
+   "balance": "45319.02",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00258",
+   "account_id": "OP",
+   "date": "2026-09-08",
+   "amount": "1605.39",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260908",
+   "balance": "46924.41",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00259",
+   "account_id": "OP",
+   "date": "2026-09-08",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "46399.41",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00260",
+   "account_id": "OP",
+   "date": "2026-09-09",
+   "amount": "1504.37",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260909",
+   "balance": "47903.78",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00261",
+   "account_id": "OP",
+   "date": "2026-09-09",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "47378.78",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00262",
+   "account_id": "OP",
+   "date": "2026-09-09",
+   "amount": "1556.28",
+   "direction": "debit",
+   "description": "SYSCO FOODS ACH DEBIT",
+   "balance": "45822.50",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00263",
+   "account_id": "OP",
+   "date": "2026-09-09",
+   "amount": "265.65",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 6613",
+   "balance": "45556.85",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00264",
+   "account_id": "OP",
+   "date": "2026-09-10",
+   "amount": "1785.19",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260910",
+   "balance": "47342.04",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00265",
+   "account_id": "OP",
+   "date": "2026-09-10",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "46817.04",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00266",
+   "account_id": "OP",
+   "date": "2026-09-10",
+   "amount": "900.00",
+   "direction": "debit",
+   "description": "CFG MERCHANT SOLUTIONS ACH DEBIT",
+   "balance": "45917.04",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00267",
+   "account_id": "OP",
+   "date": "2026-09-10",
+   "amount": "291.59",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 3645",
+   "balance": "45625.45",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00268",
+   "account_id": "OP",
+   "date": "2026-09-10",
+   "amount": "650.00",
+   "direction": "debit",
+   "description": "CITY ELECTRIC CO",
+   "balance": "44975.45",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00269",
+   "account_id": "OP",
+   "date": "2026-09-11",
+   "amount": "1638.38",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260911",
+   "balance": "46613.83",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00270",
+   "account_id": "OP",
+   "date": "2026-09-11",
+   "amount": "4000.00",
+   "direction": "credit",
+   "description": "ACH CREDIT ACME DISTRIBUTING PPD ID 99887766",
+   "balance": "50613.83",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00271",
+   "account_id": "OP",
+   "date": "2026-09-11",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "50088.83",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00272",
+   "account_id": "OP",
+   "date": "2026-09-11",
+   "amount": "193.09",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 6926",
+   "balance": "49895.74",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00273",
+   "account_id": "OP",
+   "date": "2026-09-11",
+   "amount": "5500.00",
+   "direction": "debit",
+   "description": "GUSTO PAYROLL ACH DEBIT",
+   "balance": "44395.74",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00274",
+   "account_id": "OP",
+   "date": "2026-09-12",
+   "amount": "220.00",
+   "direction": "debit",
+   "description": "COMCAST BUSINESS",
+   "balance": "44175.74",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00275",
+   "account_id": "OP",
+   "date": "2026-09-14",
+   "amount": "1396.07",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260914",
+   "balance": "45571.81",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00276",
+   "account_id": "OP",
+   "date": "2026-09-14",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "45046.81",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00277",
+   "account_id": "OP",
+   "date": "2026-09-14",
+   "amount": "1200.00",
+   "direction": "debit",
+   "description": "BLUEOAK ADV ACH DEBIT",
+   "balance": "43846.81",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00278",
+   "account_id": "OP",
+   "date": "2026-09-15",
+   "amount": "1899.09",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260915",
+   "balance": "45745.90",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00279",
+   "account_id": "OP",
+   "date": "2026-09-15",
+   "amount": "517.72",
+   "direction": "credit",
+   "description": "MOBILE DEPOSIT",
+   "balance": "46263.62",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00280",
+   "account_id": "OP",
+   "date": "2026-09-15",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "45738.62",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00281",
+   "account_id": "OP",
+   "date": "2026-09-15",
+   "amount": "380.00",
+   "direction": "debit",
+   "description": "NEXT INSURANCE PREM",
+   "balance": "45358.62",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00282",
+   "account_id": "OP",
+   "date": "2026-09-15",
+   "amount": "2100.00",
+   "direction": "debit",
+   "description": "IRS USATAXPYMT",
+   "balance": "43258.62",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00283",
+   "account_id": "OP",
+   "date": "2026-09-16",
+   "amount": "1495.35",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260916",
+   "balance": "44753.97",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00284",
+   "account_id": "OP",
+   "date": "2026-09-16",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "44228.97",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00285",
+   "account_id": "OP",
+   "date": "2026-09-16",
+   "amount": "1921.34",
+   "direction": "debit",
+   "description": "SYSCO FOODS ACH DEBIT",
+   "balance": "42307.63",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00286",
+   "account_id": "OP",
+   "date": "2026-09-17",
+   "amount": "1756.25",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260917",
+   "balance": "44063.88",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00287",
+   "account_id": "OP",
+   "date": "2026-09-17",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "43538.88",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00288",
+   "account_id": "OP",
+   "date": "2026-09-17",
+   "amount": "900.00",
+   "direction": "debit",
+   "description": "CFG MERCHANT SOLUTIONS ACH DEBIT",
+   "balance": "42638.88",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00289",
+   "account_id": "OP",
+   "date": "2026-09-18",
+   "amount": "1639.73",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260918",
+   "balance": "44278.61",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00290",
+   "account_id": "OP",
+   "date": "2026-09-18",
+   "amount": "4000.00",
+   "direction": "credit",
+   "description": "ACH CREDIT ACME DISTRIBUTING PPD ID 99887766",
+   "balance": "48278.61",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00291",
+   "account_id": "OP",
+   "date": "2026-09-18",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "47753.61",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00292",
+   "account_id": "OP",
+   "date": "2026-09-20",
+   "amount": "2000.00",
+   "direction": "debit",
+   "description": "ZELLE TO JANE DOE",
+   "balance": "45753.61",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00293",
+   "account_id": "OP",
+   "date": "2026-09-21",
+   "amount": "1409.47",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260921",
+   "balance": "47163.08",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00294",
+   "account_id": "OP",
+   "date": "2026-09-21",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "46638.08",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00295",
+   "account_id": "OP",
+   "date": "2026-09-21",
+   "amount": "1200.00",
+   "direction": "debit",
+   "description": "BLUEOAK ADV ACH DEBIT",
+   "balance": "45438.08",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00296",
+   "account_id": "OP",
+   "date": "2026-09-21",
+   "amount": "3000.00",
+   "direction": "debit",
+   "description": "AMEX EPAYMENT",
+   "balance": "42438.08",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00297",
+   "account_id": "OP",
+   "date": "2026-09-22",
+   "amount": "1446.00",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260922",
+   "balance": "43884.08",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00298",
+   "account_id": "OP",
+   "date": "2026-09-22",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "43359.08",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00299",
+   "account_id": "OP",
+   "date": "2026-09-23",
+   "amount": "1810.56",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260923",
+   "balance": "45169.64",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00300",
+   "account_id": "OP",
+   "date": "2026-09-23",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "44644.64",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00301",
+   "account_id": "OP",
+   "date": "2026-09-23",
+   "amount": "1829.44",
+   "direction": "debit",
+   "description": "SYSCO FOODS ACH DEBIT",
+   "balance": "42815.20",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00302",
+   "account_id": "OP",
+   "date": "2026-09-23",
+   "amount": "93.08",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 4197",
+   "balance": "42722.12",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00303",
+   "account_id": "OP",
+   "date": "2026-09-24",
+   "amount": "1828.27",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260924",
+   "balance": "44550.39",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00304",
+   "account_id": "OP",
+   "date": "2026-09-24",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "44025.39",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00305",
+   "account_id": "OP",
+   "date": "2026-09-24",
+   "amount": "900.00",
+   "direction": "debit",
+   "description": "CFG MERCHANT SOLUTIONS ACH DEBIT",
+   "balance": "43125.39",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00306",
+   "account_id": "OP",
+   "date": "2026-09-24",
+   "amount": "151.29",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 4714",
+   "balance": "42974.10",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00307",
+   "account_id": "OP",
+   "date": "2026-09-25",
+   "amount": "1431.01",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260925",
+   "balance": "44405.11",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00308",
+   "account_id": "OP",
+   "date": "2026-09-25",
+   "amount": "4000.00",
+   "direction": "credit",
+   "description": "ACH CREDIT ACME DISTRIBUTING PPD ID 99887766",
+   "balance": "48405.11",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00309",
+   "account_id": "OP",
+   "date": "2026-09-25",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "47880.11",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00310",
+   "account_id": "OP",
+   "date": "2026-09-25",
+   "amount": "5500.00",
+   "direction": "debit",
+   "description": "GUSTO PAYROLL ACH DEBIT",
+   "balance": "42380.11",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00311",
+   "account_id": "OP",
+   "date": "2026-09-28",
+   "amount": "1533.02",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260928",
+   "balance": "43913.13",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00312",
+   "account_id": "OP",
+   "date": "2026-09-28",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "43388.13",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00313",
+   "account_id": "OP",
+   "date": "2026-09-28",
+   "amount": "1200.00",
+   "direction": "debit",
+   "description": "BLUEOAK ADV ACH DEBIT",
+   "balance": "42188.13",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00314",
+   "account_id": "SAV",
+   "date": "2026-09-28",
+   "amount": "2.10",
+   "direction": "credit",
+   "description": "INTEREST PAYMENT",
+   "balance": "20008.40",
+   "source_ref": "SAV-202609.pdf"
+  },
+  {
+   "txn_id": "T00315",
+   "account_id": "OP",
+   "date": "2026-09-29",
+   "amount": "1318.30",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260929",
+   "balance": "43506.43",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00316",
+   "account_id": "OP",
+   "date": "2026-09-29",
+   "amount": "1017.80",
+   "direction": "credit",
+   "description": "MOBILE DEPOSIT",
+   "balance": "44524.23",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00317",
+   "account_id": "OP",
+   "date": "2026-09-29",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "43999.23",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00318",
+   "account_id": "OP",
+   "date": "2026-09-29",
+   "amount": "104.92",
+   "direction": "debit",
+   "description": "POS PURCHASE HOME DEPOT 4172",
+   "balance": "43894.31",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00319",
+   "account_id": "OP",
+   "date": "2026-09-30",
+   "amount": "1753.85",
+   "direction": "credit",
+   "description": "SQUARE INC DEP 260930",
+   "balance": "45648.16",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00320",
+   "account_id": "OP",
+   "date": "2026-09-30",
+   "amount": "525.00",
+   "direction": "debit",
+   "description": "RAPIDFUND LLC ACH DEBIT 0001234",
+   "balance": "45123.16",
+   "source_ref": "OP-202609.pdf"
+  },
+  {
+   "txn_id": "T00321",
+   "account_id": "OP",
+   "date": "2026-09-30",
+   "amount": "1896.58",
+   "direction": "debit",
+   "description": "SYSCO FOODS ACH DEBIT",
+   "balance": "43226.58",
+   "source_ref": "OP-202609.pdf"
+  }
+ ]
+}
