@@ -2,3 +2,4 @@
 tests/.build/
 mac_ocr
 __pycache__/
+.venv/
