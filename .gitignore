@@ -3,3 +3,5 @@ tests/.build/
 mac_ocr
 __pycache__/
 .venv/
+*.jsonl
+.exparsed-hooked.html
