@@ -13,6 +13,7 @@
 // and the extractor groups text into rows by height on the page).
 import Foundation
 import Vision
+import CoreML
 import AppKit
 import PDFKit
 
@@ -44,7 +45,14 @@ func pass(_ cg: CGImage, _ roi: CGRect) throws -> [Obs] {
     req.usesLanguageCorrection = false        // account numbers and amounts are not words
     req.recognitionLanguages = ["en-US", "es-ES"]
     req.regionOfInterest = roi
-    try VNImageRequestHandler(cgImage: cg, options: [:]).perform([req])
+    do { try VNImageRequestHandler(cgImage: cg, options: [:]).perform([req]) }
+    catch {
+        // The Neural Engine sometimes refuses a request (e5rtError ... 13), e.g. after sleep or
+        // while another app holds it. Read the same region again on the CPU: slower, same text.
+        guard let cpu = (try? req.supportedComputeStageDevices)?[.main]?.first(where: { if case .cpu = $0 { return true }; return false }) else { throw error }
+        req.setComputeDevice(cpu, for: .main)
+        try VNImageRequestHandler(cgImage: cg, options: [:]).perform([req])
+    }
     func q(_ r: VNRectangleObservation) -> Quad {
         var b = quad(r, Double(roi.width) * W, Double(roi.height) * H)
         b.cx += Double(roi.minX) * W; b.cy += Double(roi.minY) * H

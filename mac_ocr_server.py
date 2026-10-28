@@ -91,7 +91,15 @@ class Worker:
                     self.proc.stdin.flush()
                     line = self.proc.stdout.readline()
                     if line:
-                        return json.loads(line)
+                        result = json.loads(line)
+                        if "error" in result and attempt == 0:
+                            # A helper whose Vision session went bad keeps failing; a new one
+                            # starts clean. Retry the request once in a fresh helper.
+                            print(f"[ocr]  helper error, restarting: {result['error']}", flush=True)
+                            self.proc.kill()
+                            self.proc = None
+                            continue
+                        return result
                 except (BrokenPipeError, ValueError):
                     pass
                 self.proc = None
