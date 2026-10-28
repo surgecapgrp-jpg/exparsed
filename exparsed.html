@@ -3545,8 +3545,8 @@
         // OCR, or another document) so non-statements are not counted as reader failures.
         var U={ cls:'unparsed', rows:[], checks:[], status:'unparsed', period:null, account:null, error:err, unclaimed:(ocrUnread&&ocrUnread.length?ocrUnread:textUnread)||[] };
         if(f.type==='pdf' && !err){ try{ var D=lgDocKind(f); if(D){ U.status=D.status; if(D.kind) U.docKind=D.kind; U.note=(D.status==='not-statement'?'not a bank statement ('+D.kind+'): ':D.status==='needs-ocr'?'needs OCR: ':'statement layout not read: ')+D.why; } }catch(e){} }
-        // a picture, or a PDF pdf.js could not open, has no text until OCR reads it
-        if(!f.ocrPages && !f.ocrMarkdown && (f.pdfOpenFailed || f.type==='image')){ U.status='needs-ocr'; U.note='needs OCR: '+(f.pdfOpenFailed?'pdf.js cannot open this PDF ('+f.pdfOpenFailed+'); Mac OCR reads it with PDFKit':(f.misnamed||'an image')+', with no text layer'); }
+        var noText=lgOcrNeedWhy(f);
+        if(noText){ U.status='needs-ocr'; U.note='needs OCR: '+noText; }
         return U;
       }
       return L;
@@ -3588,26 +3588,40 @@
     var LG_DOC_ROW=new RegExp('^\\s*(?:\\d{6,}\\s+)?(\\d{1,2}[\\/-]\\d{1,2}([\\/-]\\d{2,4})?|('+LG_MON_EN+')[a-z]*\\.? \\d{1,2}(, \\d{4})?)\\b','i');
     // A dated row: a line starting with a date, with an amount on it or on one of the next 7 lines.
     function lgDocRows(lines){ var n=0; for(var i=0;i<lines.length;i++) if(LG_DOC_ROW.test(lines[i]) || (LG_MON_ALONE_RE.test(lines[i]) && /^\s*\d{1,2}\s*$/.test(lines[i+1]||''))){ for(var j=i;j<Math.min(lines.length,i+8);j++) if(/\d\.\d{2}\b|^\s*-\d[\d,]*\s*$/.test(lines[j])){ n++; break; } } return n; }
-    function lgDocKind(f){
-      var pages=(f.ocrPages&&f.ocrPages.length)?f.ocrPages:(f.pages||[]);
-      var texts=pages.map(function(p){ return (p.lines||[]).map(function(l){ return l.text; }); });
-      if(f.ocrMarkdown && !(f.ocrPages&&f.ocrPages.length)) texts=[String(f.ocrMarkdown).split('\n')];
-      if(!texts.length) return null;
+    // Why a file needs OCR before its ledger can be read, or null. The only definition: lgDocKind and
+    // lgBuild give it as the ledger's needs-ocr note, and fileOcrNeed offers OCR when the ledger says
+    // needs-ocr. texts: the lines of each page (lgDocKind has them); without them only the
+    // no-text-at-all cases are checked.
+    function lgOcrNeedWhy(f, texts){
+      // a picture, or a PDF pdf.js could not open, has no text until OCR reads it
+      if(!f.ocrPages && !f.ocrMarkdown && (f.pdfOpenFailed || f.type==='image'))
+        return f.pdfOpenFailed ? 'pdf.js cannot open this PDF ('+f.pdfOpenFailed+'); Mac OCR reads it with PDFKit' : (f.misnamed||'an image')+', with no text layer';
+      if(!texts || !texts.length) return null;
       // a page "has text" when it carries more than a running header: 8+ lines or 300+ characters
       // (an online printout can keep its title as text and its table as an image); a one-page file
       // needs only some text
       var withText=texts.filter(function(t){ var n=t.join('').replace(/\s/g,'').length; return n>30 && (texts.length<2 || t.length>=8 || n>=300); }).length;
       // (one account split out of a statement keeps every page, most of them holding only the other
       // accounts' lines: the whole file's text layer was already checked before the split)
-      if(withText*2<texts.length && !f.splitFrom) return { status:'needs-ocr', why:(texts.length-withText)+' of '+texts.length+' page(s) have no text layer or only a header' };
+      if(withText*2<texts.length && !f.splitFrom) return (texts.length-withText)+' of '+texts.length+' page(s) have no text layer or only a header';
+      var ocrRead=!!(f.ocrPages&&f.ocrPages.length);
       // a text layer whose font map is broken reads as symbols (see suspectPages)
       var broken=brokenTextLevel(f, texts.length);
-      if(!(f.ocrPages&&f.ocrPages.length) && (broken==='whole' || broken==='most')) return { status:'needs-ocr', why:(broken==='whole'?'the text layer':(f.suspectPages.length+' of '+texts.length+' page(s)'))+' does not read as words (broken font map)' };
-      var all=texts.map(function(t){ return t.join('\n'); }), text=all.join('\n'), head=all.slice(0,3).join('\n'), p1=all[0]||'';
+      if(!ocrRead && (broken==='whole' || broken==='most')) return (broken==='whole'?'the text layer':(f.suspectPages.length+' of '+texts.length+' page(s)'))+' does not read as words (broken font map)';
       // digits the font map scrambles too ("1',500.00", "$8.,634.46)" -- Bank of America eStatements
       // whose letters also read "B'nk o- A e™ic'"): the figures cannot be trusted, OCR reads the page
-      var garbled=(text.match(/\d',\d{3}\.\d\d|'\d{1,3},\d{3}\.\d\d|\.,\d{3}\.\d\d|\d'\d,\d{3}\.\d\d/g)||[]).length;
-      if(!(f.ocrPages&&f.ocrPages.length) && garbled>=5) return { status:'needs-ocr', why:garbled+' figures with scrambled digits in the text layer (broken font map)' };
+      var garbled=(texts.map(function(t){ return t.join('\n'); }).join('\n').match(/\d',\d{3}\.\d\d|'\d{1,3},\d{3}\.\d\d|\.,\d{3}\.\d\d|\d'\d,\d{3}\.\d\d/g)||[]).length;
+      if(!ocrRead && garbled>=5) return garbled+' figures with scrambled digits in the text layer (broken font map)';
+      return null;
+    }
+    function lgDocKind(f){
+      var pages=(f.ocrPages&&f.ocrPages.length)?f.ocrPages:(f.pages||[]);
+      var texts=pages.map(function(p){ return (p.lines||[]).map(function(l){ return l.text; }); });
+      if(f.ocrMarkdown && !(f.ocrPages&&f.ocrPages.length)) texts=[String(f.ocrMarkdown).split('\n')];
+      if(!texts.length) return null;
+      var ocrWhy=lgOcrNeedWhy(f, texts);
+      if(ocrWhy) return { status:'needs-ocr', why:ocrWhy };
+      var all=texts.map(function(t){ return t.join('\n'); }), text=all.join('\n'), head=all.slice(0,3).join('\n'), p1=all[0]||'';
       if(texts.some(function(t,i){ return LG_DOC_BEG.test(all[i]) && LG_DOC_END.test(all[i]) && lgDocRows(t)>=3; })) return { status:'unparsed', why:'a page has a beginning balance, an ending balance and dated rows' };
       function count(re,s){ re.lastIndex=0; return (s.match(re)||[]).length; }
       var nRows=lgDocRows([].concat.apply([],texts));
@@ -5067,18 +5081,19 @@
     }
     // One decision for the file list, the status dot, the output pane and the auto-OCR queue.
     //   state:  reading | read-error | ocring | queued | ocr-done | ocr-failed | damaged | image |
-    //           scanned | image-pages-verified | scanned-pages | broken-text | broken-pages | readable
+    //           scanned | image-pages-verified | scanned-pages | broken-text | broken-pages |
+    //           unreadable-text (the ledger says needs-ocr: lgOcrNeedWhy) | readable
     //   button: the OCR button label for that state, or null when OCR is not offered
     //   dot:    busy | err | warn | ok, read from the state (red: nothing usable until OCR runs;
     //           amber: part of the file is unread; green: readable as it stands)
     //   autoOcr: the batch queue sends this file to OCR on its own (nothing readable without OCR)
     //   brokenBanner: the output pane shows the raw text under a "text layer broken" warning
-    // The ledger is read only for a partly scanned or partly unreadable file, the two states
-    // where a reconciling text layer means OCR is not needed.
+    // The ledger is read for a partly scanned or partly unreadable file (a reconciling text layer
+    // means OCR is not needed) and for a file every earlier check calls readable.
     var OCR_NEED_DOT={ reading:'busy', 'read-error':'err', ocring:'busy', queued:'busy', 'ocr-done':'ok', 'ocr-failed':'err',
       damaged:'err', image:'err', scanned:'err', 'image-pages-verified':'ok', 'scanned-pages':'warn',
-      'broken-text':'err', 'broken-pages':'warn', readable:'ok' };
-    var OCR_NEED_AUTO={ damaged:1, image:1, scanned:1, 'broken-text':1 };
+      'broken-text':'err', 'broken-pages':'warn', 'unreadable-text':'err', readable:'ok' };
+    var OCR_NEED_AUTO={ damaged:1, image:1, scanned:1, 'broken-text':1, 'unreadable-text':1 };
     function fileOcrNeed(f){
       var verified=function(){ return lgFileLedger(f).status==='verified'; };
       var allScanned=f.scanned>0 && f.scanned===f.pages.length;
@@ -5097,6 +5112,8 @@
       else if(f.scanned>0){ state='scanned-pages'; button='OCR full doc'; }
       else if(broken==='whole'){ state='broken-text'; button='Run OCR'; }
       else if(broken!=='none' && !verified()){ state='broken-pages'; button='OCR full doc'; }
+      // header-only pages, scrambled figures: the ledger cannot be read without OCR
+      else if(lgFileLedger(f).status==='needs-ocr'){ state='unreadable-text'; button='Run OCR'; }
       else state='readable';
       return { state:state, button:button, dot:OCR_NEED_DOT[state],
         autoOcr: !f.removed && f.status==='done' && !!OCR_NEED_AUTO[state],
@@ -5386,6 +5403,19 @@
         }catch(_){}
         return { status:response.status, short:short, errType:errType, full:'HTTP '+response.status+' '+(response.statusText||'')+'\n\n'+text };
       });
+    }
+    // Stores a successful OCR result r on record f (provider: its label). Returns one child content per
+    // account when Mac OCR's pages hold several accounts (split the same way a text layer is), else null.
+    function ocrApply(f, r, provider){
+      f.ocrMarkdown=r.text; f.ocrPages=r.pages||null; f.ocrSecs=r.secs; f.ocrUsage=r.usage||null;
+      f.ocrStatus='done'; f.ocrProvider=provider;
+      if(r.truncated){
+        f.ocrStatus='error: output truncated at max output length';
+        f.ocrErrorFull='['+provider+'] Output hit the model\'s max-output ceiling. Partial transcript preserved (still shown below). The document is longer than one response can hold -- split the PDF or try a smaller batch.';
+        return null;
+      }
+      if(!r.pages || !f._content || f.splitFrom || f.removed) return null;
+      return lgAccountChildren(f._content, f.name, r.pages, { ocrStatus:'done', ocrProvider:provider, ocrSecs:r.secs, ocrUsage:r.usage||null });
     }
     // help: optional function giving start instructions, appended to the diagnostic.
     function macHttpPort(base, signal, help){
@@ -6151,17 +6181,8 @@
       return def.run(f).then(function(r){
         if(!r || r.cancelled) return r;
         if(r.ok){
-          f.ocrMarkdown=r.text; f.ocrPages=r.pages||null; f.ocrSecs=r.secs; f.ocrUsage=r.usage||null;
-          f.ocrStatus='done'; f.ocrProvider=def.label;
-          if(r.truncated){
-            f.ocrStatus='error: output truncated at max output length';
-            f.ocrErrorFull='['+def.label+'] Output hit the model\'s max-output ceiling. Partial transcript preserved (still shown below). The document is longer than one response can hold -- split the PDF or try a smaller batch.';
-          }
-          // a scan holding several accounts: Mac OCR's pages split the same way a text layer does
-          if(f.ocrStatus==='done' && r.pages && f._content && !f.splitFrom && !f.removed){
-            var kids=lgAccountChildren(f._content, f.name, r.pages, { ocrStatus:'done', ocrProvider:def.label, ocrSecs:r.secs, ocrUsage:r.usage||null });
-            if(kids){ f.children=kids; expandChildren(f); }
-          }
+          var kids=ocrApply(f, r, def.label);
+          if(kids){ f.children=kids; expandChildren(f); }
         } else {
           f.ocrStatus='error: '+r.message.slice(0,110);
           f.ocrErrorFull=def.label+': '+r.message+(r.fullDiagnostic?'\n\n'+r.fullDiagnostic:'');

@@ -114,17 +114,7 @@ async function readOne([name, b64, ocr, macUrl]) {
           via: "ocr",
         },
       ];
-    const ocrFields = {
-      ocrStatus: "done",
-      ocrProvider: "Mac OCR",
-      ocrSecs: r.secs,
-    };
-    Object.assign(
-      rec,
-      { ocrMarkdown: r.text, ocrPages: r.pages || null },
-      ocrFields,
-    );
-    const kids = r.pages && lgAccountChildren(c, name, r.pages, ocrFields);
+    const kids = ocrApply(rec, r, "Mac OCR"); // same as the page's OCR button
     recs = kids
       ? kids.map((k) => [
           recordFromContent(k.name, file.size, k.content),
