@@ -113,7 +113,7 @@ def convert(src, owners=(), business=None):
                     direction="credit" if amt > 0 else "debit",
                     description=desc,
                     balance=balance or None,
-                    source_ref=f"{name} p.{page}",
+                    source_ref=f"{name} p.{page}" if page else name,
                 )
             )
     if not txns:

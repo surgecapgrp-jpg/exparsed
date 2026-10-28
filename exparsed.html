@@ -4857,15 +4857,22 @@
     function lgPdfDate(s){ var m=String(s||'').match(/D:(\d{4})(\d{2})(\d{2})(\d{2})?(\d{2})?/); return m?(m[1]+'-'+m[2]+'-'+m[3]+(m[4]?' '+m[4]+':'+(m[5]||'00'):'')):null; }
 
     /* ---------- export shapes ---------- */
-    function lgRedactDesc(s){ return $optRedact && $optRedact.checked ? redactStructuredPII(s).text : s; }
+    // Export options. Omitted fields follow the page toggles, so the export buttons match the
+    // screen; underwriting passes {redact:false, compact:false, markdown:false} and so always gets
+    // the bank's printed text, whatever the toggles say (stable txn ids, real funder text).
+    function lgExportOpts(o){ o=o||{};
+      return { redact:o.redact!=null ? !!o.redact : !!($optRedact && $optRedact.checked),
+        compact:o.compact!=null ? !!o.compact : !!(typeof $optCompactDesc!=='undefined' && $optCompactDesc && $optCompactDesc.checked),
+        markdown:o.markdown!==false }; }
+    function lgRedactDesc(s, O){ return lgExportOpts(O).redact ? redactStructuredPII(s).text : s; }
     // Optional: drop pure reference-number fields (trace, TRN, IMAD, payment/reference IDs).
     // These identify a message, never its meaning: no return code, T1 term, counterparty or
     // SEC code lives in them, so stripping them cannot remove behavioural evidence. Off by
     // default -- the prompt's standing rule is raw descriptors.
     var LG_REFID_RE=/\b(?:Trace#|Trace #|Trn|Imad|Eed|Rfb|Bbi|Reference#|Payment ID|Payment Id|Orig ID|Ind ID|Desc Date|Confirmation#|Conf#)\s*:?\s*(?:[A-Za-z0-9\/=,.\-]*\d[A-Za-z0-9\/=,.\-]*)?(?:\s+\d{4,}(?=\s|$))?/gi;
     function lgCompactDesc(s){ return lgNorm(String(s).replace(LG_REFID_RE,' ').replace(/\s+(Rx|RX)\b/,' ')); }
-    function lgDescOut(s){ var t=lgRedactDesc(s); return (typeof $optCompactDesc!=='undefined' && $optCompactDesc && $optCompactDesc.checked) ? lgCompactDesc(t) : t; }
-    function lgRowStr(r){ return [r.date, r.section, lgMoney(r.signed).toFixed(2), r.balance==null?'':lgMoney(r.balance).toFixed(2), r.page, lgDescOut(r.desc).replace(/\|/g,'/')].concat(r.type?[r.type]:[]).join('|'); }
+    function lgDescOut(s, O){ O=lgExportOpts(O); var t=lgRedactDesc(s, O); return O.compact ? lgCompactDesc(t) : t; }
+    function lgRowStr(r, O){ return [r.date, r.section, lgMoney(r.signed).toFixed(2), r.balance==null?'':lgMoney(r.balance).toFixed(2), r.page, lgDescOut(r.desc, O).replace(/\|/g,'/')].concat(r.type?[r.type]:[]).join('|'); }
     function lgFileLedger(f){
       var key=derivedKey(f)+':'+(f.ocrMarkdown?1:0);
       if(f._ledgerKey===key) return f._ledger;
@@ -4920,7 +4927,8 @@
       var cflags=[]; list.forEach(function(f){ var L=f._ledger; if(L&&L.coverageFlags&&L.coverageFlags.length) cflags.push(f.name+': '+L.coverageFlags.join('; ')); });
       return 'Files: '+parts.join(' | ')+'. Cross-file: '+cross.filter(function(c){return c.result==='pass';}).length+' pass, '+br+' break'+(gaps.length?', gaps: '+gaps.join('; '):', no period gaps')+(overlaps.length?', overlapping periods: '+overlaps.join('; '):'')+'.'+(cflags.length?' Coverage flags: '+cflags.join(' || ')+'.':'')+(flags.length?' Provenance flags: '+flags.join(' || ')+'.':' Provenance flags: none.');
     }
-    function lgLedgerExport(list){
+    function lgLedgerExport(list, opts){
+      var O=lgExportOpts(opts);
       list.forEach(function(f){ lgFileLedger(f); });
       var cross=lgCrossFile(list), OWN=lgOwnership(list);
       return {
@@ -4932,7 +4940,7 @@
         // Deterministic figures (no labels applied): calendar-month liquidity with carry-forward
         // ADB, negative days and streaks, thinnest five, gross inflows and outflows, statement
         // average-balance checks. Money in dollars. See the COMPUTED block for conventions.
-        computed:lgComputedOut(lgComputed(list)),
+        computed:lgComputedOut(lgComputed(list), O),
         files:list.map(function(f){
           var L=f._ledger, out={ name:f.name, class:L.cls, source:f.ocrMarkdown?('ocr:'+(f.ocrProvider||'unknown')):(f.type||'extract'),
             layout:L.layout||null, period:L.period||null, accountLast4:L.account?L.account.slice(-4):(L.linkedAccount||null), accountSource:L.account?'printed':(L.linkedAccount?'balance chain to '+L.link.statement:'none'),
@@ -4957,9 +4965,9 @@
           if(L.coverageFlags && L.coverageFlags.length) out.coverageFlags=L.coverageFlags;
           if(L.filter) out.filter=L.filter;
           if((L.rows||[]).some(function(r){ return r.mixed; })) out.combinedTable=true;
-          if(L.status!=='verified' && L.unclaimed && L.unclaimed.length) out.unclaimedLines=L.unclaimed.slice(0,50).map(function(u){ return 'p'+u.page+'|'+u.why+'|'+lgDescOut(u.text).replace(/\|/g,'/'); });
-          out.rows=rows.map(lgRowStr);
-          if(L.status!=='verified') out.markdown=fileMarkdownFinal(f);
+          if(L.status!=='verified' && L.unclaimed && L.unclaimed.length) out.unclaimedLines=L.unclaimed.slice(0,50).map(function(u){ return 'p'+u.page+'|'+u.why+'|'+lgDescOut(u.text, O).replace(/\|/g,'/'); });
+          out.rows=rows.map(function(r){ return lgRowStr(r, O); });
+          if(L.status!=='verified' && O.markdown) out.markdown=fileMarkdownFinal(f);
           return out;
         })
       };
@@ -5173,8 +5181,8 @@
     }
 
     // Descriptors go out the same way as ledger rows (redaction / compact options applied).
-    function lgComputedOut(C){ return C.map(function(A){ if(A.error) return A;
-      var o=lgComputedOutRaw(A); o.debitsOnNegativeDays=o.debitsOnNegativeDays.map(function(d){ d.desc=lgDescOut(d.desc).slice(0,110); return d; }); return o; }); }
+    function lgComputedOut(C, O){ return C.map(function(A){ if(A.error) return A;
+      var o=lgComputedOutRaw(A); o.debitsOnNegativeDays=o.debitsOnNegativeDays.map(function(d){ d.desc=lgDescOut(d.desc, O).slice(0,110); return d; }); return o; }); }
     // money fields -> dollars; everything else unchanged
     function lgComputedOutRaw(C){
       var M=['adb','grossInflows','grossOutflows','computedAvgBalance','printedAvgBalance','printedNsfFees','printedNsfFeesYtd','amount','balance','dayEnd'];
@@ -6591,7 +6599,7 @@
     $underwrite.addEventListener('click',function(){
       var d=doneFiles(); if(!d.length) return;
       var w=window.open('about:blank','_blank');
-      fetch(UW_URL+'/runs',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(lgLedgerExport(d)) })
+      fetch(UW_URL+'/runs',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(lgLedgerExport(d, { redact:false, compact:false, markdown:false })) })
         .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||('HTTP '+r.status)); return j; }); })
         .then(function(j){ if(w) w.location.href=j.url; else window.open(j.url,'_blank'); })
         .catch(function(e){ if(w) w.close();

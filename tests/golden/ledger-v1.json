@@ -1,0 +1,274 @@
+{
+ "format": "ledger-v1",
+ "note": "computed = arithmetic derived in code from verified rows (use them, never recompute; counterparty, fee, transfer and funding labels are not applied in code); rows are pipe-delimited per columns; amount is signed (+credit/-debit); balance is the bank-printed running balance where the document has one; section codes: dep=deposits/additions, cdep=customer deposits, carddep=card (ATM) deposits, chk=checks paid, atm=card/ATM, elec=electronic withdrawals, wd=other withdrawals, fee=fees, credit/debit/pending=printout rows. Amounts are the bank-printed figures; integrity checks run in integer cents. markdown is included only for files whose ledger is not verified. status: verified = a check covering every row passed; partial = checks pass but none covers every row; breaks = a check failed; untestable = no control figures; unparsed = reads as a statement but no reader matched its layout; needs-ocr = mostly pages with no text layer; not-statement = another document (docKind names it), no ledger expected. combinedTable = rows come from one table of debits and credits, checked per direction and by running balance. unclaimedLines = page|reason|text of lines with a date and an amount that were not read as rows.",
+ "coverageStamp": "Files: chase.pdf [statement, text, 2026-01-01..2026-01-31, verified] | checking.csv [printout, csv, 2026-01-05..2026-01-08, verified]. Cross-file: 0 pass, 0 break, no period gaps. Provenance flags: none.",
+ "crossFile": [],
+ "computed": [
+  {
+   "account": "6789",
+   "window": {
+    "start": "2026-01-01",
+    "end": "2026-01-31",
+    "debitsVisibleThrough": "2026-01-31",
+    "calendarDays": 31,
+    "businessDays": 20
+   },
+   "basedOnUnverified": [],
+   "notes": [],
+   "checks": [
+    {
+     "check": "month gross inflows = statement deposits total",
+     "month": "2026-01",
+     "result": "pass",
+     "detail": "$300.00 vs $300.00"
+    },
+    {
+     "check": "series closing balance = last statement ending balance",
+     "result": "pass",
+     "detail": "$1,225.00 vs $1,225.00"
+    }
+   ],
+   "months": [
+    {
+     "month": "2026-01",
+     "partial": false,
+     "coveredDays": "31/31",
+     "coverage": "full",
+     "adb": 1179.03,
+     "adbDays": 31,
+     "businessDaysVisible": 20,
+     "balanceKnownPct": 100,
+     "printedBalanceDays": 4,
+     "businessDaysNegative": 0,
+     "longestNegativeStreak": 0,
+     "streakContinuesFrom": null,
+     "grossInflows": 300,
+     "depositCount": 2,
+     "grossOutflows": 75
+    }
+   ],
+   "statements": [
+    {
+     "file": "chase.pdf",
+     "period": "2026-01-01..2026-01-31",
+     "days": 31,
+     "computedAvgBalance": 1179.03,
+     "printedAvgBalance": null
+    }
+   ],
+   "longestNegativeStreakOverall": {
+    "len": 0,
+    "start": null,
+    "end": null
+   },
+   "thinnestFive": [
+    {
+     "date": "2026-01-05",
+     "balance": 1100,
+     "basis": "printed"
+    },
+    {
+     "date": "2026-01-20",
+     "balance": 1225,
+     "basis": "printed"
+    },
+    {
+     "date": "2026-01-15",
+     "balance": 1250,
+     "basis": "printed"
+    },
+    {
+     "date": "2026-01-12",
+     "balance": 1300,
+     "basis": "printed"
+    }
+   ],
+   "debitsOnNegativeDays": []
+  },
+  {
+   "account": "unknown:checking.csv",
+   "window": {
+    "start": "2026-01-06",
+    "end": "2026-01-08",
+    "debitsVisibleThrough": "2026-01-08",
+    "calendarDays": 3,
+    "businessDays": 3
+   },
+   "basedOnUnverified": [],
+   "notes": [
+    "no account number found in this file, so its figures are not combined with any other file",
+    "checking.csv: oldest date 2026-01-05 may be a partial day; its rows are excluded from inflows, its closing balance is used"
+   ],
+   "checks": [],
+   "months": [
+    {
+     "month": "2026-01",
+     "partial": true,
+     "coveredDays": "3/31",
+     "coverage": "full",
+     "adb": 3400,
+     "adbDays": 3,
+     "businessDaysVisible": 3,
+     "balanceKnownPct": 100,
+     "printedBalanceDays": 3,
+     "businessDaysNegative": 0,
+     "longestNegativeStreak": 0,
+     "streakContinuesFrom": null,
+     "grossInflows": 1200,
+     "depositCount": 1,
+     "grossOutflows": 550
+    }
+   ],
+   "statements": [],
+   "longestNegativeStreakOverall": {
+    "len": 0,
+    "start": null,
+    "end": null
+   },
+   "thinnestFive": [
+    {
+     "date": "2026-01-07",
+     "balance": 2950,
+     "basis": "printed"
+    },
+    {
+     "date": "2026-01-06",
+     "balance": 3100,
+     "basis": "printed"
+    },
+    {
+     "date": "2026-01-08",
+     "balance": 4150,
+     "basis": "printed"
+    }
+   ],
+   "debitsOnNegativeDays": []
+  }
+ ],
+ "files": [
+  {
+   "name": "chase.pdf",
+   "class": "statement",
+   "source": "pdf",
+   "layout": "columnar",
+   "period": {
+    "start": "2026-01-01",
+    "end": "2026-01-31"
+   },
+   "accountLast4": "6789",
+   "accountSource": "printed",
+   "status": "verified",
+   "checks": [
+    {
+     "check": "section total vs summary",
+     "section": "dep",
+     "result": "pass",
+     "detail": "rows 2/2, $300.00 vs $300.00",
+     "page": null
+    },
+    {
+     "check": "section total vs summary",
+     "section": "chk",
+     "result": "pass",
+     "detail": "rows 1/1, $50.00 vs $50.00",
+     "page": null
+    },
+    {
+     "check": "section total vs summary",
+     "section": "atm",
+     "result": "pass",
+     "detail": "rows 1/1, $25.00 vs $25.00",
+     "page": null
+    },
+    {
+     "check": "beginning + credits - debits = ending",
+     "full": true,
+     "result": "pass",
+     "detail": "$1,000.00 + $225.00 = $1,225.00 vs $1,225.00"
+    },
+    {
+     "check": "daily roll-forward vs printed daily ending balance",
+     "full": true,
+     "result": "pass",
+     "detail": "4 printed day-ends, 0 breaks",
+     "page": null,
+     "breaks": []
+    }
+   ],
+   "reviewPages": [],
+   "provenance": null,
+   "summary": {
+    "beginning": 1000,
+    "ending": 1225,
+    "sections": {
+     "dep": {
+      "label": "Deposits and Additions",
+      "count": 2,
+      "total": 300
+     },
+     "chk": {
+      "label": "Checks Paid",
+      "count": 1,
+      "total": 50
+     },
+     "atm": {
+      "label": "ATM & Debit Card Withdrawals",
+      "count": 1,
+      "total": 25
+     }
+    }
+   },
+   "dailyEndingBalance": {
+    "2026-01-05": 1100,
+    "2026-01-12": 1300,
+    "2026-01-15": 1250,
+    "2026-01-20": 1225
+   },
+   "columns": "date|section|amount|balance|page|description",
+   "rows": [
+    "2026-01-05|dep|100.00||1|Deposit",
+    "2026-01-12|dep|200.00||1|ACH Credit Stripe Transfer",
+    "2026-01-15|chk|-50.00||1|1001 ^",
+    "2026-01-20|atm|-25.00||2|Card Purchase 01/19 Starbucks Card 1234"
+   ]
+  },
+  {
+   "name": "checking.csv",
+   "class": "printout",
+   "source": "csv",
+   "layout": "csv-transactions",
+   "period": {
+    "start": "2026-01-05",
+    "end": "2026-01-08"
+   },
+   "accountLast4": null,
+   "accountSource": "none",
+   "status": "verified",
+   "checks": [
+    {
+     "check": "running-balance chain (row level)",
+     "full": true,
+     "result": "pass",
+     "tested": 3,
+     "breakCount": 0,
+     "detail": "4 posted rows, 3 printed balances tested (listed newest first), 0 breaks",
+     "page": null
+    },
+    {
+     "check": "header balance ties to rows",
+     "result": "untestable",
+     "detail": "no present/ledger balance tile bound by position"
+    }
+   ],
+   "reviewPages": [],
+   "provenance": null,
+   "columns": "date|section|amount|balance|page|description|type",
+   "rows": [
+    "2026-01-08|credit|1200.00|4150.00||CREDIT SQUARE INC DEP 260108|ACH_CREDIT",
+    "2026-01-07|debit|-150.00|2950.00||DEBIT ACH DEBIT RAPIDFUND LLC Trace# 99887766|ACH_DEBIT",
+    "2026-01-06|debit|-400.00|3100.00||DEBIT ZELLE TO jane@example.com Orig ID 1234567890|ACH_DEBIT",
+    "2026-01-05|credit|2500.00|3500.00||CREDIT SQUARE INC DEP 260105|ACH_CREDIT"
+   ]
+  }
+ ]
+}

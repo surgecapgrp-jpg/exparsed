@@ -15,6 +15,10 @@ import uw  # noqa: E402
 import adapter  # noqa: E402
 
 SAMPLE = json.loads((ROOT / "tests" / "fixtures" / "sample_ledger.json").read_text())
+# The real lgLedgerExport output, written by the page's own test (tests/contract.js).
+GOLDEN = json.loads(
+    (ROOT.parent / "tests" / "golden" / "ledger-v1.json").read_text(encoding="utf-8")
+)
 
 
 def to_export(led):
@@ -153,6 +157,23 @@ class Adapter(unittest.TestCase):
             sorted((t["direction"], t["amount"]) for t in led["transactions"]),
             [("credit", "250.00"), ("credit", "30.00"), ("debit", "20.00")],
         )
+
+    def test_real_page_export(self):
+        led, skipped = adapter.convert(GOLDEN, ["Jane Doe"], "Acme LLC")
+        self.assertEqual(skipped, [])
+        self.assertEqual(len(led["transactions"]), 8)
+        descs = {t["description"] for t in led["transactions"]}
+        self.assertIn("DEBIT ZELLE TO jane@example.com Orig ID 1234567890", descs)
+        refs = {t["source_ref"] for t in led["transactions"]}
+        self.assertIn("chase.pdf p.2", refs)
+        self.assertIn("checking.csv", refs)  # CSV rows carry no page
+        accts = {a["account_id"]: a for a in led["accounts"]}
+        self.assertEqual(accts["6789"]["integrity"], "Pass")
+        self.assertEqual(accts["file:checking.csv"]["integrity"], "Unverified")
+        again, _ = adapter.convert(GOLDEN, ["Jane Doe"], "Acme LLC")
+        self.assertEqual(led, again)  # same export, same transaction ids
+        e = uw.Engine(json.dumps(led).encode())
+        self.assertIn("Table 9", e.render())
 
     def test_rejects_other_formats(self):
         with self.assertRaises(adapter.AdapterError):
