@@ -13,6 +13,8 @@ Writes DIR/questions.json, DIR/audit.json, DIR/report.md. Exit 0 on success,
 1 on bad input or a failed self-check, 2 on usage error.
 """
 
+from __future__ import annotations
+
 import argparse
 import hashlib
 import importlib.util

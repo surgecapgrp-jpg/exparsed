@@ -46,7 +46,7 @@ python engine/uw.py tests/fixtures/sample_ledger.json --judgments tests/fixtures
 python -m unittest discover -s tests -v
 ```
 
-Exit codes: 0 success, 1 bad input or failed self-check (message on stderr), 2 usage error. Python 3.10+ standard library only. `jsonschema` is optional and only used by one test.
+Exit codes: 0 success, 1 bad input or failed self-check (message on stderr), 2 usage error. Python 3.9+ standard library only. `jsonschema` is optional and only used by one test.
 
 ## 3. Contracts
 
