@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Local underwriting server for Exparsed.
 
-Exparsed's "Underwrite" button posts the files loaded in its window (ledger-v1) here; the page
-this server hosts runs the engine, sends its questions to the chosen LLM, shows the ten tables
-and holds a follow-up chat about that run. Runs live in memory only (last 5) and vanish when
-the server stops. Listens on 127.0.0.1 only.
+Exparsed's Underwriting tab posts the files loaded in its window (ledger-v1) here. This server
+runs the engine, sends its questions to the model the tab picks, and answers the tab's follow-up
+chat about that run. It serves JSON only; the tab is part of exparsed.html. Runs live in memory
+only (last 5) and vanish when the server stops. Listens on 127.0.0.1 only.
 
 Usage: python3 uw/server.py [--port 8092]
 Keys: ANTHROPIC_API_KEY, OPENAI_API_KEY, XAI_API_KEY, GEMINI_API_KEY, OPENROUTER_API_KEY;
@@ -204,15 +204,7 @@ def make_handler(port):
             if self._refused():
                 return
             path = self.path.split("?", 1)[0]
-            if path == "/":
-                body = (HERE / "ui.html").read_bytes()
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.send_header("Cache-Control", "no-store")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
-            elif path == "/health":
+            if path == "/health":
                 self._json(200, {"status": "ok"})
             elif path == "/models":
                 models, errors = llm.available()
@@ -236,9 +228,7 @@ def make_handler(port):
                     RUNS[rid] = run
                     while len(RUNS) > KEEP_RUNS:
                         RUNS.popitem(last=False)
-                    self._json(
-                        200, {"run": rid, "url": f"http://127.0.0.1:{port}/?run={rid}"}
-                    )
+                    self._json(200, {"run": rid})
                 elif m := re.fullmatch(r"/runs/([0-9a-f]{16})/(judge|chat)", path):
                     run = self._run(m[1])
                     if not run:

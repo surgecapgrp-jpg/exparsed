@@ -239,7 +239,48 @@
   .logo-pick.on{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent)}
   .logo-pick:focus-visible{box-shadow:var(--focus)}
 
+  /* ---- workflow tabs (header) ---- */
+  .tabs{display:flex; gap:2px; padding:3px; background:var(--subtle); border-radius:var(--radius-sm); margin-right:var(--space-4)}
+  .tab{font-family:var(--font-sans); font-size:var(--text-sm); font-weight:550; color:var(--muted); background:transparent; border:0; border-radius:6px; height:26px; padding:0 12px; white-space:nowrap}
+  .tab:hover{color:var(--fg)}
+  .tab[aria-selected="true"]{background:var(--elev); color:var(--fg); box-shadow:var(--shadow-sm), 0 0 0 1px var(--border)}
+  .tab:focus-visible{box-shadow:var(--focus)}
+  .tab .tabdot{display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--accent); margin-left:6px; vertical-align:middle}
+
+  /* ---- underwriting tab: report left, chat right ---- */
+  .uw{display:grid; grid-template-columns:minmax(0,1fr) minmax(300px,400px); flex:1 1 auto; min-height:0; overflow:hidden}
+  .uw-main{min-width:0; min-height:0; overflow:auto; padding:var(--space-4) var(--space-5) var(--space-6)}
+  .uw-chat{display:flex; flex-direction:column; min-height:0; border-left:1px solid var(--border); background:var(--paper); padding:var(--space-4)}
+  .uw-row{display:flex; flex-wrap:wrap; gap:var(--space-2); align-items:center; margin-bottom:var(--space-2)}
+  .uw-row input, .uw-row select, .uw-chat textarea{font-family:var(--font-sans); font-size:var(--text-sm); color:var(--fg); background:var(--elev); border:1px solid var(--border-strong); border-radius:var(--radius-sm); padding:5px 9px; min-width:0}
+  .uw-row input{flex:1 1 200px} .uw-row select{flex:1 1 260px; max-width:420px; height:32px}
+  .uw-row input:focus, .uw-row select:focus, .uw-chat textarea:focus{outline:none; border-color:var(--accent); box-shadow:var(--focus)}
+  .uw-info{font-size:var(--text-sm); color:var(--muted); font-variant-numeric:tabular-nums}
+  .uw-info b{color:var(--fg); font-weight:600}
+  .uw-status{font-size:var(--text-sm); min-height:20px; margin:4px 0 8px; white-space:pre-wrap}
+  .uw-status.ok{color:var(--pos)} .uw-status.err{color:var(--neg)} .uw-status.busy{color:var(--muted)}
+  .uw-stale{font-size:var(--text-sm); color:var(--warn); background:color-mix(in srgb, var(--warn) 10%, transparent); border-radius:var(--radius-sm); padding:6px 10px; margin-bottom:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  .uw-empty{max-width:560px; margin:10vh auto 0; text-align:center; color:var(--muted); display:flex; flex-direction:column; gap:12px; align-items:center}
+  .uw-empty h2{font-size:17px; font-weight:650; color:var(--fg); margin:0}
+  .uw-report{font-size:var(--text-sm)}
+  .uw-report h3{font-size:var(--text-base); font-weight:650; margin:22px 0 6px}
+  .uw-report p{margin:4px 0}
+  .uw-report .tblwrap{overflow-x:auto}
+  .uw-report table{border-collapse:collapse; font-size:12.5px; margin:4px 0 10px; font-variant-numeric:tabular-nums}
+  .uw-report th, .uw-report td{border:1px solid var(--border); padding:4px 7px; text-align:left; vertical-align:top}
+  .uw-report th{background:var(--subtle); font-weight:600}
+  .uw-report code, .uw-msg code{font-family:var(--font-mono); font-size:12px; background:var(--subtle); padding:0 3px; border-radius:3px}
+  .uw-log{flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:8px; margin:8px 0; min-height:120px}
+  .uw-msg{padding:8px 10px; border-radius:var(--radius-sm); white-space:pre-wrap; overflow-wrap:anywhere; font-size:var(--text-sm)}
+  .uw-msg.user{background:var(--subtle); align-self:flex-end; max-width:90%}
+  .uw-msg.assistant{border:1px solid var(--border)}
+  .uw-msg.error{color:var(--neg); border:1px solid var(--neg)}
+  .uw-ask{display:flex; gap:8px; align-items:flex-end}
+  .uw-chat textarea{flex:1; resize:vertical; min-height:64px}
+
   @media (max-width:820px){
+    .uw{grid-template-columns:1fr; grid-template-rows:1fr auto}
+    .uw-chat{border-left:0; border-top:1px solid var(--border); max-height:45vh}
     main{grid-template-columns:1fr; grid-template-rows:auto 1fr}
     .left{border-right:0; border-bottom:1px solid var(--border); max-height:40vh}
     header{padding:0 var(--space-4); gap:var(--space-3)}
@@ -250,7 +291,12 @@
     .redactpanel{margin:0 var(--space-4) var(--space-3)}
   }
   @media (max-width:480px){
-    .hdr-left{display:none}
+    /* the tabs get their own row under the brand and the header buttons */
+    header{height:auto; padding-top:8px; padding-bottom:8px; grid-template-columns:auto minmax(0,1fr); row-gap:8px}
+    .hdr-right{grid-column:2}
+    .hdr-left{grid-column:1 / -1; grid-row:2; justify-self:stretch; border-left:0; padding-left:0; height:auto}
+    .tabs{flex:1; margin-right:0} .tab{flex:1}
+    .hdr-left .meter{display:none}
     .actions button.act:not(.primary){padding:0 9px}
   }
   @media (prefers-reduced-motion:reduce){
@@ -264,6 +310,10 @@
 
   <header>
     <div class="hdr-left">
+      <div class="tabs" role="tablist" aria-label="Workflow">
+        <button class="tab" id="tabStatements" type="button" role="tab" aria-selected="true" aria-controls="statementsView">Statements</button>
+        <button class="tab" id="tabUw" type="button" role="tab" aria-selected="false" aria-controls="uwView">Underwriting</button>
+      </div>
       <div class="meter" id="agg">0 files</div>
     </div>
     <div class="brand" aria-label="exparsed">
@@ -365,7 +415,7 @@
 
   <div class="fatal" id="fatal"></div>
 
-  <main>
+  <main id="statementsView" role="tabpanel" aria-labelledby="tabStatements">
     <section class="left">
       <div class="dropzone" id="drop" tabindex="0" role="button" aria-label="Add files">
         <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4"/><path d="M7.5 8.5 12 4l4.5 4.5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
@@ -393,7 +443,7 @@
               <button class="act" id="downloadAllJson" type="button">All JSON</button>
               <button class="act" id="downloadAllPdf" type="button">All PDF</button>
               <button class="act" id="downloadLedger" type="button" title="Verified transaction rows + integrity checks + provenance, for the underwriting prompt">Ledger JSON</button>
-              <button class="act" id="underwrite" type="button" title="Send every loaded file to the local underwriting server (uw/server.py) and open its report and chat">Underwrite</button>
+              <button class="act" id="underwrite" type="button" title="Send every loaded file to the local underwriting server (uw/server.py) and show its report and chat on the Underwriting tab">Send to Underwriting</button>
               <button class="act" id="downloadIntegrity" type="button" title="Plain-text reconciliation and provenance report">Integrity report</button>
             </div>
           </div>
@@ -411,6 +461,43 @@
       <textarea id="output" readonly spellcheck="false" placeholder="Drop a file to begin"></textarea>
     </section>
   </main>
+
+  <div class="uw" id="uwView" role="tabpanel" aria-labelledby="tabUw" hidden>
+    <section class="uw-main">
+      <div class="uw-empty" id="uwEmpty">
+        <h2>No underwriting run yet</h2>
+        <div>Load one merchant's statements on the Statements tab, then send them here. The engine computes the ten tables; the model you pick answers only the judgment questions.</div>
+        <button class="act primary" id="uwSendEmpty" type="button" disabled>Send loaded files</button>
+        <div class="uw-status" id="uwEmptyStatus"></div>
+      </div>
+      <div id="uwRunView" hidden>
+        <div class="uw-row">
+          <span class="uw-info" id="uwInfo"></span>
+          <span class="uw-info" id="uwHeadline"></span>
+        </div>
+        <div class="uw-stale" id="uwStale" hidden>Files changed since this run.<button class="act small" id="uwResend" type="button">Send again</button></div>
+        <div class="uw-row">
+          <select id="uwModel" aria-label="Model"><option value="">Loading models…</option></select>
+          <button class="act primary" id="uwJudge" type="button">Run judgments</button>
+        </div>
+        <div class="uw-row">
+          <input id="uwOwners" placeholder="Owner names, comma separated" aria-label="Owner names">
+          <input id="uwBusiness" placeholder="Business name" aria-label="Business name">
+        </div>
+        <div class="uw-status" id="uwStatus"></div>
+        <div class="uw-report" id="uwReport"></div>
+      </div>
+    </section>
+    <section class="uw-chat" aria-label="Ask about this run">
+      <strong>Ask about this run</strong>
+      <span class="uw-info" id="uwCtx">Send files to start a run.</span>
+      <div class="uw-log" id="uwLog"></div>
+      <div class="uw-ask">
+        <textarea id="uwQ" placeholder="e.g. Which debits make up the RapidFund position?" aria-label="Question"></textarea>
+        <button class="act primary" id="uwAsk" type="button" disabled>Send</button>
+      </div>
+    </section>
+  </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script id="exparsed-core">
@@ -5801,7 +5888,7 @@
       if($dlIntegrity) $dlIntegrity.disabled=$dlAll.disabled;
       if($exportBtn) $exportBtn.disabled = $download.disabled && $dlAll.disabled;
     }
-    function renderAll(){ renderList(); renderOutput(); renderAgg(); }
+    function renderAll(){ renderList(); renderOutput(); renderAgg(); uwSync(); }
     function select(id){ selectedId=id; renderAll(); }
     // Drops one file from the batch. Every export (ledger.json, combined md/json/pdf,
     // integrity report) reads doneFiles(), which reads `files`, so a removed file leaves
@@ -6649,18 +6736,143 @@
     $dlPdf.addEventListener('click',function(){ var f=selectedFile(); if(f) savePdf(pdfBanner(f.name,0)+fileMarkdownFinal(f), baseName(f)+'.pdf'); });
     $dlAllPdf.addEventListener('click',function(){ var d=doneFiles(); if(d.length) savePdf(pdfBanner('Combined extraction', d.length)+combinedMarkdown(d), 'converted.pdf'); });
     $dlLedger.addEventListener('click',function(){ var d=doneFiles(); if(d.length) saveText(JSON.stringify(lgLedgerExport(d),null,1),'ledger.json','application/json;charset=utf-8'); });
-    // Every loaded file goes to uw/server.py as one ledger; its page shows the ten tables and the chat.
-    // The tab opens before the request so the popup blocker treats it as part of the click.
+    /* ============ UNDERWRITING TAB ============ */
+    // Every loaded file goes to uw/server.py (127.0.0.1:8092) as one ledger with the bank's raw
+    // descriptions. The engine computes the ten tables; the model picked here answers only its
+    // judgment questions, and the chat asks about this run. The run lives in the server's memory;
+    // this page keeps its id, the chat history and a stamp of the files it was made from.
     var UW_URL='http://127.0.0.1:8092';
-    $underwrite.addEventListener('click',function(){
-      var d=doneFiles(); if(!d.length) return;
-      var w=window.open('about:blank','_blank');
-      fetch(UW_URL+'/runs',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(lgLedgerExport(d, { redact:false, compact:false, markdown:false })) })
-        .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||('HTTP '+r.status)); return j; }); })
-        .then(function(j){ if(w) w.location.href=j.url; else window.open(j.url,'_blank'); })
-        .catch(function(e){ if(w) w.close();
-          alert(/fetch/i.test(e.message) ? 'The underwriting server is not running. Start it in Terminal:\n  python3 uw/server.py\n(from the exparsed folder), then press Underwrite again.' : 'Underwriting failed: '+e.message); });
+    var UW_START='cd ~/exparsed && source .venv/bin/activate && python3 uw/server.py';
+    var uw={ run:null, stamp:null, history:[], busy:false, models:false };
+    var $tabStatements=el('tabStatements'), $tabUw=el('tabUw'), $statementsView=el('statementsView'), $uwView=el('uwView'),
+        $uwEmpty=el('uwEmpty'), $uwSendEmpty=el('uwSendEmpty'), $uwEmptyStatus=el('uwEmptyStatus'), $uwRunView=el('uwRunView'),
+        $uwInfo=el('uwInfo'), $uwHeadline=el('uwHeadline'), $uwStale=el('uwStale'), $uwResend=el('uwResend'),
+        $uwModel=el('uwModel'), $uwJudge=el('uwJudge'), $uwOwners=el('uwOwners'), $uwBusiness=el('uwBusiness'),
+        $uwStatus=el('uwStatus'), $uwReport=el('uwReport'), $uwCtx=el('uwCtx'), $uwLog=el('uwLog'), $uwQ=el('uwQ'), $uwAsk=el('uwAsk');
+
+    function showTab(t){
+      var u=t==='uw';
+      $statementsView.hidden=u; $uwView.hidden=!u;
+      $tabStatements.setAttribute('aria-selected', String(!u)); $tabUw.setAttribute('aria-selected', String(u));
+      if($exportMenu) $exportMenu.hidden=true;
+      lsSet('mdx.tab', u?'uw':'statements');
+      if(u) uwSync();
+    }
+    $tabStatements.addEventListener('click', function(){ showTab('statements'); });
+    $tabUw.addEventListener('click', function(){ showTab('uw'); });
+
+    function uwStamp(list){ return list.map(function(f){ return f.name+':'+(f.rev||0); }).join('|'); }
+    function uwSay($el, text, cls){ $el.className='uw-status'+(cls?' '+cls:''); $el.textContent=text||''; }
+    function uwApi(method, path, body){
+      return fetch(UW_URL+path, { method:method, headers:body?{ 'Content-Type':'application/json' }:{}, body:body?JSON.stringify(body):undefined })
+        .catch(function(){ throw new Error('The underwriting server is not running. Start it in Terminal and leave the window open:\n  '+UW_START); })
+        .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||('HTTP '+r.status)); return j; }); });
+    }
+    // Buttons and notices follow the page: loaded files, a run, a request in flight.
+    function uwSync(){
+      if(!$uwEmpty) return;   // renderAll runs during start-up, before this block has run
+      var n=doneFiles().length, hasRun=!!uw.run;
+      $uwEmpty.hidden=hasRun; $uwRunView.hidden=!hasRun;
+      $uwSendEmpty.disabled=uw.busy || !n;
+      $uwSendEmpty.textContent=n ? 'Send '+n+' loaded file'+(n===1?'':'s') : 'Send loaded files';
+      $uwStale.hidden=!hasRun || uw.stamp===uwStamp(doneFiles());
+      $uwResend.disabled=uw.busy || !n;
+      $uwJudge.disabled=$uwAsk.disabled=uw.busy || !hasRun || !$uwModel.value;
+      $tabUw.innerHTML='Underwriting'+(hasRun?'<span class="tabdot" title="a run is loaded"></span>':'');
+    }
+    function uwBusy(on){ uw.busy=on; uwSync(); }
+
+    // The engine's report uses headings, pipe tables, bold, code and plain lines only.
+    function uwInline(t){ return escapeHtml(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/`([^`]+)`/g,'<code>$1</code>'); }
+    function uwMarkdown(md){
+      var out=[], lines=String(md||'').split('\n'), i=0;
+      function cells(r){ return r.trim().replace(/^\||\|$/g,'').split('|'); }
+      while(i<lines.length){
+        var l=lines[i];
+        if(/^\s*\|/.test(l)){
+          var rows=[]; while(i<lines.length && /^\s*\|/.test(lines[i])) rows.push(lines[i++]);
+          rows=rows.filter(function(r,k){ return k!==1 || !/^[\s|:\-]+$/.test(r); });
+          out.push('<div class="tblwrap"><table><thead><tr>'+cells(rows[0]).map(function(c){ return '<th>'+uwInline(c.trim())+'</th>'; }).join('')+'</tr></thead><tbody>'+
+            rows.slice(1).map(function(r){ return '<tr>'+cells(r).map(function(c){ return '<td>'+uwInline(c.trim())+'</td>'; }).join('')+'</tr>'; }).join('')+'</tbody></table></div>');
+          continue;
+        }
+        var h=/^(#{1,6})\s+(.*)$/.exec(l);
+        if(h) out.push('<h3>'+uwInline(h[2])+'</h3>'); else if(l.trim()) out.push('<p>'+uwInline(l)+'</p>');
+        i++;
+      }
+      return out.join('\n');
+    }
+    function uwShow(st){
+      $uwInfo.innerHTML='<b>'+st.files+'</b> file'+(st.files===1?'':'s')+', <b>'+fmt(st.transactions)+'</b> transactions'+
+        (st.skipped.length?' · skipped: '+escapeHtml(st.skipped.map(function(x){ return x.file+' ('+x.reason+')'; }).join(', ')):'');
+      $uwHeadline.innerHTML='HEADLINE <b>'+escapeHtml(st.headline)+'</b>/mo · '+
+        (st.open_questions ? '<span style="color:var(--warn)">'+st.open_questions+' question'+(st.open_questions===1?'':'s')+' open, engine defaults applied</span>' : '<span style="color:var(--pos)">all questions answered</span>')+
+        ' · '+(st.judged_by ? 'judged by '+escapeHtml(st.judged_by) : 'no judgments yet');
+      $uwCtx.textContent='The model gets this run: about '+fmt(st.context_tokens)+' tokens of ledger rows, report, audit and judgments.';
+      $uwOwners.value=(st.owners||[]).join(', '); $uwBusiness.value=st.business||'';
+      $uwReport.innerHTML=uwMarkdown(st.report);
+    }
+    function uwLoadModels(){
+      if(uw.models) return; uw.models=true;
+      uwApi('GET','/models').then(function(m){
+        var saved=lsGet('uw.model','');
+        $uwModel.innerHTML=m.models.map(function(x){ return '<option value="'+escapeHtml(x.id)+'">'+escapeHtml(x.provider+' · '+x.model)+'</option>'; }).join('') ||
+          '<option value="">No models: set an API key or start a local model server, then restart uw/server.py</option>';
+        if(saved && m.models.some(function(x){ return x.id===saved; })) $uwModel.value=saved;
+        var errs=Object.keys(m.errors);
+        if(errs.length) uwSay($uwStatus, 'Model list failed for '+errs.map(function(k){ return k+': '+m.errors[k]; }).join('; '), 'err');
+        uwSync();
+      }).catch(function(e){ uw.models=false; $uwModel.innerHTML='<option value="">Models unavailable</option>'; uwSay($uwStatus, e.message, 'err'); uwSync(); });
+    }
+    $uwModel.addEventListener('change', function(){ lsSet('uw.model', $uwModel.value); uwSync(); });
+
+    // A new run replaces the old one (and its chat): the tables come from these files only.
+    function uwSend(){
+      var d=doneFiles(); if(!d.length || uw.busy) return;
+      showTab('uw');
+      var $say=uw.run ? $uwStatus : $uwEmptyStatus;
+      uwBusy(true); uwSay($say, 'Sending '+d.length+' file'+(d.length===1?'':'s')+' to the engine…', 'busy');
+      var stamp=uwStamp(d);
+      uwApi('POST','/runs', lgLedgerExport(d, { redact:false, compact:false, markdown:false }))
+        .then(function(j){ return uwApi('GET','/runs/'+j.run).then(function(st){ return [j.run, st]; }); })
+        .then(function(r){
+          uw.run=r[0]; uw.stamp=stamp; uw.history=[]; $uwLog.innerHTML='';
+          uwShow(r[1]); uwSay($uwEmptyStatus, ''); uwSay($uwStatus, 'Engine report with default answers. Pick a model and run judgments.', '');
+          uwLoadModels();
+        })
+        .catch(function(e){ uwSay($say, e.message, 'err'); })
+        .then(function(){ uwBusy(false); });
+    }
+    $underwrite.addEventListener('click', uwSend);
+    $uwSendEmpty.addEventListener('click', uwSend);
+    $uwResend.addEventListener('click', uwSend);
+
+    $uwJudge.addEventListener('click', function(){
+      var model=$uwModel.value; if(!uw.run || !model) return;
+      uwBusy(true); uwSay($uwStatus, 'Asking '+model+' the engine’s questions…', 'busy');
+      uwApi('POST','/runs/'+uw.run+'/judge', { model:model, owners:$uwOwners.value.split(','), business:$uwBusiness.value })
+        .then(function(st){ uwShow(st); uwSay($uwStatus, 'Judgments accepted by the engine.', 'ok'); })
+        .catch(function(e){ uwSay($uwStatus, e.message, 'err'); })
+        .then(function(){ uwBusy(false); });
     });
+    function uwAdd(role, text){
+      var d=document.createElement('div'); d.className='uw-msg '+role; d.textContent=text;
+      $uwLog.appendChild(d); $uwLog.scrollTop=$uwLog.scrollHeight;
+    }
+    function uwAskSend(){
+      var q=$uwQ.value.trim(), model=$uwModel.value;
+      if(!q || !model || !uw.run || uw.busy) return;
+      uw.history.push({ role:'user', content:q }); uwAdd('user', q); $uwQ.value='';
+      uwBusy(true);
+      uwApi('POST','/runs/'+uw.run+'/chat', { model:model, messages:uw.history })
+        .then(function(r){ uw.history.push({ role:'assistant', content:r.reply }); uwAdd('assistant', r.reply); })
+        .catch(function(e){ uw.history.pop(); uwAdd('error', e.message); })
+        .then(function(){ uwBusy(false); });
+    }
+    $uwAsk.addEventListener('click', uwAskSend);
+    $uwQ.addEventListener('keydown', function(e){ if(e.key==='Enter' && (e.metaKey || e.ctrlKey)){ e.preventDefault(); uwAskSend(); } });
+    function uwReset(){ uw.run=null; uw.stamp=null; uw.history=[]; $uwLog.innerHTML=''; $uwReport.innerHTML=''; uwSay($uwStatus,''); uwSay($uwEmptyStatus,''); uwSync(); }
+    showTab(lsGet('mdx.tab','statements')==='uw' ? 'uw' : 'statements');
     $dlIntegrity.addEventListener('click',function(){ var d=doneFiles(); if(d.length) saveText(lgIntegrityReport(d),'integrity-report.txt','text/plain;charset=utf-8'); });
 
     /* ============ NEW BATCH ============ */
@@ -6670,6 +6882,7 @@
       $prog.classList.remove('run'); $prog.classList.remove('indef'); $bar.style.marginLeft='0'; $bar.style.width='0';
       $output.value=''; $output.placeholder='Drop a file to begin';
       $redactPanel.hidden=true;
+      uwReset();
       renderAll();
     });
 

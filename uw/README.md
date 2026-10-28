@@ -10,14 +10,15 @@ export ANTHROPIC_API_KEY=...          # set any of the keys below
 python3 uw/server.py                  # http://127.0.0.1:8092, stop with Ctrl-C
 ```
 
-In Exparsed, load the merchant's statements, open the export menu and press **Underwrite**. Every file loaded in that window goes to the server as one ledger. A tab opens with the default-answer report.
+In Exparsed, load the merchant's statements and open the **Underwriting** tab (or Export → **Send to Underwriting**). Every file loaded in that window goes to the server as one ledger, with the bank's raw descriptions whatever the Redact and Compact toggles say. The tab shows the default-answer report.
 
 In that tab:
 1. Pick a model, add owner names and a business name, and press **Run judgments**. The engine accepts the answers or rejects the whole set and says why. A rejected set leaves the previous report in place.
 2. Read the ten tables.
-3. Ask questions in the chat panel. The model gets the ledger rows, report, audit record and accepted judgments. It quotes the engine's figures and transaction IDs, and computes nothing new.
+3. Ask questions in the chat panel (Cmd/Ctrl-Enter sends). The model gets the ledger rows, report, audit record and accepted judgments. It quotes the engine's figures and transaction IDs, and computes nothing new.
+4. Files added or removed after the run show a "Files changed" notice with **Send again**. A new run replaces the old one and clears the chat.
 
-Runs live in server memory only (last 5) and are gone when the server stops. Chat history lives in the tab only.
+Runs live in server memory only (last 5) and are gone when the server stops. Chat history lives in the page only. The server serves JSON only; the tab is part of `exparsed.html`.
 
 ## Providers
 
@@ -36,11 +37,11 @@ Privacy: the judge call sends the questions (transaction descriptions and amount
 
 ## Files
 
-- `server.py`: local server and run state. `ui.html`: model picker, report, chat.
-- `adapter.py`: Exparsed `ledger-v1` export to the engine's ledger. Stable transaction IDs; the same statement loaded twice is dropped as a duplicate. Federal Reserve holidays computed per year.
+- `server.py`: local server and run state. The model picker, report and chat are the Underwriting tab in `exparsed.html`.
+- `adapter.py`: Exparsed `ledger-v1` export to the engine's ledger. Rows go to the engine in posting order (Exparsed exports printouts newest first). Stable transaction IDs; the same statement loaded twice is dropped as a duplicate. Federal Reserve holidays computed per year, checked against the page's (`tests/golden/holidays.json`).
 - `llm.py`: provider calls. `prompts/judge.md`, `prompts/chat.md`: the only two prompts.
 - `engine/uw.py`, `schemas/`, `legacy/validate_uw_report_v2_2.py`: the V3.0 package, unchanged. Design and the 12 policy readings that need underwriter sign-off: `docs/HANDOFF.md` (its section 5 and `adapter/` predate this folder; `adapter.py` replaces that adapter).
-- `tests/`: engine (24), adapter (6), server with a stub LLM (3). Run `python3 -m unittest discover -s uw/tests`.
+- `tests/`: engine (24), adapter (9, including the real page export in `tests/golden/ledger-v1.json` and the page/engine agreement on holidays and day-end balances), server with a stub LLM (3). Run `python3 -m unittest discover -s uw/tests`.
 
 ## Status
 

@@ -4,7 +4,7 @@ State as of 2026-10-26. Repo: https://github.com/surgecapgrp-jpg/exparsed (priva
 
 ## What exparsed is
 
-`exparsed.html` is one self-contained page (6,688 lines) that turns bank statements into a ledger.
+`exparsed.html` is one self-contained page (6,979 lines) that turns bank statements into a ledger.
 It reads text PDFs (through pdf.js), CSV, OFX/QFX, Excel (SheetJS) and scanned PDFs (through the local
 Mac OCR server). Each ledger is checked against the statement's own figures: opening balance plus
 credits minus debits must equal the closing balance, and section totals must match the printed
@@ -48,36 +48,40 @@ The repo holds no customer statements. `tests/samples/` has synthetic files only
   Current result: 231 passed, 0 failed (reported on the Mac). `node tests/run-node.js` gives 212 passed,
   0 failed on Linux on 2026-10-27; the 19-check gap is not yet explained. Confirm with `bash tests/run.sh` on the Mac.
 - Run the unit tests after every change to `exparsed.html`.
-- Underwriting: `python3 uw/server.py`, then the Underwrite button in the export menu. Tests:
+- Underwriting: `python3 uw/server.py`, then the Underwriting tab in the page. Tests:
   `python3 -m unittest discover -s uw/tests`. Details, providers and the privacy note: `uw/README.md`.
 
 ## How the page reads a file
 
-Entry is `readFileContent` (line 5642). Line numbers below are for the committed `exparsed.html`.
+Entry is `readFileContent` (line 5352). Line numbers below are for the committed `exparsed.html`.
+The page has two scripts: `<script id="exparsed-core">` holds everything from bytes to ledger (no DOM
+state; the toggles arrive through `EXP`), and the page script after it holds the UI, the OCR queue and the
+Underwriting tab. The tests and the batch run load the first script only.
 
-1. `dispatchFile` (927) picks a reader by file type. PDFs go through pdf.js page text.
-2. `fileOcrNeed` (5223) and `lgDocKind` (3740) decide whether a PDF needs OCR or is not a statement.
+1. `dispatchFile` (850) picks a reader by file type. PDFs go through pdf.js page text.
+2. `lgOcrNeedWhy` (3682) is the one definition of "needs OCR". `lgDocKind` (3704) uses it and also decides
+   whether a PDF is not a statement; `fileOcrNeed` (5184) offers or queues OCR when the ledger says needs-ocr.
    Split children (`f.splitFrom`) skip the needs-OCR test.
-3. `doOcrMac` (6418) posts scanned pages to the OCR server and gets lines back.
-4. `lgAccountChildren` (5652) splits one file into several ledgers:
-   - `lgSplitAccounts` (4060): one ledger per account heading (Numerica "ID", "Account Number: …",
+3. `doOcrMac` (6570) posts scanned pages to the OCR server and gets lines back.
+4. `lgAccountChildren` (5362) splits one file into several ledgers:
+   - `lgSplitAccounts` (4012): one ledger per account heading (Numerica "ID", "Account Number: …",
      share headings).
-   - `lgSplitStatements` (4091): one ledger per statement when "Page 1 of N" repeats, for files that
+   - `lgSplitStatements` (4043): one ledger per statement when "Page 1 of N" repeats, for files that
      hold several months.
-5. `lgFileLedger` (4868) builds and caches the ledger (`_ledgerKey`) by running `lgBuild` (3612),
+5. `lgFileLedger` (4827) builds and caches the ledger (`_ledgerKey`) by running `lgBuild` (3550),
    which tries the readers in order:
-   - `lgParseColumnar` (2259): statements with sections (Deposits, Withdrawals, Checks, Fees) and a summary.
-   - `lgParsePrintout` (2940): online printouts with a running balance. `lgJoinWrappedCents` (2925)
+   - `lgParseColumnar` (2197): statements with sections (Deposits, Withdrawals, Checks, Fees) and a summary.
+   - `lgParsePrintout` (2878): online printouts with a running balance. `lgJoinWrappedCents` (2863)
      first rejoins cents that wrapped to the next line.
-   - `lgParseCards` (4153): card-style rows.
-   - `lgParseStackedRows` (4192): phone-app screenshots with amount / date and payee / balance on three lines.
+   - `lgParseCards` (4105): card-style rows.
+   - `lgParseStackedRows` (4144): phone-app screenshots with amount / date and payee / balance on three lines.
 6. Helpers used by all readers:
-   - `lgCleanLine` (2109): fixes OCR and text-layer damage ("124.20-SC", "L,204.00", marks glued to dates).
-   - `lgSectionOf` (1901): maps a heading to a section key (dep, wd, chk, fee, ret, other).
-   - `lgSummaryKey` (2030): maps a summary label to a total.
-   - `lgFindPeriod` (1814): finds the statement period.
-   - `lgNoActivity` (3830): detects statements with no transactions.
-7. `recFromContent` (5662) turns the ledger into the record shown on the page.
+   - `lgCleanLine` (2047): fixes OCR and text-layer damage ("124.20-SC", "L,204.00", marks glued to dates).
+   - `lgSectionOf` (1839): maps a heading to a section key (dep, wd, chk, fee, ret, other).
+   - `lgSummaryKey` (1968): maps a summary label to a total.
+   - `lgFindPeriod` (1743): finds the statement period.
+   - `lgNoActivity` (3782): detects statements with no transactions.
+7. `recFromContent` (5971) turns the ledger into the record shown on the page.
 
 ## Test results on the Desktop set (244 files)
 
