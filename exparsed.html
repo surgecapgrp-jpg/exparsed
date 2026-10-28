@@ -1612,13 +1612,19 @@
       octubre:10,noviembre:11,dic:12,diciembre:12};
     // A printed month name ("Aug", "AUG.", "September", "Agosto"), as a regex fragment for the patterns below.
     var LG_MON='(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec|Ene|Abr|Ago|Dic|Set)[a-z]*\\.?';
+    // English month abbreviations, for the patterns that must not match Spanish ("Set 12" is not a
+    // date in an English statement). Month numbers come from LG_MONTHS.
+    var LG_MON_EN='Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
+    var LG_MON_ALONE_RE=new RegExp('^\\s*('+LG_MON_EN+')\\s*$','i');
     // Money as banks print it. Thousands separators are optional ("1234.56" is common outside the
     // big banks); the sign may lead, trail, sit in parentheses or be a CR / DR suffix (credit-union
     // style); "$" may be followed by a space; a trailing "*" marker is ignored; a figure under a dollar
     // may print without its leading zero (".75" -- Pinnacle).
     var LG_MONEY_RE=/^[+−–-]?\s*\(?\s*\$?\s*[+−–-]?(?:\d{1,3}(?:,\d{3})+|\d+)?\.\d{2}\s*\)?\s*(?:[−–-]|CR|DR)?$/i;
     function lgIsMoney(s){ return LG_MONEY_RE.test(String(s==null?'':s).replace(/\*/g,'').trim()); }
-    function lgUSDate(s){ var m=String(s||'').match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/); if(!m) return null; var y=m[3].length===2?'20'+m[3]:m[3]; return y+'-'+lgPad(+m[1])+'-'+lgPad(+m[2]); }
+    // M/D/YY or M/D/YYYY, slashes only, nothing around it. Read by lgDateTok, so an impossible
+    // month or day (13/40/26) is null rather than "2026-13-40".
+    function lgUSDate(s){ var t=String(s||''); return /^\d{1,2}\/\d{1,2}\/(?:\d{2}|\d{4})$/.test(t) ? lgDateIso(t) : null; }
     // A printed row date: MM/DD, MM/DD/YY, MM/DD/YYYY, or the same with "-". Returns
     // { mmdd:'MM/DD', iso } -- iso only when the year is printed -- or null.
     // Also month-name dates ("Aug 5", "AUG 05", "Aug. 5, 2026") as U.S. Bank and others print them.
@@ -1690,6 +1696,15 @@
       return null;
     }
 
+    // Money readers, one rule each (tests/parsers.js snapshots all of them):
+    //   lgCents       a printed figure anywhere in the text; sign from -, (), trailing -, DR. CR ignored.
+    //   lgJsonAmount  a structured field (number, {amount}, whole string); bare integers are dollars; CR forces +.
+    //   lgDecCents    a plain decimal string only ("-12.5"), any number of decimals (OFX TRNAMT).
+    //   lgCentsNum    whatever Number() accepts (spreadsheet cells).
+    //   lgDlCents     lgDecCents, else lgCents (DecisionLogic exports mix both forms).
+    //   lgPrintedAmts every figure in a line; strips every comma, so "1,23.45" is 123.45 where
+    //                 lgCents reads 23.45 (they disagree on garbled commas, so they stay separate).
+    //   parseMoneyCell a whole markdown cell as float dollars, for the table export only.
     function lgCents(s){
       // Integer cents, never float sums (see parseMoneyCell note). Accepts $, commas, unicode
       // minus, a leading/trailing sign, parentheses and a DR suffix (debit); CR is a credit.
@@ -2712,13 +2727,13 @@
       // pictures of the period's checks and deposit slips ("09/16/2026 $6,021.79 09/10/2026 2582 $55.00"
       // -- First National Bank Texas prints them with no heading of their own)
       // (dates compared by month and day: "09/16/2026", "Sep 04" -- U.S. Bank's check images)
-      var seenDC={}, MON3=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+      var seenDC={};
       rows.forEach(function(r){ var d=String(r.itemDate||r.date||''); seenDC[d.slice(5)+'|'+r.cents]=1; });
       return unclaimed.filter(function(u){
-        var re=/\b(\d{1,2})\/(\d{1,2})(?:\/\d{2,4})?\b|\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.? (\d{1,2})\b|(-?\$?[\d,]*\.\d{2})(?!\d)/gi, m, md=null, n=0, all=true;
+        var re=new RegExp('\\b(\\d{1,2})\\/(\\d{1,2})(?:\\/\\d{2,4})?\\b|\\b('+LG_MON_EN+')[a-z]*\\.? (\\d{1,2})\\b|(-?\\$?[\\d,]*\\.\\d{2})(?!\\d)','gi'), m, md=null, n=0, all=true;
         while((m=re.exec(u.text))){
           if(m[1]){ md=lgPad(+m[1])+'-'+lgPad(+m[2]); continue; }
-          if(m[3]){ md=lgPad(MON3.indexOf(m[3].toLowerCase())+1)+'-'+lgPad(+m[4]); continue; }
+          if(m[3]){ md=lgPad(LG_MONTHS[m[3].toLowerCase()])+'-'+lgPad(+m[4]); continue; }
           if(!md){ all=false; break; } n++; if(!seenDC[md+'|'+Math.abs(lgCents(m[5]))]){ all=false; break; } }
         return !(all && n>0);
       });
@@ -3266,7 +3281,7 @@
       if((m=s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})(?![\d])/))) return m[1]+'-'+lgPad(+m[2])+'-'+lgPad(+m[3]);
       // US bank / spreadsheet dates: 1/5/26, 01-05-2026, optionally followed by a time
       if((m=s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2}|\d{4})(?=$|[\sT])/))) return lgDateIso(m[1]+'/'+m[2]+'/'+m[3]);
-      if((m=s.match(/^(\d{4})(\d{2})(\d{2})/))) return m[1]+'-'+m[2]+'-'+m[3];
+      if((m=lgOfxDate(s))) return m;   // YYYYMMDD, as OFX prints it
       // "Jan 5, 2026" / "January 05 2026"
       if((m=s.match(/^([A-Za-z]{3,9})\.? (\d{1,2}),? (\d{4})$/))) return lgParseLongDate(m[1]+' '+m[2]+', '+m[3]);
       return null;
@@ -3570,9 +3585,9 @@
     var LG_DOC_BANK=/\b(available balance|current balance|ledger balance|statement period|account statement|account summary|account activity|transaction (history|details|search)|posted|pending|routing number|account number|checking|savings|deposits?|withdrawals?|debits?|credits?|posting date|post date|previous balance|statement of account|statement dates?|transactions?|daily balance|running balance|date range)\b/ig;
     // (a long reference number may lead the date: "202609030 9/3/2026 PREAUTHO ..."; a printout may
     // print the month and the day on lines of their own: "AUG" / "31")
-    var LG_DOC_ROW=/^\s*(?:\d{6,}\s+)?(\d{1,2}[\/-]\d{1,2}([\/-]\d{2,4})?|(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.? \d{1,2}(, \d{4})?)\b/i;
+    var LG_DOC_ROW=new RegExp('^\\s*(?:\\d{6,}\\s+)?(\\d{1,2}[\\/-]\\d{1,2}([\\/-]\\d{2,4})?|('+LG_MON_EN+')[a-z]*\\.? \\d{1,2}(, \\d{4})?)\\b','i');
     // A dated row: a line starting with a date, with an amount on it or on one of the next 7 lines.
-    function lgDocRows(lines){ var n=0; for(var i=0;i<lines.length;i++) if(LG_DOC_ROW.test(lines[i]) || (/^\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*$/i.test(lines[i]) && /^\s*\d{1,2}\s*$/.test(lines[i+1]||''))){ for(var j=i;j<Math.min(lines.length,i+8);j++) if(/\d\.\d{2}\b|^\s*-\d[\d,]*\s*$/.test(lines[j])){ n++; break; } } return n; }
+    function lgDocRows(lines){ var n=0; for(var i=0;i<lines.length;i++) if(LG_DOC_ROW.test(lines[i]) || (LG_MON_ALONE_RE.test(lines[i]) && /^\s*\d{1,2}\s*$/.test(lines[i+1]||''))){ for(var j=i;j<Math.min(lines.length,i+8);j++) if(/\d\.\d{2}\b|^\s*-\d[\d,]*\s*$/.test(lines[j])){ n++; break; } } return n; }
     function lgDocKind(f){
       var pages=(f.ocrPages&&f.ocrPages.length)?f.ocrPages:(f.pages||[]);
       var texts=pages.map(function(p){ return (p.lines||[]).map(function(l){ return l.text; }); });
@@ -3646,7 +3661,7 @@
       if((hm=hd.match(/Deposits\/Credits \$?([\d,]+\.\d\d)/))) H['Deposits/Credits']=lgCents(hm[1]);
       if((hm=hd.match(/Withdrawals\/Debits \(?\$?([\d,]+\.\d\d)\)?/))) H['Withdrawals/Debits']=lgCents(hm[1]);
       if((hm=hd.match(/Current Balance (\(?-?\$[\d,]+\.\d\d\)?)/))) H['current balance']=lgCents(hm[1]);
-      var monthly=[], cal=t.slice(sg.end, sg.end+4000), cr=new RegExp('\\b('+'Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec'+') (\\d{4}) \\(?-?\\$[\\d,]+\\.\\d\\d\\)? \\d+ \\d+ (\\$[\\d,]+\\.\\d\\d) (\\(\\$[\\d,]+\\.\\d\\d\\)|\\$[\\d,]+\\.\\d\\d)','g');
+      var monthly=[], cal=t.slice(sg.end, sg.end+4000), cr=new RegExp('\\b('+LG_MON_EN+') (\\d{4}) \\(?-?\\$[\\d,]+\\.\\d\\d\\)? \\d+ \\d+ (\\$[\\d,]+\\.\\d\\d) (\\(\\$[\\d,]+\\.\\d\\d\\)|\\$[\\d,]+\\.\\d\\d)','g');
       if(/^ ?Calendar View/.test(cal)) while((m=cr.exec(cal))) monthly.push({ month:m[2]+'-'+lgPad(LG_MONTHS[m[1].toLowerCase()]), deposits:lgCents(m[3]), withdrawals:Math.abs(lgCents(m[4])) });
       var acct=(sg.head.match(/Account Number \.{3}(\d{4})/)||[])[1]||null, ds=rows.map(function(r){ return r.date; }).sort();
       return { cls:'printout', layout:'decisionlogic-text', period:{ start:ds[0], end:ds[ds.length-1] }, account:acct, rows:rows, headerBalances:H, summary:null, daily:null, filter:null,
@@ -4068,7 +4083,7 @@
     // A printed sign ("-$12.50", "(12.50)", "+$3,067.00") gives the direction; otherwise the
     // running balance settles it (lgSettleSigns). The result is used only when its checks pass
     // (verified or partial), or when every direction was printed and there is nothing to check.
-    var LG_DR_MON='(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\\.?';
+    var LG_DR_MON='('+LG_MON_EN+')[a-z]*\\.?';
     // Lines put back together before records are read, for layouts that split a row's date or wrap
     // it in page furniture:
     //  - sidebar text glued to a full date ("Line of Credit08/06/2026 LUCKY STAR CAFE" -- Bluevine);
@@ -4104,7 +4119,7 @@
         stickyParts.forEach(function(sp){ if(sp.words && t.indexOf(sp.words)===0 && t.length>sp.words.length){ t=t.slice(sp.words.length); sp.money.forEach(function(mn){ var k=t.lastIndexOf(mn); if(k>=0) t=t.slice(0,k)+' '+t.slice(k+mn.length); }); } });
         return lgNorm(t);
       }
-      var MON3='(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)', monAlone=new RegExp('^'+MON3+'$'), monGlued=new RegExp('^(?:\\*+\\d+)?'+MON3+'(?:([A-Z0-9*#].*)| ([A-Z*#][A-Za-z].*))$');
+      var MON3='('+LG_MON_EN.toUpperCase()+')', monAlone=new RegExp('^'+MON3+'$'), monGlued=new RegExp('^(?:\\*+\\d+)?'+MON3+'(?:([A-Z0-9*#].*)| ([A-Z*#][A-Za-z].*))$');
       var weekday=new RegExp('^(?:Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day, ('+LG_MON+' \\d{1,2},? \\d{4})$','i'), money1=/^[+−–-]?\$[\d,]+\.\d\d$/;
       var day=null, furn=/^https?:\/\/|^\d{1,2}\/\d{1,2}\/\d{2},? \d{1,2}:\d\d ?[AP]M\b/i;
       // the first line of the next page that is not its print header (a row can break across pages)
