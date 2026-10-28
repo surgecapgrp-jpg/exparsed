@@ -12,6 +12,10 @@ import sys
 from collections import Counter
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "engine"))
+from uw import WORST_ORDER  # noqa: E402
 
 # Exparsed ledger status -> V2.2 Table 1 verdict. Files with any other status are skipped.
 INTEGRITY = {
@@ -20,7 +24,6 @@ INTEGRITY = {
     "untestable": "Unverified",
     "breaks": "Break",
 }
-WORST = ("Break", "Unverified", "Pass with flag", "Pass")
 
 
 class AdapterError(Exception):
@@ -50,6 +53,29 @@ def fed_holidays(year):
         [d + timedelta(1) if d.weekday() == 6 else d for d in fixed if d.weekday() != 5]
         + moving
     )
+
+
+def posting_order(rows):
+    """rows (split ledger-v1 rows) oldest posting first. The engine reads a day's last row as the
+    day's closing balance and pairs returns by order, but Exparsed exports printouts newest first.
+    The running balance decides: previous balance + this amount = this balance means oldest first.
+    Without balances, a first date later than the last date means newest first."""
+
+    def dec(x):
+        try:
+            return Decimal(x) if x else None
+        except InvalidOperation:
+            return None
+
+    fwd = back = 0
+    for a, b in zip(rows, rows[1:]):
+        ab, bb, aa, ba = dec(a[3]), dec(b[3]), dec(a[2]), dec(b[2])
+        if None in (ab, bb, aa, ba):
+            continue
+        fwd += ab + ba == bb
+        back += bb + aa == ab
+    newest_first = back > fwd if back != fwd else rows[0][0] > rows[-1][0]
+    return rows[::-1] if newest_first else rows
 
 
 def convert(src, owners=(), business=None):
@@ -90,12 +116,12 @@ def convert(src, owners=(), business=None):
             )
         )
         verdict = INTEGRITY[status] if last4 else "Unverified"
-        a["integrity"] = min(a["integrity"], verdict, key=WORST.index)
+        a["integrity"] = min(a["integrity"], verdict, key=WORST_ORDER.index)
         a["notes"].append(f"{name}: Exparsed {status}")
         # n separates identical rows inside one file; the same row in two files keeps one id,
         # so the engine drops it as a duplicate (overlapping statements).
         seen = Counter()
-        for date_, _section, amount, balance, page, desc, *_ in rows:
+        for date_, _section, amount, balance, page, desc, *_ in posting_order(rows):
             try:
                 amt = Decimal(amount)
             except InvalidOperation:

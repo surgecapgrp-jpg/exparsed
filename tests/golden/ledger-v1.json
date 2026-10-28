@@ -106,7 +106,7 @@
      "partial": true,
      "coveredDays": "3/31",
      "coverage": "full",
-     "adb": 3400,
+     "adb": 3366.67,
      "adbDays": 3,
      "businessDaysVisible": 3,
      "balanceKnownPct": 100,
@@ -116,7 +116,7 @@
      "streakContinuesFrom": null,
      "grossInflows": 1200,
      "depositCount": 1,
-     "grossOutflows": 550
+     "grossOutflows": 600
     }
    ],
    "statements": [],
@@ -128,7 +128,7 @@
    "thinnestFive": [
     {
      "date": "2026-01-07",
-     "balance": 2950,
+     "balance": 2900,
      "basis": "printed"
     },
     {
@@ -138,7 +138,7 @@
     },
     {
      "date": "2026-01-08",
-     "balance": 4150,
+     "balance": 4100,
      "basis": "printed"
     }
    ],
@@ -249,9 +249,9 @@
      "check": "running-balance chain (row level)",
      "full": true,
      "result": "pass",
-     "tested": 3,
+     "tested": 4,
      "breakCount": 0,
-     "detail": "4 posted rows, 3 printed balances tested (listed newest first), 0 breaks",
+     "detail": "5 posted rows, 4 printed balances tested (listed newest first), 0 breaks",
      "page": null
     },
     {
@@ -264,7 +264,8 @@
    "provenance": null,
    "columns": "date|section|amount|balance|page|description|type",
    "rows": [
-    "2026-01-08|credit|1200.00|4150.00||CREDIT SQUARE INC DEP 260108|ACH_CREDIT",
+    "2026-01-08|credit|1200.00|4100.00||CREDIT SQUARE INC DEP 260108|ACH_CREDIT",
+    "2026-01-07|debit|-50.00|2900.00||DEBIT POS PURCHASE OFFICE DEPOT|DEBIT_CARD",
     "2026-01-07|debit|-150.00|2950.00||DEBIT ACH DEBIT RAPIDFUND LLC Trace# 99887766|ACH_DEBIT",
     "2026-01-06|debit|-400.00|3100.00||DEBIT ZELLE TO jane@example.com Orig ID 1234567890|ACH_DEBIT",
     "2026-01-05|credit|2500.00|3500.00||CREDIT SQUARE INC DEP 260105|ACH_CREDIT"

@@ -6,6 +6,7 @@ import json
 import sys
 import unittest
 from datetime import date
+from decimal import Decimal
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -161,7 +162,7 @@ class Adapter(unittest.TestCase):
     def test_real_page_export(self):
         led, skipped = adapter.convert(GOLDEN, ["Jane Doe"], "Acme LLC")
         self.assertEqual(skipped, [])
-        self.assertEqual(len(led["transactions"]), 8)
+        self.assertEqual(len(led["transactions"]), 9)
         descs = {t["description"] for t in led["transactions"]}
         self.assertIn("DEBIT ZELLE TO jane@example.com Orig ID 1234567890", descs)
         refs = {t["source_ref"] for t in led["transactions"]}
@@ -174,6 +175,47 @@ class Adapter(unittest.TestCase):
         self.assertEqual(led, again)  # same export, same transaction ids
         e = uw.Engine(json.dumps(led).encode())
         self.assertIn("Table 9", e.render())
+
+    def test_page_and_engine_agree_on_shared_figures(self):
+        # Fed holidays: the page's lgFedHolidays wrote tests/golden/holidays.json
+        golden = json.loads(
+            (ROOT.parent / "tests" / "golden" / "holidays.json").read_text()
+        )
+        for year, days in golden.items():
+            self.assertEqual(
+                [d.isoformat() for d in adapter.fed_holidays(int(year))], days, year
+            )
+        # Day-end balances: every printed day-end the page reports (thinnestFive) is the
+        # engine's end-of-day balance for that account and date. The CSV in the golden export
+        # is newest first with two rows on 2026-01-07; the day closes at 2,900.00.
+        led, _ = adapter.convert(GOLDEN)
+        e = uw.Engine(json.dumps(led).encode())
+        e.render()
+        checked = 0
+        for acct in GOLDEN["computed"]:
+            aid = acct["account"].replace("unknown:", "file:")
+            for day in acct["thinnestFive"]:
+                if day["basis"] != "printed" or aid not in e.eod or not e.eod[aid]:
+                    continue
+                self.assertEqual(
+                    e.eod[aid][date.fromisoformat(day["date"])],
+                    Decimal(str(day["balance"])).quantize(Decimal("0.01")),
+                    f"{aid} {day['date']}",
+                )
+                checked += 1
+        self.assertGreaterEqual(checked, 3)
+
+    def test_posting_order(self):
+        newest = [
+            "2026-01-08|c|10.00|130.00||x",
+            "2026-01-07|d|-5.00|120.00||y",
+            "2026-01-07|d|-5.00|125.00||z",
+        ]
+        rows = [r.split("|") for r in newest]
+        self.assertEqual([r[3] for r in adapter.posting_order(rows)], ["125.00", "120.00", "130.00"])
+        self.assertIs(adapter.posting_order(rows[::-1])[0], rows[::-1][0])  # already oldest first
+        no_bal = [["2026-01-09", "c", "1.00", ""], ["2026-01-02", "c", "1.00", ""]]
+        self.assertEqual(adapter.posting_order(no_bal)[0][0], "2026-01-02")
 
     def test_rejects_other_formats(self):
         with self.assertRaises(adapter.AdapterError):

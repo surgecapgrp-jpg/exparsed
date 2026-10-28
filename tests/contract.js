@@ -8,10 +8,11 @@
   }
   var csv =
     "Details,Posting Date,Description,Amount,Type,Balance,Check or Slip #\n" +
-    'CREDIT,01/05/2026,"SQUARE INC DEP 260105",2500.00,ACH_CREDIT,3500.00,\n' +
-    'DEBIT,01/06/2026,"ZELLE TO jane@example.com Orig ID 1234567890",-400.00,ACH_DEBIT,3100.00,\n' +
+    'CREDIT,01/08/2026,"SQUARE INC DEP 260108",1200.00,ACH_CREDIT,4100.00,\n' +
+    'DEBIT,01/07/2026,"POS PURCHASE OFFICE DEPOT",-50.00,DEBIT_CARD,2900.00,\n' +
     'DEBIT,01/07/2026,"ACH DEBIT RAPIDFUND LLC Trace# 99887766",-150.00,ACH_DEBIT,2950.00,\n' +
-    'CREDIT,01/08/2026,"SQUARE INC DEP 260108",1200.00,ACH_CREDIT,4150.00,\n';
+    'DEBIT,01/06/2026,"ZELLE TO jane@example.com Orig ID 1234567890",-400.00,ACH_DEBIT,3100.00,\n' +
+    'CREDIT,01/05/2026,"SQUARE INC DEP 260105",2500.00,ACH_CREDIT,3500.00,\n';
   function recs() {
     return [
       { name: "chase.pdf", type: "pdf", pages: chase.map(function (p) { return { hasText: true, lines: p.lines }; }) },
@@ -75,6 +76,14 @@
     "export with toggles: row count unchanged",
     shown.files[1].rows.length === raw.files[1].rows.length,
   );
+  // Fed holidays 2020-2035: uw/adapter.py fed_holidays must give the same days (test_adapter.py)
+  var hol = {};
+  for (var y = 2020; y <= 2035; y++) hol[y] = Object.keys(lgFedHolidays(y)).sort();
+  var holJson = JSON.stringify(hol, null, 1) + "\n", holPath = TESTS + "/golden/holidays.json";
+  if (typeof writeFile === "function") writeFile(holPath, holJson);
+  var holGolden = null;
+  try { holGolden = readFile(holPath); } catch (e) {}
+  ct("Fed holidays 2020-2035 match tests/golden/holidays.json", holGolden === holJson);
   var json = JSON.stringify(raw, null, 1) + "\n",
     path = TESTS + "/golden/ledger-v1.json";
   if (typeof writeFile === "function") {
