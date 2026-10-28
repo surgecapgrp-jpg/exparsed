@@ -1,6 +1,6 @@
 // Batch run: reads every statement in a folder through the page's real path (readFileContent, the
 // account/statement split, lgFileLedger) in headless Chrome and appends one JSON line per ledger.
-//   node tests/batch/run.js <dir> <out.jsonl> [--ocr] [--workers 4] [--only list.txt]
+//   node tests/batch/run.js <dir> <out.jsonl> [--ocr] [--mac-url URL] [--workers 4] [--only list.txt]
 //   node tests/batch/run.js compare <old.jsonl> <new.jsonl>
 // --ocr sends needs-ocr PDFs to the Mac OCR server (python3 mac_ocr_server.py) first.
 // Reruns skip files already in out.jsonl, so a stopped run picks up where it left off.
@@ -53,34 +53,90 @@ function compare(a, b) {
   process.exit(worse.length ? 1 : 0);
 }
 
-// The page keeps its functions inside one closure; this exposes the ones the run needs.
-const HOOK = `
-    window.__exparsed=async function(name, b64, ocr){
-      var bytes=Uint8Array.from(atob(b64), function(ch){ return ch.charCodeAt(0); });
-      var file=new File([bytes], name), out=[];
-      function report(rec, ledger, via){
-        var L=lgFileLedger(rec);
-        out.push({ ledger:ledger, status:L.status, note:L.note||'', docKind:L.docKind||'', rows:(L.rows||[]).length, via:via });
-      }
-      var c;
-      try{ c=await readFileContent(file); }
-      catch(e){ return [{ ledger:name, status:'error', note:String(e&&e.message||e), via:'text' }]; }
-      var rec=recFromContent(name, file.size, c); rec.blob=file;
-      var recs=c.children ? c.children.map(function(k){ return [recFromContent(k.name, file.size, k.content), k.name]; }) : [[rec, name]];
-      if(ocr && !c.children && lgFileLedger(rec).status==='needs-ocr'){
-        var r=await doOcrMac(rec);
-        if(!r || !r.ok) return [{ ledger:name, status:'needs-ocr', note:'OCR failed: '+(r&&r.message||'no result'), via:'ocr' }];
-        Object.assign(rec, { ocrMarkdown:r.text, ocrPages:r.pages||null, ocrSecs:r.secs, ocrStatus:'done', ocrProvider:'Mac OCR' });
-        var kids=r.pages && lgAccountChildren(c, name, r.pages, { ocrStatus:'done', ocrProvider:'Mac OCR', ocrSecs:r.secs });
-        recs=kids ? kids.map(function(k){ return [recFromContent(k.name, file.size, k.content), k.name]; }) : [[rec, name]];
-        recs.forEach(function(p){ report(p[0], p[1], 'ocr'); });
-        return out;
-      }
-      recs.forEach(function(p){ report(p[0], p[1], 'text'); });
-      return out;
+// Runs inside the page: reads one file with the parsing script's own functions
+// (<script id="exparsed-core"> defines them as globals) and reports one line per ledger.
+async function readOne([name, b64, ocr, macUrl]) {
+  const bytes = Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0));
+  const file = new File([bytes], name),
+    out = [];
+  const report = (rec, ledger, via) => {
+    const L = lgFileLedger(rec);
+    out.push({
+      ledger,
+      status: L.status,
+      note: L.note || "",
+      docKind: L.docKind || "",
+      rows: (L.rows || []).length,
+      via,
+    });
+  };
+  let c;
+  try {
+    c = await readFileContent(file);
+  } catch (e) {
+    return [
+      {
+        ledger: name,
+        status: "error",
+        note: String((e && e.message) || e),
+        via: "text",
+      },
+    ];
+  }
+  const rec = recordFromContent(name, file.size, c);
+  rec.blob = file;
+  let recs = c.children
+    ? c.children.map((k) => [
+        recordFromContent(k.name, file.size, k.content),
+        k.name,
+      ])
+    : [[rec, name]];
+  if (ocr && !c.children && lgFileLedger(rec).status === "needs-ocr") {
+    let r;
+    try {
+      r = await macOcrRead(rec, macHttpPort(macUrl), {
+        cancelled: () => false,
+        progress: () => {},
+        md: EXP.md,
+        now: () => Date.now(),
+        wait: (ms) => new Promise((res) => setTimeout(res, ms)),
+        log: () => {},
+      });
+    } catch (e) {
+      r = { ok: false, message: String((e && e.message) || e) };
+    }
+    if (!r || !r.ok)
+      return [
+        {
+          ledger: name,
+          status: "needs-ocr",
+          note: "OCR failed: " + ((r && r.message) || "no result"),
+          via: "ocr",
+        },
+      ];
+    const ocrFields = {
+      ocrStatus: "done",
+      ocrProvider: "Mac OCR",
+      ocrSecs: r.secs,
     };
-  })();
-  </script>`;
+    Object.assign(
+      rec,
+      { ocrMarkdown: r.text, ocrPages: r.pages || null },
+      ocrFields,
+    );
+    const kids = r.pages && lgAccountChildren(c, name, r.pages, ocrFields);
+    recs = kids
+      ? kids.map((k) => [
+          recordFromContent(k.name, file.size, k.content),
+          k.name,
+        ])
+      : [[rec, name]];
+    recs.forEach(([r2, n2]) => report(r2, n2, "ocr"));
+    return out;
+  }
+  recs.forEach(([r2, n2]) => report(r2, n2, "text"));
+  return out;
+}
 
 const EXT =
   /\.(pdf|csv|tsv|xlsx|xls|xlsm|xlsb|ods|txt|json|xml|ofx|qfx|qbo|jpg|jpeg|png|webp)$/i;
@@ -97,23 +153,7 @@ const walk = (d) =>
 
 async function run(dir, outFile, opts) {
   const { chromium } = require("playwright");
-  const html = fs.readFileSync(
-    path.join(__dirname, "..", "..", "exparsed.html"),
-    "utf8",
-  );
-  const end = html.lastIndexOf("\n  })();\n  </script>");
-  if (end < 0)
-    throw new Error(
-      'exparsed.html: closing "})();" of the main script not found; update HOOK placement',
-    );
-  const page = path.join(path.dirname(outFile), ".exparsed-hooked.html");
-  fs.writeFileSync(
-    page,
-    html.slice(0, end) +
-      HOOK +
-      html.slice(end + "\n  })();\n  </script>".length),
-  );
-
+  const page = path.join(__dirname, "..", "..", "exparsed.html");
   const done = new Set(
     fs.existsSync(outFile)
       ? fs
@@ -153,7 +193,7 @@ async function run(dir, outFile, opts) {
   const open = async () => {
     const p = await browser.newPage();
     await p.goto(url);
-    await p.waitForFunction(() => window.__exparsed);
+    await p.waitForFunction(() => typeof lgFileLedger === "function");
     return p;
   };
   let next = 0,
@@ -164,17 +204,18 @@ async function run(dir, outFile, opts) {
       const f = todo[next++],
         rel = path.relative(dir, f);
       let res;
-      const timer = new Promise((r) => setTimeout(() => r(null), limit));
+      let timeout;
+      const timer = new Promise(
+        (r) => (timeout = setTimeout(() => r(null), limit)),
+      );
       try {
         res = await Promise.race([
-          p.evaluate(
-            ([n, b, o]) => window.__exparsed(n, b, o),
-            [
-              path.basename(f),
-              fs.readFileSync(f).toString("base64"),
-              !!opts.ocr,
-            ],
-          ),
+          p.evaluate(readOne, [
+            path.basename(f),
+            fs.readFileSync(f).toString("base64"),
+            !!opts.ocr,
+            opts.macUrl,
+          ]),
           timer,
         ]);
       } catch (e) {
@@ -186,6 +227,7 @@ async function run(dir, outFile, opts) {
           },
         ];
       }
+      clearTimeout(timeout); // a pending timer would keep node alive after the last file
       if (!res) {
         res = [
           {
@@ -210,14 +252,13 @@ async function run(dir, outFile, opts) {
     Array.from({ length: Math.min(opts.workers, todo.length) || 1 }, worker),
   );
   await browser.close();
-  fs.unlinkSync(page);
 }
 
 const a = process.argv.slice(2);
 if (a[0] === "compare") compare(a[1], a[2]);
 else if (a.length < 2) {
   console.error(
-    "usage: node tests/batch/run.js <dir> <out.jsonl> [--ocr] [--workers 4] [--only list.txt]\n       node tests/batch/run.js compare <old.jsonl> <new.jsonl>",
+    "usage: node tests/batch/run.js <dir> <out.jsonl> [--ocr] [--mac-url http://127.0.0.1:8091] [--workers 4] [--only list.txt]\n       node tests/batch/run.js compare <old.jsonl> <new.jsonl>",
   );
   process.exit(2);
 } else {
@@ -229,6 +270,7 @@ else if (a.length < 2) {
     ocr: a.includes("--ocr"),
     workers: +(opt("--workers") || 4),
     only: opt("--only"),
+    macUrl: opt("--mac-url") || "http://127.0.0.1:8091",
   }).catch((e) => {
     console.error(e);
     process.exit(1);

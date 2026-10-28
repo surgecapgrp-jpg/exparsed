@@ -1,7 +1,7 @@
 // What a file needs (fileOcrNeed) and the Mac OCR reader (macOcrRead) run against a fake server port.
-// Loaded after formats.js, whose derivedKey stub ('1') lets a test hand a file a ready ledger.
+// withLedger hands a file a ready ledger by stamping lgFileLedger's cache key.
 function t(name, cond, info){ print((cond?'PASS ':'FAIL ')+name+(info?'  '+info:'')); }
-function withLedger(f, status){ f._ledgerKey='1:'+(f.ocrMarkdown?1:0); f._ledger={ status:status }; return f; }
+function withLedger(f, status){ f._ledgerKey=derivedKey(f)+':'+(f.ocrMarkdown?1:0); f._ledger={ status:status }; return f; }
 var PG=function(){ return { hasText:false, lines:[] }; };
 
 // ---- O1: the decision table, one record per state

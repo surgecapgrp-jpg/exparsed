@@ -1,5 +1,5 @@
-var $optRedact={checked:false}, $optCompactDesc={checked:false};
-function derivedKey(f){ return '1'; } function fileMarkdownFinal(f){ return f.md||''; } function redactStructuredPII(t){ return { text:t, hits:{} }; }
+// These checks read descriptions as printed, so the Redact toggle is off here.
+EXP.redact=false;
 function t(name, cond, info){ print((cond?'PASS ':'FAIL ')+name+(info?'  '+info:'')); }
 // ---- CSV: preamble lines above the header, signed amount + running balance (Chase-style CSV)
 var c1=parseCsvText('Account Name:,Business Checking\nAccount Number:,XXXXXX1234\n\nDetails,Posting Date,Description,Amount,Type,Balance,Check or Slip #\nDEBIT,01/07/2026,"ACH DEBIT ACME FUNDING",-1500.00,ACH_DEBIT,1975.00,\nDEBIT,01/06/2026,"POS PURCHASE STARBUCKS",-25.00,DEBIT_CARD,3475.00,\nCREDIT,01/05/2026,"DEPOSIT",2500.00,DEPOSIT,3500.00,\n', ',');

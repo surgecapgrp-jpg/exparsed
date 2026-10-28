@@ -65,9 +65,9 @@
   );
   var shown = exp({ redact: true, compact: true });
   ct(
-    // redaction is stubbed out until the parsing code loads as one script (formats.js stub)
-    "export with toggles: reference ids dropped",
-    !/Orig ID 1234567890/.test(desc(shown)) &&
+    "export with toggles: email redacted, reference ids dropped",
+    !/jane@example/.test(desc(shown)) &&
+      !/Orig ID 1234567890/.test(desc(shown)) &&
       !/Trace# 99887766/.test(desc(shown)),
     desc(shown),
   );

@@ -413,18 +413,12 @@
   </main>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script>
-  (function(){
-    "use strict";
-
-    var fatal=document.getElementById('fatal');
-    if (typeof pdfjsLib==='undefined'){
-      fatal.style.display='block';
-      fatal.textContent="Couldn't load the PDF engine (pdf.js) from the CDN. The network or page sandbox likely blocked it. Open this file directly in a browser, or check your network settings.";
-      return;
-    }
-    pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-
+  <script id="exparsed-core">
+  // Everything that turns file bytes into ledgers: extraction, markdown, redaction, the ledger
+  // readers and checks, computed figures, OCR decisions, the page rasterizer and the Mac OCR port.
+  // No DOM state: the page's toggles arrive through EXP (set by the page script). The page script
+  // below, tests/run-node.js, tests/run.sh and tests/batch/run.js all call these functions.
+  "use strict";
     // Where pdf.js fetches metrics for the 14 standard fonts a PDF may reference without
     // embedding. Without it, every such font logs "fetchStandardFontData: failed to fetch
     // file ... the standard font baseUrl parameter must be specified" and pdf.js falls back
@@ -439,177 +433,18 @@
     // same warning and carries on, so this degrades to today's behaviour rather than failing.
     var PDFJS_STANDARD_FONTS="https://unpkg.com/pdfjs-dist@3.11.174/standard_fonts/";
 
-    var ANTHROPIC="https://api.anthropic.com";
-    var ANTHROPIC_VERSION="2023-06-01";
-    // Anthropic requires this opt-in header for browser-side calls to bypass CORS.
-    // Its presence is why this file can call the API directly instead of needing a backend.
-    function anthropicHeaders(key){
-      return {
-        'Content-Type':'application/json',
-        'x-api-key':key,
-        'anthropic-version':ANTHROPIC_VERSION,
-        'anthropic-dangerous-direct-browser-access':'true'
-      };
+    // Page toggles the parsing code depends on. The page script keeps them current (syncEXP);
+    // tests and the batch run use these defaults. gen is bumped when every file's output changes.
+    var EXP={ redact:true, compact:false, md:{ hf:true, hyph:true, head:false, page:false }, gen:0 };
+    // Cache stamp for derived markdown and ledgers (fileMarkdown, fileMarkdownFinal, lgFileLedger).
+    function derivedKey(f){ return EXP.gen+':'+(f.rev||0)+':'+(EXP.redact?'1':'0'); }
+    // A list record for one file; the page adds its id.
+    function newRecord(name, size, blob){
+      return { name:name, size:size, blob:blob||null, status:'busy', type:null, pages:[], scanned:0, error:null, markdown:null,
+               rowCount:0, sheetCount:0, mergeCount:0, delim:null, nodeCount:0, xmlError:false, ocrMarkdown:null, ocrStatus:null, ocrSecs:null,
+               ocrUsage:null, ocrLive:'', ocrErrorFull:null, ocrProvider:null, redactHeaderLines:null, redactHits:null, redactBoundaryFound:null, rev:0 };
     }
-
-    var OPENROUTER="https://openrouter.ai";
-    var MAC_DEFAULT_URL="http://127.0.0.1:8091";    // mac_ocr_server.py's default port
-    // mac_ocr_server.py sits in the same folder as this html. Opened from disk, the page knows
-    // that folder, so the start command names the real path and stays right if the folder moves.
-    var MAC_SERVER_FALLBACK='/Users/springfunding/JuniMyAgentVault/03_Agent_Wiki/pdf-vision-ocr/mac_ocr_server.py';
-    var MAC_SERVER_PATH=(function(){
-      try{
-        if(location.protocol==='file:') return decodeURIComponent(location.pathname.replace(/[^\/]*$/,''))+'mac_ocr_server.py';
-      }catch(e){}
-      return MAC_SERVER_FALLBACK;
-    })();
-    function shellQuote(p){ return /^[\w\/.~-]+$/.test(p) ? p : "'"+p.replace(/'/g,"'\\''")+"'"; }
-    var MAC_START_LINE='python3 '+shellQuote(MAC_SERVER_PATH);
-    var MAC_START_CMD='in Terminal: '+MAC_START_LINE;
-
-    // Per-model output ceilings, populated live from Anthropic's models endpoint (max_tokens).
-    // Keyed "provider:modelId". Empty until a successful key check runs, so every read falls
-    // back to a conservative floor that is valid on every current Claude model.
-    var modelMaxTokens={};
-    var MAX_TOKENS_FALLBACK={ claude:32000 };
-    // Hard ceiling applied on top of whatever the API reports. A full bank statement
-    // transcript runs well under this; going higher buys nothing for this workload and
-    // only widens the blast radius if a provider ever reports a bogus limit.
-    var MAX_TOKENS_CEILING=64000;
-
-    function maxTokensFor(provider, model){
-      var lim=modelMaxTokens[provider+':'+model] || MAX_TOKENS_FALLBACK[provider] || 32000;
-      return Math.min(lim, MAX_TOKENS_CEILING);
-    }
-
-    var files=[], selectedId=null, nextId=1, apiKey='', orApiKey='', keyTimer=null, orKeyTimer=null;
-    // Cache stamp for derived markdown (see fileMarkdown / fileMarkdownFinal). Bumped when
-    // a setting that changes EVERY file's output changes; each record also carries its own
-    // `rev`, bumped when that one file's content changes.
-    var derivedGen=0;
-    function bumpDerived(){ derivedGen++; }
-    function derivedKey(f){ return derivedGen+':'+(f.rev||0)+':'+($optRedact.checked?'1':'0'); }
-    function touchFile(f){ if(f) f.rev=(f.rev||0)+1; }
-    var ocrQueue=[], ocrRunning=false, ocrGen=0, ocrAbort=new AbortController();
-    function abortOcr(){
-      ocrGen++;
-      ocrQueue.length=0;
-      ocrRunning=false;
-      try{ ocrAbort.abort(); }catch(e){}
-      ocrAbort=new AbortController();
-    }
-    function isOcrAbort(err){
-      return !!(err && (err.name==='AbortError' || /aborted|AbortError/i.test(err.message||'')));
-    }
-
-    function el(id){ return document.getElementById(id); }
-    var $files=el('files'), $output=el('output'), $outname=el('outname'), $outstats=el('outstats'),
-        $agg=el('agg'), $copy=el('copy'), $download=el('download'), $downloadJson=el('downloadJson'), $dlAll=el('downloadAll'), $dlAllJson=el('downloadAllJson'),
-        $dlPdf=el('downloadPdf'), $dlAllPdf=el('downloadAllPdf'), $exportBtn=el('exportBtn'), $exportMenu=el('exportMenu'),
-        $clear=el('clear'), $prog=el('progress'), $bar=$prog.querySelector('.bar'),
-        $apiKey=el('apiKey'), $model=el('model'), $keystate=el('keystate'),
-        $orApiKey=el('orApiKey'), $orModel=el('orModel'), $orModelFilter=el('orModelFilter'), $orEngine=el('orEngine'), $orKeystate=el('orKeystate'),
-        $macUrl=el('macUrl'), $macKeystate=el('macKeystate'),
-        $optOcr=el('optOcr'), $optRedact=el('optRedact'), $optCompactDesc=el('optCompactDesc'),
-        $dlLedger=el('downloadLedger'), $underwrite=el('underwrite'), $dlIntegrity=el('downloadIntegrity'),
-        $reviewRedact=el('reviewRedact'), $redactPanel=el('redactPanel'), $redactSummary=el('redactSummary'),
-        $redactCloseBtn=el('redactCloseBtn'), $redactLines=el('redactLines');
-
-    // persistence (settings only, never the key)
-    var LS_OK=(function(){ try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); return true; }catch(e){ return false; } })();
-    function lsGet(k,d){ if(!LS_OK) return d; try{ var v=localStorage.getItem(k); return v===null?d:v; }catch(e){ return d; } }
-    function lsSet(k,v){ if(!LS_OK) return; try{ localStorage.setItem(k,v); }catch(e){} }
-
-    var opt={ hf:el('optHF'), hyph:el('optHyph'), head:el('optHead'), page:el('optPage') };
-
-    // Restore prior settings. A saved Claude model that isn't a Claude id (a leftover from an
-    // older version of this tool) is dropped so the tool never sends Anthropic an invalid model.
-    function seedSelect(sel, value, emptyLabel){
-      if(!sel) return;
-      sel.innerHTML='';
-      var o=document.createElement('option');
-      o.value=value||'';
-      o.textContent=value||emptyLabel||'Choose a model';
-      sel.appendChild(o);
-    }
-    function fillModelSelect(sel, opts, persistKey, preferred){
-      if(!sel) return;
-      var current=(sel.value||'').trim() || preferred || '';
-      var seen={};
-      var list=[];
-      function add(id){
-        if(!id || seen[id]) return;
-        seen[id]=1;
-        list.push(id);
-      }
-      add(current);
-      (opts||[]).forEach(add);
-      if(!list.length){
-        seedSelect(sel, '', 'Models appear after the key is accepted');
-        return;
-      }
-      sel.innerHTML=list.map(function(id){
-        return '<option value="'+escapeHtml(id)+'">'+escapeHtml(id)+'</option>';
-      }).join('');
-      sel.value=seen[current] ? current : list[0];
-      if(persistKey && sel.value) lsSet(persistKey, sel.value);
-    }
-    var orModelAll=[];
-    function renderOrModelSelect(){
-      var q=(($orModelFilter && $orModelFilter.value)||'').trim().toLowerCase();
-      var shown=orModelAll.filter(function(id){ return !q || id.toLowerCase().indexOf(q)>=0; });
-      // persistKey deliberately null: this runs on every keystroke in the model SEARCH
-      // box, and fillModelSelect writes sel.value to localStorage. Filtering would
-      // therefore silently overwrite the operator's saved model with whatever happened to
-      // sort first under the current query. The choice is persisted where it is actually
-      // made -- the select's own 'change' handler.
-      fillModelSelect($orModel, shown, null, ($orModel && $orModel.dataset.pref)||'');
-    }
-
-    var savedModel=lsGet('mdx.model','');
-    if(savedModel && !/^claude/i.test(savedModel)){ savedModel=''; lsSet('mdx.model',''); }
-    seedSelect($model, savedModel, 'Paste a Claude key first');
-    var savedOrModel=lsGet('mdx.orModel','openrouter/free');
-    if(savedOrModel && savedOrModel.indexOf('/')===-1){ savedOrModel=''; lsSet('mdx.orModel',''); }
-    seedSelect($orModel, savedOrModel, 'Paste an OpenRouter key first');
-    $orEngine.value=lsGet('mdx.orEngine','');
-    $macUrl.value=lsGet('mdx.macUrl',MAC_DEFAULT_URL);
-    $optOcr.checked=lsGet('mdx.ocr','0')==='1';
-    opt.hf.checked=lsGet('mdx.hf','1')==='1';
-    opt.hyph.checked=lsGet('mdx.hyph','1')==='1';
-    opt.head.checked=lsGet('mdx.head','0')==='1';
-    opt.page.checked=lsGet('mdx.page','0')==='1';
-    $optRedact.checked=lsGet('mdx.redact','1')==='1';
-    $optRedact.addEventListener('change',function(){ lsSet('mdx.redact',$optRedact.checked?'1':'0'); bumpDerived(); renderAll(); });
-    $optCompactDesc.checked=lsGet('mdx.compactDesc','0')==='1';
-    $optCompactDesc.addEventListener('change',function(){ lsSet('mdx.compactDesc',$optCompactDesc.checked?'1':'0'); });
-
-    Object.keys(opt).forEach(function(k){ opt[k].addEventListener('change',function(){ lsSet('mdx.'+k, opt[k].checked?'1':'0'); bumpDerived(); renderAll(); }); });
-    $optOcr.addEventListener('change',function(){ lsSet('mdx.ocr',$optOcr.checked?'1':'0'); });
-    $model.addEventListener('change',function(){ lsSet('mdx.model',$model.value.trim()); renderList(); });
-    $orModel.addEventListener('change',function(){ lsSet('mdx.orModel',$orModel.value.trim()); renderList(); });
-    $orEngine.addEventListener('change',function(){ lsSet('mdx.orEngine',$orEngine.value); });
-    if($orModelFilter) $orModelFilter.addEventListener('input', renderOrModelSelect);
-    $macUrl.addEventListener('input',function(){ lsSet('mdx.macUrl',$macUrl.value.trim()||MAC_DEFAULT_URL); scheduleMacPing(); renderList(); });
-
-    function options(){ return { hf:opt.hf.checked, hyph:opt.hyph.checked, head:opt.head.checked, page:opt.page.checked }; }
-    function estTokens(s){ return Math.ceil(s.length/4); }
-    function fmt(n){ return n.toLocaleString('en-US'); }
-    // Reasoning tokens: only OpenRouter's usage object can carry these here (Claude OCR calls
-    // never enable extended thinking, and Mac OCR returns no usage, so neither populates
-    // this). The field is optional even for OpenRouter
-    // -- some models do internal reasoning without ever reporting it (a known, documented
-    // OpenRouter behavior, not a bug in this check) -- so absence must render as "nothing to
-    // show," never as 0 or "undefined". Verified against OpenRouter's own API reference:
-    // completion_tokens_details.reasoning_tokens (snake_case wire format, NOT the SDK's
-    // camelCased completionTokensDetails.reasoningTokens -- those are two different things).
-    function reasoningTokens(usage){
-      var d=usage&&usage.completion_tokens_details;
-      var n=d&&d.reasoning_tokens;
-      return (typeof n==='number'&&n>0)?n:null;
-    }
-    function kb(b){ if(!b) return '0 KB'; return (b/1024)>=1024 ? (b/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(b/1024))+' KB'; }
-    function escapeHtml(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+    function recordFromContent(name, size, content){ var r=newRecord(name, size, null); Object.assign(r, content); r._content=content; r.status='done'; return r; }
 
     /* ============ EXTRACTION ============ */
     function assembleLine(items){
@@ -1470,7 +1305,7 @@
       });
       return '```\n'+rows.join('\n')+'\n```';
     }
-    function computeMarkdown(f){ if(f.error) return ''; if(f.ocrPages) return buildMarkdown(f.ocrPages,options()); if(f.ocrMarkdown) return f.ocrMarkdown; if(f.markdown) return f.markdown; return buildMarkdown(f.pages,options()); }
+    function computeMarkdown(f){ if(f.error) return ''; if(f.ocrPages) return buildMarkdown(f.ocrPages,EXP.md); if(f.ocrMarkdown) return f.ocrMarkdown; if(f.markdown) return f.markdown; return buildMarkdown(f.pages,EXP.md); }
     // Memoized. renderList() calls fileMarkdownFinal() once per row purely to show a token
     // estimate, and renderList() is bound to per-keystroke `input` events (the key and URL
     // fields) -- without the cache each keystroke re-ran buildMarkdown() across every page
@@ -1614,7 +1449,7 @@
     }
     function computeMarkdownFinal(f){
       var raw=fileMarkdown(f);
-      if(!raw || !$optRedact.checked){ f.redactHits=null; return raw; }
+      if(!raw || !EXP.redact){ f.redactHits=null; return raw; }
       var structured=redactStructuredPII(raw);
       f.redactHits=structured.hits;
       if(!headerRedactionApplies(f)){ f.redactHeaderLines=null; f.redactBoundaryFound=null; return structured.text; }
@@ -1719,8 +1554,8 @@
     function fileToJson(f){
       var md=fileMarkdownFinal(f)||'';
       var tables=parseMarkdownTables(md);
-      var headerRedacted=!!($optRedact.checked && (f.redactHeaderLines||[]).some(function(c){return c.redact;}));
-      var piiRedacted=!!($optRedact.checked && f.redactHits && Object.keys(f.redactHits).some(function(k){ return f.redactHits[k]>0; }));
+      var headerRedacted=!!(EXP.redact && (f.redactHeaderLines||[]).some(function(c){return c.redact;}));
+      var piiRedacted=!!(EXP.redact && f.redactHits && Object.keys(f.redactHits).some(function(k){ return f.redactHits[k]>0; }));
       return {
         name: f.name,
         type: f.type||null,
@@ -4861,8 +4696,8 @@
     // screen; underwriting passes {redact:false, compact:false, markdown:false} and so always gets
     // the bank's printed text, whatever the toggles say (stable txn ids, real funder text).
     function lgExportOpts(o){ o=o||{};
-      return { redact:o.redact!=null ? !!o.redact : !!($optRedact && $optRedact.checked),
-        compact:o.compact!=null ? !!o.compact : !!(typeof $optCompactDesc!=='undefined' && $optCompactDesc && $optCompactDesc.checked),
+      return { redact:o.redact!=null ? !!o.redact : EXP.redact,
+        compact:o.compact!=null ? !!o.compact : EXP.compact,
         markdown:o.markdown!==false }; }
     function lgRedactDesc(s, O){ return lgExportOpts(O).redact ? redactStructuredPII(s).text : s; }
     // Optional: drop pure reference-number fields (trace, TRN, IMAD, payment/reference IDs).
@@ -5389,6 +5224,369 @@
       return f.type==='image' ? viaImage() : viaServer();
     }
 
+    // A file's content: everything read from its bytes (type, pages, text, a ledger it carries, the
+    // files or accounts it holds) and nothing about its row in the list (status, OCR progress,
+    // selection). readFileContent(file) gives a Promise of it; the Promise rejects when the file cannot
+    // be read (a password, a page that will not read), with what was read so far as err.content.
+    // A text-layer PDF statement holding several accounts comes back as one child content per
+    // account (lgAccountChildren); recFromContent makes a list record from a content.
+    function readFileContent(file){
+      var c={ type:null, pages:[], scanned:0, error:null, markdown:null, rowCount:0, sheetCount:0, mergeCount:0, delim:null, nodeCount:0, xmlError:false };
+      return dispatchFile(file, c).then(function(){
+        if(c.type==='pdf' && !c.error && !c.children && !c.suspectText && c.pages.length && c.scanned!==c.pages.length){
+          var kids=lgAccountChildren(c, file.name, c.pages, null); if(kids) c.children=kids; }
+        return c;
+      }, function(e){ if(e && typeof e==='object') e.content=c; throw e; });
+    }
+    // One child { name, content } per account (lgSplitAccounts), or null for a single account.
+    // pages: the pages to split (the text layer, or Mac OCR's pages with ocr holding the OCR fields).
+    function lgAccountChildren(c, name, pages, ocr){
+      var parts=null; try{ parts=lgSplitAccounts(pages) || lgSplitStatements(pages); }catch(e){ parts=null; }
+      if(!parts) return null;
+      return parts.map(function(p){
+        var k=Object.assign({}, c, { children:undefined, splitFrom:name, splitLabel:p.label, splitOf:parts.length },
+          p.statement ? { splitStatement:p.id } : { splitAccount:p.id });
+        if(ocr){ k.ocrPages=p.pages; k.ocrMarkdown=buildMarkdown(p.pages, EXP.md).trim(); Object.assign(k, ocr); }
+        else { k.pages=p.pages; k.scanned=0; k.suspectText=false; k.suspectPages=[]; }
+        return { name:name+' · '+p.id, content:k }; });
+    }
+
+    /* ============ OCR: PAGE RASTERIZER (Mac OCR) ============ */
+    // Claude and OpenRouter take the PDF itself; Mac OCR reads page IMAGES, so pages
+    // are drawn with pdf.js, one at a time and only when needed: pages served from the PDF
+    // text layer are never rasterized, and only the page being transcribed is in memory
+    // (drawing the whole statement up front held 20-30 MB of base64 for a 40-page file, on
+    // the same 16 GB machine hosting the model).
+    //
+    // Render size: ~2200px on the long edge (about 200 DPI for Letter).
+    var PAGE_RENDER_SCALE=3, PAGE_MAX_EDGE=2200, PAGE_JPEG_QUALITY=0.92;
+    // Blank-page test. It runs on a copy scaled to a fixed reference size (a Letter page at
+    // 1188px), because ink coverage depends on render size: sharper renders draw thinner,
+    // less anti-aliased strokes. A page counts as blank only when under 0.1% of its pixels
+    // carry any ink. Measured at the reference size (every pixel): a digitally blank page is
+    // 0%, a scanned page with 2 transaction rows 0.30%, 4 rows 0.61%. The old test (0.8% of an
+    // 80-column sample grid) scored those 0.37% and 0.52% and skipped both as blank, silently
+    // dropping real transactions; a 6-row page cleared it by 0.06 points. The asymmetry sets
+    // the threshold: sending a truly blank page costs ~2s of free local compute, skipping a
+    // real one loses statement data without any warning.
+    var BLANK_REF_SCALE=1.5, BLANK_REF_MAX_EDGE=1400, BLANK_INK_RATIO=0.001;
+
+    function canvasMostlyBlank(ctx, w, h){
+      try{
+        var d=ctx.getImageData(0,0,w,h).data, n=d.length>>2;
+        if(!n) return false;
+        var limit=Math.floor(n*BLANK_INK_RATIO), ink=0;
+        for(var i=0;i<d.length;i+=4){
+          if(d[i]<248 || d[i+1]<248 || d[i+2]<248){ if(++ink>limit) return false; }
+        }
+        return true;
+      }catch(e){ return false; }
+    }
+
+    function openPdfRasterizer(blob){
+      return blob.arrayBuffer().then(function(buf){
+        // isEvalSupported:false is the security mitigation explained at extract() -- it must
+        // stay on this getDocument call too, since this is the path that renders glyphs.
+        return pdfjsLib.getDocument({ data:new Uint8Array(buf), isEvalSupported:false, standardFontDataUrl:PDFJS_STANDARD_FONTS }).promise;
+      }).then(function(pdf){
+        return {
+          count: pdf.numPages,
+          page: function(idx){
+            return pdf.getPage(idx+1).then(function(page){
+              var base=page.getViewport({ scale:1 }), nativeMax=Math.max(base.width, base.height)||1;
+              var scale=Math.min(PAGE_RENDER_SCALE, PAGE_MAX_EDGE/nativeMax);
+              var refScale=Math.min(BLANK_REF_SCALE, BLANK_REF_MAX_EDGE/nativeMax);
+              var vp=page.getViewport({ scale:scale });
+              var canvas=document.createElement('canvas');
+              canvas.width=vp.width; canvas.height=vp.height;
+              var ctx=canvas.getContext('2d', { alpha:false });
+              return page.render({ canvasContext:ctx, viewport:vp }).promise.then(function(){
+                try{ page.cleanup(); }catch(e){}
+                return finishPageCanvas(canvas, refScale/scale);
+              });
+            });
+          },
+          close: function(){ try{ pdf.destroy(); }catch(e){} }
+        };
+      });
+    }
+
+    // Blank test on a reference-size copy, then JPEG-encode the page and free the canvas.
+    function finishPageCanvas(canvas, refRatio){
+      var ref=document.createElement('canvas');
+      ref.width=Math.max(1, Math.round(canvas.width*refRatio));
+      ref.height=Math.max(1, Math.round(canvas.height*refRatio));
+      var rctx=ref.getContext('2d', { alpha:false });
+      rctx.imageSmoothingEnabled=true; rctx.imageSmoothingQuality='high';
+      rctx.drawImage(canvas, 0, 0, ref.width, ref.height);
+      var blank=canvasMostlyBlank(rctx, ref.width, ref.height);
+      ref.width=0; ref.height=0;
+      var dataUrl=canvas.toDataURL('image/jpeg', PAGE_JPEG_QUALITY);
+      canvas.width=0; canvas.height=0;
+      return { b64:dataUrl.slice(dataUrl.indexOf(',')+1), blank:blank };
+    }
+    // Draw an image file (honouring phone EXIF rotation) onto a white canvas no larger than
+    // maxEdge -- white, because a transparent PNG would otherwise turn black under JPEG.
+    function drawImageFile(blob, maxEdge){
+      return createImageBitmap(blob, { imageOrientation:'from-image' }).then(function(bmp){
+        var scale=Math.min(1, maxEdge/Math.max(bmp.width, bmp.height, 1));
+        var canvas=document.createElement('canvas');
+        canvas.width=Math.max(1, Math.round(bmp.width*scale)); canvas.height=Math.max(1, Math.round(bmp.height*scale));
+        var ctx=canvas.getContext('2d', { alpha:false });
+        ctx.fillStyle='#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
+        ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+        if(bmp.close) bmp.close();
+        return canvas;
+      });
+    }
+    // Same interface as openPdfRasterizer(): one page, the image itself.
+    function openImageRasterizer(blob){
+      return Promise.resolve({
+        count:1,
+        page:function(){ return drawImageFile(blob, PAGE_MAX_EDGE).then(function(canvas){
+          // a photo has no page size; its long edge is taken as a Letter page's 792 pt
+          var pxPerPt=Math.max(canvas.width, canvas.height)/792, heightPt=canvas.height/pxPerPt;
+          // reference size for the blank test: a Letter page's long edge at the reference scale
+          var out=finishPageCanvas(canvas, Math.min(1, 1188/Math.max(canvas.width, canvas.height)));
+          out.pxPerPt=pxPerPt; out.heightPt=heightPt;
+          return out;
+        }); },
+        close:function(){}
+      });
+    }
+    function openPageSource(f){ return f.type==='image' ? openImageRasterizer(f.blob) : openPdfRasterizer(f.blob); }
+    // The Mac OCR server (mac_ocr_server.py) as a port for macOcrRead. Every request carries the run's
+    // abort signal, except the release, which must still reach the server after a cancel.
+    // Reads a failed response once and pulls out the provider's own error message.
+    function httpFailure(response, label){
+      return response.text().then(function(text){
+        console.error('['+label+'] HTTP', response.status, response.statusText, '\n', text);
+        var short='HTTP '+response.status, errType=null;
+        try{
+          var j=JSON.parse(text), e=j && j.error;
+          if(e && typeof e==='object' && e.message){ short+=': '+e.message; errType=e.type||null; }
+          else if(typeof e==='string'){ short+=': '+e; }
+          else if(j && j.message){ short+=': '+j.message; }
+        }catch(_){}
+        return { status:response.status, short:short, errType:errType, full:'HTTP '+response.status+' '+(response.statusText||'')+'\n\n'+text };
+      });
+    }
+    // help: optional function giving start instructions, appended to the diagnostic.
+    function macHttpPort(base, signal, help){
+      return {
+        upload:function(blob){ return fetch(base+'/pdf', { method:'POST', headers:{ 'Content-Type':'application/pdf' }, signal:signal, body:blob }); },
+        page:function(id, i){ return fetch(base+'/pdf/'+id+'/'+i, { signal:signal }); },
+        release:function(id){ fetch(base+'/pdf/'+id, { method:'DELETE' }).catch(function(){}); },
+        // a photo is drawn here (rotation from its EXIF applied) and sent as a JPEG
+        image:function(f){
+          return openPageSource(f).then(function(doc){
+            return doc.page(0).then(function(img){
+              return fetch(base+'/ocr', { method:'POST', headers:{ 'Content-Type':'application/json' }, signal:signal,
+                body: JSON.stringify({ image:'data:image/jpeg;base64,'+img.b64 }) })
+                .then(function(response){
+                  if(!response.ok) return response;
+                  return { ok:true, json:function(){ return response.json().then(function(v){ v.pxPerPt=img.pxPerPt; v.heightPt=img.heightPt; return v; }); } };
+                });
+            }).then(function(r){ doc.close(); return r; }, function(e){ doc.close(); throw e; });
+          });
+        },
+        fail:function(response, pageNo, total){
+          return httpFailure(response, 'OCR/Mac OCR').then(function(h){
+            return { ok:false, message:(h.short+(pageNo?' on page '+pageNo:'')).slice(0,140),
+              fullDiagnostic:'Mac OCR '+h.full+(pageNo?'\n\n(page '+pageNo+' of '+total+')':'')+(help?'\n\n'+help():'') };
+          });
+        }
+      };
+    }
+
+  </script>
+  <script>
+  (function(){
+    "use strict";
+
+    var fatal=document.getElementById('fatal');
+    if (typeof pdfjsLib==='undefined'){
+      fatal.style.display='block';
+      fatal.textContent="Couldn't load the PDF engine (pdf.js) from the CDN. The network or page sandbox likely blocked it. Open this file directly in a browser, or check your network settings.";
+      return;
+    }
+    pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+
+    var ANTHROPIC="https://api.anthropic.com";
+    var ANTHROPIC_VERSION="2023-06-01";
+    // Anthropic requires this opt-in header for browser-side calls to bypass CORS.
+    // Its presence is why this file can call the API directly instead of needing a backend.
+    function anthropicHeaders(key){
+      return {
+        'Content-Type':'application/json',
+        'x-api-key':key,
+        'anthropic-version':ANTHROPIC_VERSION,
+        'anthropic-dangerous-direct-browser-access':'true'
+      };
+    }
+
+    var OPENROUTER="https://openrouter.ai";
+    var MAC_DEFAULT_URL="http://127.0.0.1:8091";    // mac_ocr_server.py's default port
+    // mac_ocr_server.py sits in the same folder as this html. Opened from disk, the page knows
+    // that folder, so the start command names the real path and stays right if the folder moves.
+    var MAC_SERVER_FALLBACK='/Users/springfunding/JuniMyAgentVault/03_Agent_Wiki/pdf-vision-ocr/mac_ocr_server.py';
+    var MAC_SERVER_PATH=(function(){
+      try{
+        if(location.protocol==='file:') return decodeURIComponent(location.pathname.replace(/[^\/]*$/,''))+'mac_ocr_server.py';
+      }catch(e){}
+      return MAC_SERVER_FALLBACK;
+    })();
+    function shellQuote(p){ return /^[\w\/.~-]+$/.test(p) ? p : "'"+p.replace(/'/g,"'\\''")+"'"; }
+    var MAC_START_LINE='python3 '+shellQuote(MAC_SERVER_PATH);
+    var MAC_START_CMD='in Terminal: '+MAC_START_LINE;
+
+    // Per-model output ceilings, populated live from Anthropic's models endpoint (max_tokens).
+    // Keyed "provider:modelId". Empty until a successful key check runs, so every read falls
+    // back to a conservative floor that is valid on every current Claude model.
+    var modelMaxTokens={};
+    var MAX_TOKENS_FALLBACK={ claude:32000 };
+    // Hard ceiling applied on top of whatever the API reports. A full bank statement
+    // transcript runs well under this; going higher buys nothing for this workload and
+    // only widens the blast radius if a provider ever reports a bogus limit.
+    var MAX_TOKENS_CEILING=64000;
+
+    function maxTokensFor(provider, model){
+      var lim=modelMaxTokens[provider+':'+model] || MAX_TOKENS_FALLBACK[provider] || 32000;
+      return Math.min(lim, MAX_TOKENS_CEILING);
+    }
+
+    var files=[], selectedId=null, nextId=1, apiKey='', orApiKey='', keyTimer=null, orKeyTimer=null;
+    // Cache stamp for derived markdown (see fileMarkdown / fileMarkdownFinal). Bumped when
+    // a setting that changes EVERY file's output changes; each record also carries its own
+    // `rev`, bumped when that one file's content changes.
+    // The parsing script reads the page toggles from EXP only; syncEXP copies them there.
+    function syncEXP(){ EXP.redact=$optRedact.checked; EXP.compact=$optCompactDesc.checked; EXP.md=options(); }
+    function bumpDerived(){ syncEXP(); EXP.gen++; }
+    function touchFile(f){ if(f) f.rev=(f.rev||0)+1; }
+    var ocrQueue=[], ocrRunning=false, ocrGen=0, ocrAbort=new AbortController();
+    function abortOcr(){
+      ocrGen++;
+      ocrQueue.length=0;
+      ocrRunning=false;
+      try{ ocrAbort.abort(); }catch(e){}
+      ocrAbort=new AbortController();
+    }
+    function isOcrAbort(err){
+      return !!(err && (err.name==='AbortError' || /aborted|AbortError/i.test(err.message||'')));
+    }
+
+    function el(id){ return document.getElementById(id); }
+    var $files=el('files'), $output=el('output'), $outname=el('outname'), $outstats=el('outstats'),
+        $agg=el('agg'), $copy=el('copy'), $download=el('download'), $downloadJson=el('downloadJson'), $dlAll=el('downloadAll'), $dlAllJson=el('downloadAllJson'),
+        $dlPdf=el('downloadPdf'), $dlAllPdf=el('downloadAllPdf'), $exportBtn=el('exportBtn'), $exportMenu=el('exportMenu'),
+        $clear=el('clear'), $prog=el('progress'), $bar=$prog.querySelector('.bar'),
+        $apiKey=el('apiKey'), $model=el('model'), $keystate=el('keystate'),
+        $orApiKey=el('orApiKey'), $orModel=el('orModel'), $orModelFilter=el('orModelFilter'), $orEngine=el('orEngine'), $orKeystate=el('orKeystate'),
+        $macUrl=el('macUrl'), $macKeystate=el('macKeystate'),
+        $optOcr=el('optOcr'), $optRedact=el('optRedact'), $optCompactDesc=el('optCompactDesc'),
+        $dlLedger=el('downloadLedger'), $underwrite=el('underwrite'), $dlIntegrity=el('downloadIntegrity'),
+        $reviewRedact=el('reviewRedact'), $redactPanel=el('redactPanel'), $redactSummary=el('redactSummary'),
+        $redactCloseBtn=el('redactCloseBtn'), $redactLines=el('redactLines');
+
+    // persistence (settings only, never the key)
+    var LS_OK=(function(){ try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); return true; }catch(e){ return false; } })();
+    function lsGet(k,d){ if(!LS_OK) return d; try{ var v=localStorage.getItem(k); return v===null?d:v; }catch(e){ return d; } }
+    function lsSet(k,v){ if(!LS_OK) return; try{ localStorage.setItem(k,v); }catch(e){} }
+
+    var opt={ hf:el('optHF'), hyph:el('optHyph'), head:el('optHead'), page:el('optPage') };
+
+    // Restore prior settings. A saved Claude model that isn't a Claude id (a leftover from an
+    // older version of this tool) is dropped so the tool never sends Anthropic an invalid model.
+    function seedSelect(sel, value, emptyLabel){
+      if(!sel) return;
+      sel.innerHTML='';
+      var o=document.createElement('option');
+      o.value=value||'';
+      o.textContent=value||emptyLabel||'Choose a model';
+      sel.appendChild(o);
+    }
+    function fillModelSelect(sel, opts, persistKey, preferred){
+      if(!sel) return;
+      var current=(sel.value||'').trim() || preferred || '';
+      var seen={};
+      var list=[];
+      function add(id){
+        if(!id || seen[id]) return;
+        seen[id]=1;
+        list.push(id);
+      }
+      add(current);
+      (opts||[]).forEach(add);
+      if(!list.length){
+        seedSelect(sel, '', 'Models appear after the key is accepted');
+        return;
+      }
+      sel.innerHTML=list.map(function(id){
+        return '<option value="'+escapeHtml(id)+'">'+escapeHtml(id)+'</option>';
+      }).join('');
+      sel.value=seen[current] ? current : list[0];
+      if(persistKey && sel.value) lsSet(persistKey, sel.value);
+    }
+    var orModelAll=[];
+    function renderOrModelSelect(){
+      var q=(($orModelFilter && $orModelFilter.value)||'').trim().toLowerCase();
+      var shown=orModelAll.filter(function(id){ return !q || id.toLowerCase().indexOf(q)>=0; });
+      // persistKey deliberately null: this runs on every keystroke in the model SEARCH
+      // box, and fillModelSelect writes sel.value to localStorage. Filtering would
+      // therefore silently overwrite the operator's saved model with whatever happened to
+      // sort first under the current query. The choice is persisted where it is actually
+      // made -- the select's own 'change' handler.
+      fillModelSelect($orModel, shown, null, ($orModel && $orModel.dataset.pref)||'');
+    }
+
+    var savedModel=lsGet('mdx.model','');
+    if(savedModel && !/^claude/i.test(savedModel)){ savedModel=''; lsSet('mdx.model',''); }
+    seedSelect($model, savedModel, 'Paste a Claude key first');
+    var savedOrModel=lsGet('mdx.orModel','openrouter/free');
+    if(savedOrModel && savedOrModel.indexOf('/')===-1){ savedOrModel=''; lsSet('mdx.orModel',''); }
+    seedSelect($orModel, savedOrModel, 'Paste an OpenRouter key first');
+    $orEngine.value=lsGet('mdx.orEngine','');
+    $macUrl.value=lsGet('mdx.macUrl',MAC_DEFAULT_URL);
+    $optOcr.checked=lsGet('mdx.ocr','0')==='1';
+    opt.hf.checked=lsGet('mdx.hf','1')==='1';
+    opt.hyph.checked=lsGet('mdx.hyph','1')==='1';
+    opt.head.checked=lsGet('mdx.head','0')==='1';
+    opt.page.checked=lsGet('mdx.page','0')==='1';
+    $optRedact.checked=lsGet('mdx.redact','1')==='1';
+    $optRedact.addEventListener('change',function(){ lsSet('mdx.redact',$optRedact.checked?'1':'0'); bumpDerived(); renderAll(); });
+    $optCompactDesc.checked=lsGet('mdx.compactDesc','0')==='1';
+    $optCompactDesc.addEventListener('change',function(){ lsSet('mdx.compactDesc',$optCompactDesc.checked?'1':'0'); syncEXP(); });
+
+    Object.keys(opt).forEach(function(k){ opt[k].addEventListener('change',function(){ lsSet('mdx.'+k, opt[k].checked?'1':'0'); bumpDerived(); renderAll(); }); });
+    syncEXP();
+    $optOcr.addEventListener('change',function(){ lsSet('mdx.ocr',$optOcr.checked?'1':'0'); });
+    $model.addEventListener('change',function(){ lsSet('mdx.model',$model.value.trim()); renderList(); });
+    $orModel.addEventListener('change',function(){ lsSet('mdx.orModel',$orModel.value.trim()); renderList(); });
+    $orEngine.addEventListener('change',function(){ lsSet('mdx.orEngine',$orEngine.value); });
+    if($orModelFilter) $orModelFilter.addEventListener('input', renderOrModelSelect);
+    $macUrl.addEventListener('input',function(){ lsSet('mdx.macUrl',$macUrl.value.trim()||MAC_DEFAULT_URL); scheduleMacPing(); renderList(); });
+
+    function options(){ return { hf:opt.hf.checked, hyph:opt.hyph.checked, head:opt.head.checked, page:opt.page.checked }; }
+    function estTokens(s){ return Math.ceil(s.length/4); }
+    function fmt(n){ return n.toLocaleString('en-US'); }
+    // Reasoning tokens: only OpenRouter's usage object can carry these here (Claude OCR calls
+    // never enable extended thinking, and Mac OCR returns no usage, so neither populates
+    // this). The field is optional even for OpenRouter
+    // -- some models do internal reasoning without ever reporting it (a known, documented
+    // OpenRouter behavior, not a bug in this check) -- so absence must render as "nothing to
+    // show," never as 0 or "undefined". Verified against OpenRouter's own API reference:
+    // completion_tokens_details.reasoning_tokens (snake_case wire format, NOT the SDK's
+    // camelCased completionTokensDetails.reasoningTokens -- those are two different things).
+    function reasoningTokens(usage){
+      var d=usage&&usage.completion_tokens_details;
+      var n=d&&d.reasoning_tokens;
+      return (typeof n==='number'&&n>0)?n:null;
+    }
+    function kb(b){ if(!b) return '0 KB'; return (b/1024)>=1024 ? (b/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(b/1024))+' KB'; }
+    function escapeHtml(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+
     /* ============ RENDER ============ */
     function statusDot(f){ return fileOcrNeed(f).dot; }
 
@@ -5637,38 +5835,8 @@
     $redactCloseBtn.addEventListener('click',function(){ $redactPanel.hidden=true; });
 
     /* ============ INTAKE ============ */
-    function makeRec(name, size, blob){
-      return { id:nextId++, name:name, size:size, blob:blob||null, status:'busy', type:null, pages:[], scanned:0, error:null, markdown:null,
-               rowCount:0, sheetCount:0, mergeCount:0, delim:null, nodeCount:0, xmlError:false, ocrMarkdown:null, ocrStatus:null, ocrSecs:null,
-               ocrUsage:null, ocrLive:'', ocrErrorFull:null, ocrProvider:null, redactHeaderLines:null, redactHits:null, redactBoundaryFound:null, rev:0 };
-    }
-    // A file's content: everything read from its bytes (type, pages, text, a ledger it carries, the
-    // files or accounts it holds) and nothing about its row in the list (status, OCR progress,
-    // selection). readFileContent(file) gives a Promise of it; the Promise rejects when the file cannot
-    // be read (a password, a page that will not read), with what was read so far as err.content.
-    // A text-layer PDF statement holding several accounts comes back as one child content per
-    // account (lgAccountChildren); recFromContent makes a list record from a content.
-    function readFileContent(file){
-      var c={ type:null, pages:[], scanned:0, error:null, markdown:null, rowCount:0, sheetCount:0, mergeCount:0, delim:null, nodeCount:0, xmlError:false };
-      return dispatchFile(file, c).then(function(){
-        if(c.type==='pdf' && !c.error && !c.children && !c.suspectText && c.pages.length && c.scanned!==c.pages.length){
-          var kids=lgAccountChildren(c, file.name, c.pages, null); if(kids) c.children=kids; }
-        return c;
-      }, function(e){ if(e && typeof e==='object') e.content=c; throw e; });
-    }
-    // One child { name, content } per account (lgSplitAccounts), or null for a single account.
-    // pages: the pages to split (the text layer, or Mac OCR's pages with ocr holding the OCR fields).
-    function lgAccountChildren(c, name, pages, ocr){
-      var parts=null; try{ parts=lgSplitAccounts(pages) || lgSplitStatements(pages); }catch(e){ parts=null; }
-      if(!parts) return null;
-      return parts.map(function(p){
-        var k=Object.assign({}, c, { children:undefined, splitFrom:name, splitLabel:p.label, splitOf:parts.length },
-          p.statement ? { splitStatement:p.id } : { splitAccount:p.id });
-        if(ocr){ k.ocrPages=p.pages; k.ocrMarkdown=buildMarkdown(p.pages, options()).trim(); Object.assign(k, ocr); }
-        else { k.pages=p.pages; k.scanned=0; k.suspectText=false; k.suspectPages=[]; }
-        return { name:name+' · '+p.id, content:k }; });
-    }
-    function recFromContent(name, size, content){ var r=makeRec(name, size, null); Object.assign(r, content); r._content=content; r.status='done'; return r; }
+    function makeRec(name, size, blob){ return Object.assign({ id:nextId++ }, newRecord(name, size, blob)); }
+    function recFromContent(name, size, content){ return Object.assign({ id:nextId++ }, recordFromContent(name, size, content)); }
     // A re-imported export becomes one record per file it contains, in its place in the list.
     function expandChildren(parent){
       var kids=(parent.children||[]).map(function(c){
@@ -5996,20 +6164,6 @@
     // and they share one retry policy, one HTTP-error reader, one SSE reader and one set of
     // failure diagnostics, so the three can no longer drift apart in how they fail.
 
-    // Reads a failed response once and pulls out the provider's own error message.
-    function httpFailure(response, label){
-      return response.text().then(function(text){
-        console.error('['+label+'] HTTP', response.status, response.statusText, '\n', text);
-        var short='HTTP '+response.status, errType=null;
-        try{
-          var j=JSON.parse(text), e=j && j.error;
-          if(e && typeof e==='object' && e.message){ short+=': '+e.message; errType=e.type||null; }
-          else if(typeof e==='string'){ short+=': '+e; }
-          else if(j && j.message){ short+=': '+j.message; }
-        }catch(_){}
-        return { status:response.status, short:short, errType:errType, full:'HTTP '+response.status+' '+(response.statusText||'')+'\n\n'+text };
-      });
-    }
     function ocrWait(ms){ return new Promise(function(resolve){ setTimeout(resolve, ms); }); }
     function secsSince(t0){ return ((Date.now()-t0)/1000).toFixed(1); }
     function showLive(f, text){
@@ -6266,111 +6420,6 @@
       return doOcrCloud(f, openrouterPort(orApiKey, $orModel.value.trim(), $orEngine.value, ocrAbort.signal), 'openrouter.ai');
     }
 
-    /* ============ OCR: PAGE RASTERIZER (Mac OCR) ============ */
-    // Claude and OpenRouter take the PDF itself; Mac OCR reads page IMAGES, so pages
-    // are drawn with pdf.js, one at a time and only when needed: pages served from the PDF
-    // text layer are never rasterized, and only the page being transcribed is in memory
-    // (drawing the whole statement up front held 20-30 MB of base64 for a 40-page file, on
-    // the same 16 GB machine hosting the model).
-    //
-    // Render size: ~2200px on the long edge (about 200 DPI for Letter).
-    var PAGE_RENDER_SCALE=3, PAGE_MAX_EDGE=2200, PAGE_JPEG_QUALITY=0.92;
-    // Blank-page test. It runs on a copy scaled to a fixed reference size (a Letter page at
-    // 1188px), because ink coverage depends on render size: sharper renders draw thinner,
-    // less anti-aliased strokes. A page counts as blank only when under 0.1% of its pixels
-    // carry any ink. Measured at the reference size (every pixel): a digitally blank page is
-    // 0%, a scanned page with 2 transaction rows 0.30%, 4 rows 0.61%. The old test (0.8% of an
-    // 80-column sample grid) scored those 0.37% and 0.52% and skipped both as blank, silently
-    // dropping real transactions; a 6-row page cleared it by 0.06 points. The asymmetry sets
-    // the threshold: sending a truly blank page costs ~2s of free local compute, skipping a
-    // real one loses statement data without any warning.
-    var BLANK_REF_SCALE=1.5, BLANK_REF_MAX_EDGE=1400, BLANK_INK_RATIO=0.001;
-
-    function canvasMostlyBlank(ctx, w, h){
-      try{
-        var d=ctx.getImageData(0,0,w,h).data, n=d.length>>2;
-        if(!n) return false;
-        var limit=Math.floor(n*BLANK_INK_RATIO), ink=0;
-        for(var i=0;i<d.length;i+=4){
-          if(d[i]<248 || d[i+1]<248 || d[i+2]<248){ if(++ink>limit) return false; }
-        }
-        return true;
-      }catch(e){ return false; }
-    }
-
-    function openPdfRasterizer(blob){
-      return blob.arrayBuffer().then(function(buf){
-        // isEvalSupported:false is the security mitigation explained at extract() -- it must
-        // stay on this getDocument call too, since this is the path that renders glyphs.
-        return pdfjsLib.getDocument({ data:new Uint8Array(buf), isEvalSupported:false, standardFontDataUrl:PDFJS_STANDARD_FONTS }).promise;
-      }).then(function(pdf){
-        return {
-          count: pdf.numPages,
-          page: function(idx){
-            return pdf.getPage(idx+1).then(function(page){
-              var base=page.getViewport({ scale:1 }), nativeMax=Math.max(base.width, base.height)||1;
-              var scale=Math.min(PAGE_RENDER_SCALE, PAGE_MAX_EDGE/nativeMax);
-              var refScale=Math.min(BLANK_REF_SCALE, BLANK_REF_MAX_EDGE/nativeMax);
-              var vp=page.getViewport({ scale:scale });
-              var canvas=document.createElement('canvas');
-              canvas.width=vp.width; canvas.height=vp.height;
-              var ctx=canvas.getContext('2d', { alpha:false });
-              return page.render({ canvasContext:ctx, viewport:vp }).promise.then(function(){
-                try{ page.cleanup(); }catch(e){}
-                return finishPageCanvas(canvas, refScale/scale);
-              });
-            });
-          },
-          close: function(){ try{ pdf.destroy(); }catch(e){} }
-        };
-      });
-    }
-
-    // Blank test on a reference-size copy, then JPEG-encode the page and free the canvas.
-    function finishPageCanvas(canvas, refRatio){
-      var ref=document.createElement('canvas');
-      ref.width=Math.max(1, Math.round(canvas.width*refRatio));
-      ref.height=Math.max(1, Math.round(canvas.height*refRatio));
-      var rctx=ref.getContext('2d', { alpha:false });
-      rctx.imageSmoothingEnabled=true; rctx.imageSmoothingQuality='high';
-      rctx.drawImage(canvas, 0, 0, ref.width, ref.height);
-      var blank=canvasMostlyBlank(rctx, ref.width, ref.height);
-      ref.width=0; ref.height=0;
-      var dataUrl=canvas.toDataURL('image/jpeg', PAGE_JPEG_QUALITY);
-      canvas.width=0; canvas.height=0;
-      return { b64:dataUrl.slice(dataUrl.indexOf(',')+1), blank:blank };
-    }
-    // Draw an image file (honouring phone EXIF rotation) onto a white canvas no larger than
-    // maxEdge -- white, because a transparent PNG would otherwise turn black under JPEG.
-    function drawImageFile(blob, maxEdge){
-      return createImageBitmap(blob, { imageOrientation:'from-image' }).then(function(bmp){
-        var scale=Math.min(1, maxEdge/Math.max(bmp.width, bmp.height, 1));
-        var canvas=document.createElement('canvas');
-        canvas.width=Math.max(1, Math.round(bmp.width*scale)); canvas.height=Math.max(1, Math.round(bmp.height*scale));
-        var ctx=canvas.getContext('2d', { alpha:false });
-        ctx.fillStyle='#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
-        ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
-        if(bmp.close) bmp.close();
-        return canvas;
-      });
-    }
-    // Same interface as openPdfRasterizer(): one page, the image itself.
-    function openImageRasterizer(blob){
-      return Promise.resolve({
-        count:1,
-        page:function(){ return drawImageFile(blob, PAGE_MAX_EDGE).then(function(canvas){
-          // a photo has no page size; its long edge is taken as a Letter page's 792 pt
-          var pxPerPt=Math.max(canvas.width, canvas.height)/792, heightPt=canvas.height/pxPerPt;
-          // reference size for the blank test: a Letter page's long edge at the reference scale
-          var out=finishPageCanvas(canvas, Math.min(1, 1188/Math.max(canvas.width, canvas.height)));
-          out.pxPerPt=pxPerPt; out.heightPt=heightPt;
-          return out;
-        }); },
-        close:function(){}
-      });
-    }
-    function openPageSource(f){ return f.type==='image' ? openImageRasterizer(f.blob) : openPdfRasterizer(f.blob); }
     // Cloud providers get images re-encoded to JPEG, long edge <= 2400px: under every provider's
     // per-image size cap, with phone rotation applied, and sharp enough for statement print.
     var CLOUD_IMAGE_MAX_EDGE=2400;
@@ -6395,40 +6444,11 @@
         'Then open exparsed from the server: '+MAC_DEFAULT_URL+'/exparsed.html\n'+
         '(Chrome can block a page opened from disk, file://, from reaching the server.)';
     }
-    // The Mac OCR server (mac_ocr_server.py) as a port for macOcrRead. Every request carries the run's
-    // abort signal, except the release, which must still reach the server after a cancel.
-    function macHttpPort(base, signal){
-      return {
-        upload:function(blob){ return fetch(base+'/pdf', { method:'POST', headers:{ 'Content-Type':'application/pdf' }, signal:signal, body:blob }); },
-        page:function(id, i){ return fetch(base+'/pdf/'+id+'/'+i, { signal:signal }); },
-        release:function(id){ fetch(base+'/pdf/'+id, { method:'DELETE' }).catch(function(){}); },
-        // a photo is drawn here (rotation from its EXIF applied) and sent as a JPEG
-        image:function(f){
-          return openPageSource(f).then(function(doc){
-            return doc.page(0).then(function(img){
-              return fetch(base+'/ocr', { method:'POST', headers:{ 'Content-Type':'application/json' }, signal:signal,
-                body: JSON.stringify({ image:'data:image/jpeg;base64,'+img.b64 }) })
-                .then(function(response){
-                  if(!response.ok) return response;
-                  return { ok:true, json:function(){ return response.json().then(function(v){ v.pxPerPt=img.pxPerPt; v.heightPt=img.heightPt; return v; }); } };
-                });
-            }).then(function(r){ doc.close(); return r; }, function(e){ doc.close(); throw e; });
-          });
-        },
-        fail:function(response, pageNo, total){
-          return httpFailure(response, 'OCR/Mac OCR').then(function(h){
-            return { ok:false, message:(h.short+(pageNo?' on page '+pageNo:'')).slice(0,140),
-              fullDiagnostic:'Mac OCR '+h.full+(pageNo?'\n\n(page '+pageNo+' of '+total+')':'')+'\n\n'+macStartHelp() };
-          });
-        }
-      };
-    }
-
     function doOcrMac(f){
       var gen=ocrGen;
       console.log('[OCR/Mac OCR] starting', f.name);
       showLive(f, 'Reading pages with Mac OCR (nothing leaves this Mac)…');
-      return macOcrRead(f, macHttpPort(macBase(), ocrAbort.signal), {
+      return macOcrRead(f, macHttpPort(macBase(), ocrAbort.signal, macStartHelp), {
         cancelled:function(){ return ocrGen!==gen; },
         progress:function(text){ showLive(f, text); },
         md:options(), now:function(){ return Date.now(); }, wait:ocrWait, log:function(t){ console.warn(t); }

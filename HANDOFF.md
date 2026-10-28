@@ -141,10 +141,11 @@ Tests for these are E13 to E15 in `tests/edge.js`.
 ## Batch harness
 
 `tests/batch/run.js` replaces the old scratchpad harness (`serve.py`, `hook.js`, `supervise.py`, `inx*.py`).
-It loads a copy of `exparsed.html` with one hook added inside the main script, opens it from `file://` in
-headless Chrome, and calls the page's real path (`readFileContent`, the account and statement split,
-`lgFileLedger`) for each file. Output is one JSON line per ledger. No local port is opened, so the
-Claude Code sandbox needs no `allowLocalBinding`. Needs Playwright (`npm i playwright`).
+It opens `exparsed.html` from `file://` in headless Chrome and, for each file, calls the parsing
+script's own functions (`readFileContent`, the account and statement split, `lgFileLedger`; with
+`--ocr`, `macOcrRead` through `macHttpPort`). The page is not modified. Output is one JSON line per
+ledger. No local port is opened, so the Claude Code sandbox needs no `allowLocalBinding`. Needs
+Playwright (`npm i playwright`).
 
 ```
 node tests/batch/run.js "<desktop set dir>" ~/exparsed-results/desktop.jsonl --workers 4
