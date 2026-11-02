@@ -1,18 +1,19 @@
 # Policy V1.7 compliance matrix
 
-Each row maps one V1.7 requirement (MCA Capacity Underwriter V1.7, 2026-11-02) to `engine/uw.py` and `adapter/exparsed_adapter.py` on branch `v17-batch1`.
+Each row maps one V1.7 requirement (MCA Capacity Underwriter V1.7, 2026-11-02) to `engine/uw.py` and `adapter/exparsed_adapter.py` on branch `v17-batch2`.
 
 Status values:
 
 - **Met**: the engine already does what the rule says.
-- **B1**: changed in batch 1 (this branch).
+- **B1**: changed in batch 1.
+- **B2**: changed in batch 2 (this branch).
 - **Partial**: part of the rule is implemented; the gap is named.
 - **Gap**: not implemented.
 - **Page**: handled by Exparsed extraction before the engine runs.
 
-Planned batches: **B2** covers debit-first discovery (D1 to D5), the ±30-day two-way match, evidence levels and position identity. **B3** covers accounts, commingling, missing-account requests, the V1.7 ten-table format and its checker.
+Batch 2 covered debit-first discovery (D1 to D5), WATCH rows, the ±30-day two-way match, evidence levels and position identity. Rows still marked B2 in the Fix column were deferred: off-bank collections, contractual cost, payoff ties and variable adverse scenarios. **B3** covers accounts, commingling, missing-account requests, the V1.7 ten-table format and its checker.
 
-Count: 150 rows. 28 B1, 42 Met, 49 Partial, 28 Gap, 3 Page.
+Count: 150 rows. 26 B1, 33 B2, 42 Met, 29 Partial, 17 Gap, 3 Page.
 
 ## Contract hard rules
 
@@ -21,12 +22,12 @@ Count: 150 rows. 28 B1, 42 Met, 49 Partial, 28 Gap, 3 Page.
 | H1 | No invented values; missing is not zero; estimates labeled SCENARIO | Every number comes from ledger rows. U costs and the 1.4x payoff print as SCENARIO. | B1 | — |
 | H2 | Keep source refs, descriptions, IDs and cents | `txn_id`, `source_ref`, raw description and Decimal amounts are kept in the audit | Met | — |
 | H3 | Missing debit or 1.4x payback never proves closure | N requires `terminated` evidence. Silence gives Y (assumed open) or U. | B1 | — |
-| H4 | Keep unresolved candidates with unknown funder, 1 to 2 payments, varying amounts or no funding | A 1 to 2 debit group stays only with a funder word and a debit in the live window. A varying payee is not MCA by default. | Partial | B2: D1 to D5 sweep, WATCH candidates |
+| H4 | Keep unresolved candidates with unknown funder, 1 to 2 payments, varying amounts or no funding | Unanswered payees with a finance word, a D3/D4 link or a fixed daily/weekly/biweekly series are WATCH rows. A varying payee without those signals is not nominated. | B2 | Sign-off B10 |
 | H5 | Code does arithmetic and checks; never claim an unrun check | `self_checks` lists only executed checks. The LLM answers questions only. | Met | — |
 | H6 | Analyze readable files; record every unreadable source | The adapter skips non-statement and row-less files without listing them | Gap | B3: inventory unreadable files in Table 1 |
 | H7 | Recompute all dependents after any change | Every run recomputes everything from ledger plus judgments | Met | — |
 | H8 | Ten fixed sections; Live? is Y/N/U; material U shown | Y/N/U rows render. The table format is still V2.2. | B1 | B3: V1.7 template |
-| H9 | Say INSUFFICIENT DATA when evidence is insufficient | Fewer than 2 counted months, material U positions or material unresolved credits | B1 | B3: missing accounts, coverage gaps |
+| H9 | Say INSUFFICIENT DATA when evidence is insufficient | Fewer than 2 counted months, a material U position, or unresolved credits that could reverse a NO (B2) | B1 | B3: missing accounts, coverage gaps |
 | H10 | Internal audit record; output is the ten tables only | `audit.json` plus a report holding the tables and fixed lines | Met | — |
 | H11 | Execution order steps 1 to 11 | Same order, but there is no account-link step and no separate debit-first sweep | Partial | B2, B3 |
 
@@ -40,9 +41,9 @@ Count: 150 rows. 28 B1, 42 Met, 49 Partial, 28 Gap, 3 Page.
 | P4 | FULL_MONTH_DAYS = 18 on material accounts | 18, counted on the union of all accounts | Partial | B3: per-account counting |
 | P5 | CURRENT_COLLECTION_WINDOW = 10 bd to the debit account's coverage end | 10 bd to that account's last statement end; was the last transaction date of any account | B1 | — |
 | P6 | PRIMARY_FUNDING_WINDOW = 7 bd on or before the first debit | 7 bd, holidays excluded | Met | — |
-| P7 | EXPANDED_DISCOVERY_WINDOW = ±30 calendar days, investigation only | None | Gap | B2 |
+| P7 | EXPANDED_DISCOVERY_WINDOW = ±30 calendar days, investigation only | Backward and forward searches list MED/HIGH credits or triggers within ±30 calendar days as INVESTIGATE | B2 | — |
 | P8 | UNATTACHED_WINDOW = 14 calendar days | 14 | Met | — |
-| P9 | SERIES_MIN = 3; EARLY_SERIES_MIN = 1 | 3. A 1 to 2 debit group needs a funder word and a recent debit. | Partial | B2 |
+| P9 | SERIES_MIN = 3; EARLY_SERIES_MIN = 1 | 3. A 1 to 2 debit payee with a finance word is a WATCH row when it is not recent. | B2 | — |
 | P10 | NEW_LEVEL = 3; AMOUNT_CHANGE strictly >10% | 3; `abs(b - a) > a * 0.10` | Met | — |
 | P11 | STOP_GAP = 2x cadence, alert only | STOPPED event, "no payoff debit seen" | Met | — |
 | P12 | PROLONGED_SILENCE = 30 covered bd | 30 covered business days, then U | B1 | — |
@@ -58,13 +59,13 @@ Count: 150 rows. 28 B1, 42 Met, 49 Partial, 28 Gap, 3 Page.
 | :--- | :--- | :--- | :--- | :--- |
 | R1 | SOURCE record per file | Account `integrity_note` lists files and Exparsed status | Partial | B3 |
 | R2 | ACCOUNT record with ownership evidence and links | ID, name, last4, statements, integrity. No ownership or links. | Partial | B3 |
-| R3 | TX record with originator ID, trace ID, sequence, evidence level | ID, account, date, amount, direction, description, balance, source_ref, seq, tag. No originator, trace or evidence level. | Partial | B2: parse ORIG ID and trace when printed |
-| R4 | DEBIT_CANDIDATE and CREDIT_CANDIDATE with a disposition each | Debit groups with questions; forward searches give each candidate credit a disposition | Partial | B2: every finance-looking debit gets a disposition |
-| R5 | MATCH with business and calendar gaps, rivals, decision | Backward searches log candidates, business-day gap and outcome. No calendar gap. | Partial | B2 |
+| R3 | TX record with originator ID, trace ID, sequence, evidence level | Adds `orig_id` from printed `ORIG ID:`. No trace ID; evidence level is on positions and strips. | Partial | Parse trace IDs when printed |
+| R4 | DEBIT_CANDIDATE and CREDIT_CANDIDATE with a disposition each | `debit_dispositions` gives each nominated payee POSITION, WATCH or NON-MCA; forward searches give each candidate credit a V1.7 disposition | B2 | — |
+| R5 | MATCH with business and calendar gaps, rivals, decision | Backward candidates log business-day and calendar-day gaps, rivals and outcome | B2 | — |
 | R6 | POSITION with status basis, closure evidence, scenario cost | `live_status`, `status_basis`, `terminated` and `scenario_cost` are in the audit | B1 | — |
 | R7 | EXCEPTION records | `capacity.uncertainty` lists U and unresolved-credit sensitivities. Other exception types are missing. | Partial | B2, B3 |
-| R8 | Never join on company name alone | Debit groups the judgments give the same funder name merge into one position | Gap | B2 |
-| R9 | Evidence levels OBSERVED, CORROBORATED, INFERRED, UNKNOWN | None. Gate kinds (`bank_text`, `document`, `sender_identified`) are stored per strip. | Gap | B2 |
+| R8 | Never join on company name alone | Same judged funder joins payees only on a shared originator ID, sequential continuity, or open payment slots | B2 | — |
+| R9 | Evidence levels OBSERVED, CORROBORATED, INFERRED, UNKNOWN | Positions and STRIP_FUNDING gates carry OBSERVED, CORROBORATED, INFERRED or UNKNOWN | B2 | Sign-off B16 |
 
 ## 1. Source routing, coverage and integrity
 
@@ -91,23 +92,23 @@ Count: 150 rows. 28 B1, 42 Met, 49 Partial, 28 Gap, 3 Page.
 | T2 | Credit tags include STRIP_UNRESOLVED | Added | B1 | — |
 | T3 | STRIP_UNRESOLVED is a revenue exclusion, not a funding claim | Unanswered candidates become STRIP_UNRESOLVED. Forward dispositions say "not called financing". | B1 | — |
 | T4 | Customer evidence keeps a credit in revenue | An answered `REV_*` tag restores it | B1 | — |
-| T5 | Debit tags incl. MCA_UNKNOWN_POSITION, FEE_NSF_OD, AMBIGUOUS_ | MCA_<payee>, FEE_NSF_OD, AMBIGUOUS_<LABEL>. No "Unknown MCA-style #N" label. | Partial | B2 |
-| T6 | Recurrence alone is not MCA; rails do not exclude | Default MCA needs a funder word or daily cadence. Card, check and transfer debits are not searched. | Partial | B2 |
+| T5 | Debit tags incl. MCA_UNKNOWN_POSITION, FEE_NSF_OD, AMBIGUOUS_ | MCA_<payee>, FEE_NSF_OD, AMBIGUOUS_<LABEL>; WATCH rows without a usable name show "Unknown MCA-style #N" | B2 | — |
+| T6 | Recurrence alone is not MCA; rails do not exclude | Manual transfers and checks are swept with other debits. Recurrence alone gives NON-MCA unless the series is fixed daily/weekly/biweekly. | B2 | — |
 | T7 | Non-bank documents corroborate; off-ledger collections disclosed | Documents serve as evidence for strips and closures. No off-bank exposure. | Partial | B2 |
 
 ## 3. Debit-first discovery
 
 | ID | V1.7 rule | Engine now | Status | Fix |
 | :--- | :--- | :--- | :--- | :--- |
-| D1 | Name and ID pass: finance language, aliases, originator and trace IDs | `MCA_WORD` and the `ORIG CO NAME` payee. No originator or trace IDs. | Partial | B2 |
-| D2 | Cadence pass incl. variable amounts, skips, splits, changes; keep 1 to 2 items | Cadence per normalized payee; VARIABLE for share-of-sales | Partial | B2: amount clusters across payees |
-| D3 | Amount pass across changed descriptors and rails | None | Gap | B2 |
-| D4 | Funding-linked pass: rescan debits after a suspected funding credit | None | Gap | B2 |
-| D5 | Exception pass: returns, stop-pays, fees, processor net settlements, missing-account transfers | Returns are paired into chains. Hidden collections are not recovered. | Partial | B2 |
+| D1 | Name and ID pass: finance language, aliases, originator and trace IDs | `MCA_WORD`, finance words inside a token (HEADWAYCAPITAL), the `ORIG CO NAME` payee and `ORIG ID` for identity | B2 | Sign-off B13 |
+| D2 | Cadence pass incl. variable amounts, skips, splits, changes; keep 1 to 2 items | Cadence per payee incl. monthly; fixed daily/weekly/biweekly series without a finance word become WATCH when unanswered | B2 | — |
+| D3 | Amount pass across changed descriptors and rails | A payee with 2+ debits at an MCA series' level, at least half its debits, within 30 days of the series | B2 | Sign-off B9 |
+| D4 | Funding-linked pass: rescan debits after a suspected funding credit | A new payee within 30 days after an explicit financing credit, when it repeats at daily/weekly/biweekly gaps or shares a word with the sender | B2 | Sign-off B8 |
+| D5 | Exception pass: returns, stop-pays, fees, processor net settlements, missing-account transfers | Returned attempts of finance-word payees are nominated (D5). Hidden collections are not recovered. | Partial | Recover collections behind failed attempts |
 | D6 | Reverse consolidations, processor splits, off-bank deductions | None | Gap | B2 |
 | D7 | Generic descriptors cannot join payments | Grouping is by normalized description | Partial | B2 |
 | D8 | Concurrent schedules under one funder are separate positions | Split only when 3+ days hold same-day debits differing by >10%. Same-amount doubles are treated as catch-up. | Partial | B2: keep same-day doubles unless the attempt chain proves a retry |
-| D9 | Series: 3+ cleared; EARLY FINANCE for 1 to 2 with finance evidence; others WATCH | Positions are CONFIRMED or PROBABLE. Provisional cadence becomes U (B1). No WATCH label. | Partial | B2 |
+| D9 | Series: 3+ cleared; EARLY FINANCE for 1 to 2 with finance evidence; others WATCH | CONFIRMED, PROBABLE, U for provisional cadence, and UNRESOLVED WATCH rows | B2 | — |
 | D10 | Amounts: cleared only, attempt chains, >10% for 3 payments, temporary cuts, frequency changes | Implemented as written | Met | — |
 | D11 | Variable remittance: documented level plus adverse scenario | VARIABLE cost = cleared debits in 20 bd. No adverse scenario. | Partial | B2 |
 | D12 | Negative control against payroll, fees, taxes, rent, transfers | Debit rules tag these first; the LLM can overrule | Met | — |
@@ -119,9 +120,9 @@ Count: 150 rows. 28 B1, 42 Met, 49 Partial, 28 Gap, 3 Page.
 | C1 | Explicit finance language or corroborated lender identity | `EXPLICIT_FIN` and funder-name tokens | Met | — |
 | C2 | New or ambiguous senders on wires, ACH, transfers, mobile deposits, checks | Wires only | Partial | B2 |
 | C3 | Large or unusual credits; size alone is weak | 3x median, excluding established payers | Met | — |
-| C4 | Any credit in primary or expanded windows of a trigger | The backward search scores every credit in the 7 bd window. No expanded window. | Partial | B2 |
+| C4 | Any credit in primary or expanded windows of a trigger | The 7 bd window scores every credit; the ±30-day window lists MED/HIGH credits as INVESTIGATE | B2 | — |
 | C5 | Documented advance or off-bank receipt | Document evidence path. No off-bank flag. | Partial | B2 |
-| C6 | Six dispositions: ATTACHED, FINANCING_UNATTACHED, COMPETING, CUSTOMER_SUPPORTED, OTHER_SUPPORTED, UNRESOLVED | Attached, unattached, competing, no trigger, no evidence | Partial | B2: rename to the six values |
+| C6 | Six dispositions: ATTACHED, FINANCING_UNATTACHED, COMPETING, CUSTOMER_SUPPORTED, OTHER_SUPPORTED, UNRESOLVED | `v17_disposition`: ATTACHED, FINANCING_UNATTACHED, COMPETING, CUSTOMER_SUPPORTED, OTHER_SUPPORTED, UNRESOLVED | B2 | — |
 
 ## 5. Matching, events and renewals
 
@@ -129,21 +130,21 @@ Count: 150 rows. 28 B1, 42 Met, 49 Partial, 28 Gap, 3 Page.
 | :--- | :--- | :--- | :--- | :--- |
 | M1 | Triggers: START, AMOUNT UP, CADENCE CHANGE, RESTART, renewal | START, AMOUNT UP, CADENCE CHANGE, RESTARTED | Met | — |
 | M2 | T is the first debit of the new level; confirmation date kept separately | Yes; the confirmation date is in the event detail | Met | — |
-| M3 | Primary match within 7 bd before T; log business and calendar gaps | Business-day gap only | Partial | B2 |
-| M4 | Expanded ±30 calendar days, kept as INVESTIGATE | None | Gap | B2 |
-| M5 | Credit after T disclosed as a contradiction | Not checked | Gap | B2 |
-| M6 | Coverage test A: every trigger has backward and expanded dispositions | Backward only (self-check) | Partial | B2 |
-| M7 | Coverage test B: every candidate credit has forward and expanded dispositions | Forward only (self-check) | Partial | B2 |
+| M3 | Primary match within 7 bd before T; log business and calendar gaps | Business-day and calendar-day gaps | B2 | — |
+| M4 | Expanded ±30 calendar days, kept as INVESTIGATE | INVESTIGATE list per trigger; never attached | B2 | — |
+| M5 | Credit after T disclosed as a contradiction | Expanded candidates after the trigger carry `after_trigger` and the outcome counts them as contradictions | B2 | — |
+| M6 | Coverage test A: every trigger has backward and expanded dispositions | Backward and expanded dispositions per trigger (self-check) | B2 | — |
+| M7 | Coverage test B: every candidate credit has forward and expanded dispositions | Forward and expanded dispositions per candidate credit (self-check) | B2 | — |
 | M8 | Pair score points +3, +2, +2, +1, -3; HIGH, MED, LOW, NONE | Same points and bands | Met | — |
 | M9 | Proof gate: financing text, document, or independent evidence of the sender | `bank_text`, `document`, `named_funder_series`; `sender_identified` from the LLM is flagged for human verification | Partial | Sign-off: is LLM knowledge "independent evidence"? |
 | M10 | Link gate; rivals listed; ties are COMPETING | Rivals logged; ties and cross-position reuse are AMBIGUOUS | Met | — |
 | M11 | One credit cannot fund two unrelated positions | Self-check | Met | — |
 | M12 | Early match: unknown cadence gets a STRESS scenario only | Provisional cadence becomes U with STRESS = max debit x20 | B1 | — |
-| M13 | Events incl. descriptor or ID change | Amount, temporary cut, cadence, stopped, restarted. No descriptor-change event. | Partial | B2 |
+| M13 | Events incl. descriptor or ID change | Adds DESCRIPTOR CHANGE when payee groups join, with the join basis | B2 | — |
 | M14 | Renewal: same verified funder within 10 bd after stop | Different-name refi hint within 10 bd. A same-name restart is one position. | Partial | B2 |
 | M15 | Unattached: proven funding without trigger in 14 days | FINANCING unattached note in Table 1 | Met | — |
 | M16 | Pre-file only when a source establishes it | No longer inferred; note says "unproven" | B1 | — |
-| M17 | "Not found" requires both coverage tests | Primary searches only | Partial | B2 |
+| M17 | "Not found" requires both coverage tests | Both windows are searched before Not found | B2 | — |
 | M18 | Funding Date and Amount come from a sourced credit only | Attached credit, else Not found | Met | — |
 
 ## 6. Position status and cost
@@ -151,20 +152,20 @@ Count: 150 rows. 28 B1, 42 Met, 49 Partial, 28 Gap, 3 Page.
 | ID | V1.7 rule | Engine now | Status | Fix |
 | :--- | :--- | :--- | :--- | :--- |
 | L1 | One POSITION ID per credible series; one funder may own several | P1, P2 and so on; display adds #n | Met | — |
-| L2 | Dispositions ESTABLISHED, PROBABLE, NON-MCA SUPPORTED, UNRESOLVED WATCH | CONFIRMED or PROBABLE | Partial | B2 |
-| L3 | Unknown funder labeled "Unknown MCA-style #N" | The payee name is used | Gap | B2 |
+| L2 | Dispositions ESTABLISHED, PROBABLE, NON-MCA SUPPORTED, UNRESOLVED WATCH | CONFIRMED, PROBABLE, NON-MCA (debit dispositions) and UNRESOLVED WATCH | B2 | — |
+| L3 | Unknown funder labeled "Unknown MCA-style #N" | "Unknown MCA-style #N" when the payee has no usable name | B2 | — |
 | L4 | Y: cleared within 10 bd of the debit account's coverage end | Yes | B1 | — |
 | L5 | Y: established position silent up to 30 covered bd, "assumed open; collections absent" | Yes; the last sustained cost is carried | B1 | — |
 | L6 | N only with closure evidence; N costs $0 | `terminated` evidence (verbatim quote) | B1 | — |
-| L7 | U: unproved identity, silence over 30 covered bd, or visibility gaps; cost —, scenario in Notes | Silence over 30 bd, provisional cadence, or no cleared debit | B1 | B2: unproved identity (WATCH) |
+| L7 | U: unproved identity, silence over 30 covered bd, or visibility gaps; cost —, scenario in Notes | Silence over 30 bd, provisional cadence, no cleared debit, or WATCH (identity unproved) | B2 | — |
 | L8 | Total Live Stack sums Y only; U stays out | Yes (self-check) | B1 | — |
-| L9 | Cost: daily x20, weekly x52/12, biweekly x26/12, monthly x1 | Daily, weekly and biweekly as stated. Monthly cadence is not classified. | Partial | B2: monthly cadence |
+| L9 | Cost: daily x20, weekly x52/12, biweekly x26/12, monthly x1 | Daily, weekly, biweekly and monthly (18 to 25 bd gaps, x1) | B2 | Sign-off B14 |
 | L10 | Temporary reductions use the prior sustained payment | TEMP CUT events | Met | — |
 | L11 | CONTRACTUAL cost separate from observed | None | Gap | B2 |
 | L12 | 1.4x payoff as SCENARIO only | Labeled "SCENARIO est. remaining ... not closure evidence" | B1 | — |
 | L13 | Contract or lender payoff tied to the position | None | Gap | B2 |
 | L14 | Non-MCA loans in DEBT_SERVICE; no double count | DEBT_SERVICE rule tag; MCA debits are tagged MCA_ only | Met | — |
-| L15 | Do not merge two positions because the funder name matches | Merged when judgments give the same funder (see R8) | Gap | B2 |
+| L15 | Do not merge two positions because the funder name matches | See R8 | B2 | — |
 | L16 | Material U blocks YES; NO stands only if unknowns cannot reverse it | `readiness()` | B1 | — |
 
 ## 7. Revenue, obligations and capacity
@@ -181,7 +182,7 @@ Count: 150 rows. 28 B1, 42 Met, 49 Partial, 28 Gap, 3 Page.
 | V8 | Rooms A to D, HEADLINE, CONSERVATIVE from unrounded cents | As written (self-check on HEADLINE) | Met | — |
 | V9 | Weekly = monthly/(52/12), daily = monthly/20 | Yes | B1 | — |
 | V10 | Binding texts | As written; material uncertainty appended when it blocks the verdict | B1 | — |
-| V11 | Readiness: <2 months, an essential unavailable amount, or material uncertainty gives INSUFFICIENT DATA | Months and material uncertainty only | Partial | B3: missing accounts and coverage gaps |
+| V11 | Readiness: <2 months, an essential unavailable amount, or material uncertainty gives INSUFFICIENT DATA | Months, material U positions, and unresolved credits that could reverse a NO | Partial | B3: missing accounts and coverage gaps |
 | V12 | Data-status suffix | Worst integrity across accounts | Met | — |
 
 ## 8. Peak, returns and liquidity
@@ -212,21 +213,21 @@ Count: 150 rows. 28 B1, 42 Met, 49 Partial, 28 Gap, 3 Page.
 
 | ID | V1.7 rule | Engine now | Status | Fix |
 | :--- | :--- | :--- | :--- | :--- |
-| A1 | Debit coverage: every cleared debit scanned by D1 to D5 with a disposition | Only grouped OTHER and DEBT_SERVICE payees are examined | Gap | B2 |
+| A1 | Debit coverage: every cleared debit scanned by D1 to D5 with a disposition | Every debit not tagged by a payroll, tax, rent, utility, insurance or fee rule is swept; each nominated payee has a disposition (self-check) | B2 | — |
 | A2 | Credit coverage: every cleared credit scanned by C1 to C5 | Candidates get forward dispositions; other credits are not dispositioned | Partial | B2 |
-| A3 | Bidirectional link coverage | Primary windows only | Partial | B2 |
-| A4 | Series and ID coverage | Each debit belongs to one position or tag | Partial | B2 |
+| A3 | Bidirectional link coverage | Primary and ±30-day windows in both directions | B2 | — |
+| A4 | Series and ID coverage | Each nominated payee maps to one position, WATCH row or NON-MCA tag; no debit in two positions (self-check) | B2 | — |
 | A5 | Live and closure coverage: every N has proof; every material U visible | Self-check "N only with closure evidence; U carries a scenario" | B1 | — |
 | A6 | Cross-account coverage | None | Gap | B3 |
 | A7 | Reconciliation: stack = Table 4 = 4b = Table 6 to the cent | Self-check plus the report validator | Met | — |
-| A8 | Completeness metrics; audit FAIL if any eligible row lacks a disposition | None | Gap | B2 |
+| A8 | Completeness metrics; audit FAIL if any eligible row lacks a disposition | `completeness` counts credits and debits scanned, candidates, positions, WATCH rows, material U, unattached and unresolved credits, closures | B2 | B3: missing-account requests |
 
 ## 11. Output and validation
 
 | ID | V1.7 rule | Engine now | Status | Fix |
 | :--- | :--- | :--- | :--- | :--- |
 | O1 | Ten sections with fixed titles, columns and widths | V2.2 template; widths match V1.7 | Partial | B3 |
-| O2 | Table 4 row types POSITION, WATCH, EVENT, SUMMARY; order Y, U, N | Y, U, N order (validator); EVENT rows; no WATCH label | B1 | B2: WATCH |
+| O2 | Table 4 row types POSITION, WATCH, EVENT, SUMMARY; order Y, U, N | Y, U, N order (validator); EVENT rows; WATCH rows are U with "UNRESOLVED WATCH" in Notes | B2 | — |
 | O3 | U Monthly Cost is —; N is $0 | Validator rejects a costed U row | B1 | — |
 | O4 | Formats: $12,345, 12.3%, MM/DD/YY, Mon-YY; pipes to slashes | As written | Met | — |
 | O5 | Table 8 Commingling and Additional Accounts lines | Missing | Gap | B3 |
@@ -239,8 +240,8 @@ Count: 150 rows. 28 B1, 42 Met, 49 Partial, 28 Gap, 3 Page.
 | # | V1.7 text | Engine reading |
 | ---: | :--- | :--- |
 | B1 | STRIP_UNRESOLVED for a "material receipt lacking sufficient evidence" | Every unanswered or "unsure" candidate credit becomes STRIP_UNRESOLVED. No per-credit dollar threshold applies. |
-| B2 | "material U/excluded-revenue ... uncertainty affecting capacity => INSUFFICIENT DATA" | Unresolved credits use the U test: material if adding them back changes the verdict or binding room, or moves BASIS by >=5%. A material item blocks YES even though stripping lowers capacity. |
-| B3 | "An incomplete or unverified cadence has a STRESS-only rate" | A position without a standard cadence (fewer than 3 cleared debits, or irregular gaps) is U with STRESS = max cleared debit x20. |
+| B2 | "material U/excluded-revenue ... uncertainty affecting capacity => INSUFFICIENT DATA" | **Decided 2026-11-02, changed:** unresolved credits never block YES. They are already out of BASIS, so adding them back can only raise capacity. They block NO only when adding them back would reverse it. Their BASIS and HEADLINE sensitivity stays in `capacity.uncertainty`. Material U positions still block YES. |
+| B3 | "An incomplete or unverified cadence has a STRESS-only rate" | A position without a standard cadence (fewer than 3 cleared debits, or irregular gaps) is U with STRESS = max cleared debit x20. **Decided 2026-11-02: kept.** A material U row blocks YES, so leaving its STRESS cost out of the stack cannot produce an unsafe YES. |
 | B4 | U scenario cost | The last sustained monthly cost. For VARIABLE, cleared debits in the 20 bd ending at the last debit. |
 | B5 | "30 covered business days without collections" | Business days after the last cleared debit, through coverage end, inside the debit account's statement periods. |
 | B6 | Current window "through the end of the relevant account's available coverage" | The debit account's last statement end date. |
@@ -256,3 +257,28 @@ Count: 150 rows. 28 B1, 42 Met, 49 Partial, 28 Gap, 3 Page.
 | Real ledger, saved answers | YES, $44,883 | INSUFFICIENT DATA, $44,882 | 5 stopped funders become U, 4 of them material: Accord $14,054, DIB $8,753, Eminent $7,500, MS Equities $7,045 per month |
 
 The $1 HEADLINE moves come from 52/12 replacing 4.333. With V1.7, a real ledger reaches YES only when each stopped funder has closure evidence (payoff letter or bank text) or resumes collections.
+
+## Batch 2 interpretations for sign-off
+
+| # | V1.7 text | Engine reading |
+| ---: | :--- | :--- |
+| B8 | D4 "rescan all subsequent and nearby debits" after a suspected financing credit | A payee whose first debit falls within 30 days after an explicit financing credit is nominated only if it repeats at daily, weekly or biweekly gaps, or shares a word with the sender. Without that filter the real ledger nominated a bar, a convenience store and Zelle payments. **Decided 2026-11-02: kept.** |
+| B9 | D3 "repeated same or similar collection amounts under changing descriptors" | 2+ debits at a default MCA series' most common amount, forming at least half the payee's cleared debits, within 30 days of the series. One $390 check among 194 checks does not count. |
+| B10 | D2 cadence without a funder name | An unanswered fixed daily, weekly or biweekly series becomes a WATCH row. Fixed monthly series without a finance word (rent-like bills) stay NON-MCA. On the real ledger, this catches KAPITUS and ACCORD BUSINESS when no answers exist. **Decided 2026-11-02: kept.** It catches KAPITUS and ACCORD BUSINESS; a model answer removes a false WATCH row. |
+| B11 | Expanded window "plausible out-of-window relationships" | Credits scoring 3+ points (MED or HIGH) within ±30 calendar days. They are listed as INVESTIGATE and never attached. |
+| B12 | "A descriptor change with a corroborated originator ID and continuity is usually the same position" | Two payees given the same funder join when they share an `ORIG ID`, when one starts within 10 business days after the other stops, or when one's debits fall inside the other's span on days without its debits. The real ledger joins KAPITUS SERVICIN into KAPITUS on the third rule. ZLUR FUNDING LLC shares a day with ZLUR FUNDING, so it stays separate (U, $1,980 STRESS). |
+| B13 | D1 finance language | Word matches, plus CAPITAL, FUNDING, FINANC, LENDING, ADVANCE or MERCHANT inside a token. This finds HEADWAYCAPITAL and FORWARD FINANCIN. It also nominates EMPIRE MERCHANTS (a liquor distributor) until the model answers. |
+| B14 | Monthly cadence x1 | Gaps of 18 to 25 business days. A fixed monthly series with a finance word is MCA by default (HEADWAYCAPITAL, $7,442/mo, silent since 03/31/26, so U). |
+| B15 | WATCH rows in Table 4b | Peak load counts positions only. WATCH debits stay out because their identity is unproved. |
+| B16 | Evidence levels | CORROBORATED: an attached funding with a bank-text, document or named-funder gate, or closure evidence. OBSERVED: a finance word in the payee. INFERRED: the model or a cadence rule says MCA with no finance word. UNKNOWN: WATCH. Strip gates map `bank_text` to OBSERVED, `document` and `named_funder_series` to CORROBORATED, and `sender_identified` to INFERRED. |
+
+Not in batch 2: same-day same-amount doubles stay one position (D8, HANDOFF interpretation 14); off-bank collections (D6, T7); contractual cost and payoff ties (L11, L13); variable adverse scenarios (D11); alternative tags (T1); new-sender ACH and mobile credits (C2).
+
+## Batch 2 effect on saved runs
+
+| Run | Batch 1 | Batch 2 |
+| :--- | :--- | :--- |
+| Sample, no answers | INSUFFICIENT DATA, $11,577; 4 positions | Same; 5 payees nominated, 0 WATCH |
+| Sample, saved answers | INSUFFICIENT DATA, $5,217 | Same |
+| Real ledger, no answers | INSUFFICIENT DATA, $74,570; 5 positions | Same HEADLINE. 6 positions and 6 WATCH rows (KAPITUS, ACCORD BUSINESS, CAPITAL ONE, DOORDASH CAPITAL, EMPIRE MERCHANTS, ZLUR FUNDING LLC); HEADWAYCAPITAL found as an MCA position. 85 questions (was 81). |
+| Real ledger, saved answers | INSUFFICIENT DATA, $44,882 | Same HEADLINE. KAPITUS SERVICIN joins KAPITUS; ZLUR FUNDING LLC becomes ZLUR FUNDING #2 (U). 6 new questions are unanswered by the saved file. |

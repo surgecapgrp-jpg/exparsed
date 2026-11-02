@@ -287,6 +287,12 @@ class Scenarios(unittest.TestCase):
         r = run(led, with_judgments(r0, answers))
         self.assertEqual(pos(r, "SUNCAP")[0]["live_status"], "N")
         self.assertEqual(r.status, "YES")
+        # Sign-off B2: the unanswered $30,000 wire stays out of BASIS and does not block YES.
+        jkl = q(r0, kind="credit")
+        r = run(led, with_judgments(r0, [a for a in answers if a["question_id"] != jkl]))
+        self.assertEqual(tags(r, led, "JKL"), ["STRIP_UNRESOLVED"])
+        self.assertEqual(r.status, "YES")
+        self.assertTrue(any(x["kind"] == "unresolved credits" for x in r.audit["capacity"]["uncertainty"]))
 
     def test_no_stands_when_uncertainty_cannot_reverse_it(self):
         led = copy.deepcopy(LEDGER)
@@ -314,6 +320,101 @@ class Scenarios(unittest.TestCase):
         r = run(led)
         self.assertEqual(tags(r, led, "SBA LOAN"), ["STRIP_FUNDING"])
         self.assertEqual(forward(r, ids(led, "SBA LOAN")[0])["gate"]["kind"], "bank_text")
+
+
+def add_debits(led, desc, amount, dates, prefix):
+    led = copy.deepcopy(led)
+    led["transactions"] += [
+        dict(txn_id=f"{prefix}{i}", account_id="OP", date=d, amount=amount, direction="debit", description=desc, balance=None)
+        for i, d in enumerate(dates)
+    ]
+    return led
+
+
+def disposition(r, group):
+    return next(d for d in r.audit["debit_dispositions"] if d["group"] == group)
+
+
+class V17Batch2(unittest.TestCase):
+    """V1.7 debit-first sweep, WATCH rows, position identity, expanded windows, evidence, completeness."""
+
+    def test_unanswered_finance_payee_is_a_watch_row(self):
+        led = add_debits(LEDGER, "ACME CAPITAL GROUP ACH DEBIT", "750.00", ["2026-07-06", "2026-07-20"], "AC")
+        r = run(led)
+        w = pos(r, "ACME CAPITAL GROUP")[0]
+        self.assertEqual((w["watch"], w["live_status"], w["evidence"], w["monthly_cost"]), (True, "U", "UNKNOWN", 0))
+        self.assertIn("WATCH: MCA identity unproved (D1 finance word in payee)", w["status_basis"])
+        self.assertTrue(disposition(r, "ACME CAPITAL GROUP").get("disposition").startswith("WATCH"))
+        # An answer settles it: OTHER removes the WATCH row.
+        r2 = run(led, with_judgments(r, [dict(question_id=q(r, "ACME CAPITAL GROUP"), tag="OTHER")]))
+        self.assertFalse(pos(r2, "ACME CAPITAL GROUP"))
+        self.assertEqual(disposition(r2, "ACME CAPITAL GROUP")["disposition"], "NON-MCA OTHER (judgment)")
+
+    def test_d3_same_amount_under_a_generic_descriptor(self):
+        led = add_debits(LEDGER, "ACH DEBIT WEB PMT 88213", "525.00", ["2026-09-08", "2026-09-15", "2026-09-22"], "G")
+        r = run(led)
+        w = next(p for p in r.audit["positions"] if p["watch"])
+        self.assertEqual(w["display"], "Unknown MCA-style #1")
+        self.assertIn("D3 same amount $525 as RAPIDFUND LLC", w["status_basis"])
+
+    def test_same_funder_name_alone_does_not_merge_overlapping_groups(self):
+        led = add_debits(LEDGER, "RAPID FUND SERVICING", "300.00", ["2026-08-03", "2026-08-10", "2026-08-17", "2026-08-24"], "RS")
+        r0 = run(led)
+        answers = [
+            dict(question_id=q(r0, "RAPID FUND SERVICING"), tag="MCA", funder="RapidFund LLC"),
+            dict(question_id=q(r0, "RAPIDFUND LLC"), tag="MCA", funder="RapidFund LLC"),
+        ]
+        r = run(led, with_judgments(r0, answers))
+        self.assertEqual(sorted(p["display"] for p in pos(r, "RAPIDFUND")), ["RAPIDFUND LLC #1", "RAPIDFUND LLC #2"])
+
+    def test_descriptor_change_with_continuity_merges(self):
+        led = copy.deepcopy(LEDGER)
+        for t in led["transactions"]:
+            if t["description"].startswith("BLUEOAK") and t["date"] >= "2026-09-01":
+                t["description"] = "BLUE OAK SERVICING ACH"
+        r0 = run(led)
+        answers = [
+            dict(question_id=q(r0, "BLUEOAK ADV"), tag="MCA", funder="BlueOak ADV"),
+            dict(question_id=q(r0, "BLUE OAK SERVICING"), tag="MCA", funder="BlueOak ADV"),
+        ]
+        p = pos(run(led, with_judgments(r0, answers)), "BLUEOAK")
+        self.assertEqual(len(p), 1)
+        ev = [e for e in p[0]["events"] if e["kind"] == "DESCRIPTOR CHANGE"]
+        self.assertEqual(ev[0]["detail"], "sequential continuity")
+
+    def test_expanded_window_lists_out_of_window_credit_without_attaching(self):
+        led = copy.deepcopy(LEDGER)
+        led["transactions"].append(
+            dict(txn_id="X1", account_id="OP", date="2026-07-08", amount="40000.00", direction="credit",
+                 description="WIRE IN RAPIDFUND LLC REF 55400", balance=None)
+        )
+        r = run(led)
+        s = next(s for s in r.audit["backward_searches"] if s["anchor"] == pos(r, "RAPIDFUND")[0]["triggers"][-1]["trigger_id"])
+        self.assertIn("X1", [c["txn_id"] for c in s["expanded"]])
+        self.assertTrue(s["expanded_outcome"].startswith("INVESTIGATE"))
+        self.assertEqual(pos(r, "RAPIDFUND")[0]["fundings"][-1]["credit_amount"], D(40000))
+        self.assertEqual(pos(r, "RAPIDFUND")[0]["fundings"][-1]["credit"], ids(LEDGER, "WIRE IN RAPIDFUND")[0])
+
+    def test_monthly_cadence_costs_one_payment(self):
+        led = add_debits(LEDGER, "NORTHSTAR FUNDING ACH", "2000.00", ["2026-06-15", "2026-07-15", "2026-08-14", "2026-09-15"], "NS")
+        p = pos(run(led), "NORTHSTAR FUNDING")[0]
+        self.assertEqual((p["cadence"], p["live_status"], p["monthly_cost"]), ("monthly", "Y", D(2000)))
+
+    def test_credit_dispositions_and_evidence_levels(self):
+        e, j = run(), run(judgments=JUDGMENTS)
+        jkl = ids(LEDGER, "JKL")[0]
+        self.assertEqual(forward(e, jkl)["v17_disposition"], "UNRESOLVED")
+        self.assertEqual((forward(j, jkl)["v17_disposition"], forward(j, jkl)["evidence"]), ("ATTACHED", "CORROBORATED"))
+        self.assertEqual(pos(j, "RAPIDFUND")[0]["evidence"], "CORROBORATED")
+
+    def test_completeness_metrics_count_every_cleared_row(self):
+        r = run()
+        c = r.audit["completeness"]
+        tx = {t["txn_id"]: t for t in LEDGER["transactions"]}
+        returned = {t["txn_id"] for t in r.audit["transactions"] if t["returned_by"]}
+        self.assertEqual(c["debits_scanned"], sum(t["direction"] == "debit" and i not in returned for i, t in tx.items()))
+        self.assertEqual(c["positions"] + c["watch"], len(r.audit["positions"]))
+        self.assertIn("every nominated debit group has a disposition; no debit in two positions", r.audit["self_checks"])
 
 
 class RealDataShapes(unittest.TestCase):

@@ -38,7 +38,11 @@ Never answer `STRIP_FUNDING` because a credit is a wire, is large, or lands near
 
 ### `debit_group`
 
-All debits to one payee. Pick one tag:
+All debits to one payee. `why` lists the sweep passes that nominated it: D1 finance word, D2 fixed cadence, D3 the same amount as an MCA series under this payee, D4 a new payee soon after a financing credit, D5 a returned attempt. A nominated payee you leave unanswered or `unsure` is reported as a WATCH row (U, identity unproved), and a material WATCH row blocks a YES verdict. Answer a non-MCA tag when the description shows an ordinary payee.
+
+Give the same `funder` to two payees only when they are one funder. The engine still keeps them as separate positions unless they share an originator ID, one starts within 10 business days after the other stops, or one fills open payment slots of the other.
+
+Pick one tag:
 
 `MCA`, `PAYROLL`, `OWNER_DRAW`, `RENT`, `UTILITIES`, `INSURANCE`, `TAX`, `DEBT_SERVICE`, `DIRECT_COST`, `TRANSFER_OUT`, `OTHER`, `AMBIGUOUS_<LABEL>`, `unsure`.
 
