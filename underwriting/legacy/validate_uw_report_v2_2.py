@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 """Validate UW V2.2 report structure and report-visible accounting.
 
+V1.7 batch 1 deltas (the only edits to the V2.2 rules): weekly = monthly x 12/52;
+Table 4 Live? accepts U with Monthly Cost "—", ordered Y, then U, then N; the binding line may end
+with "; material uncertainty: ..."; and INSUFFICIENT DATA is allowed with two or more counted
+months, because material uncertainty is not visible in the report. The V1.7 report checker
+replaces this file in batch 3.
+
 Usage: python validate_uw_report.py report.md
 
 Limits: This validator does NOT verify transaction-to-funder attribution,
@@ -162,7 +168,7 @@ def validate(t):
     seen=set()
     prior_funder=None
     prev_live=False
-    non_live_seen=False
+    non_live_seen=0
     event_dates=[]
     for r in t4[:-2]:
         name=r[0]
@@ -183,10 +189,13 @@ def validate(t):
             seen.add(name)
             prior_funder=name
             event_dates=[]
-            require(r[5] in ("Y","N"),"Table 4: invalid live status")
-            if r[5]=="N": non_live_seen=True
-            if r[5]=="Y":
-                require(not non_live_seen,"Table 4: live funder follows non-live")
+            require(r[5] in ("Y","U","N"),"Table 4: invalid live status")
+            rank={"Y":0,"U":1,"N":2}[r[5]]
+            require(rank>=non_live_seen,"Table 4: rows not ordered Y, U, N")
+            non_live_seen=rank
+            if r[5]=="U":
+                require(r[7]=="—","Table 4: U row must have Monthly Cost —")
+            elif r[5]=="Y":
                 require(r[4]!="—" and r[4]!="Not found","Table 4: live funder has no last debit")
                 monthly=money(r[7],f"Table 4 {name} monthly",True)
                 if monthly is not None: live_sum+=monthly
@@ -212,7 +221,7 @@ def validate(t):
         weekly=money(r[2],f"Table 4b {r[0]} weekly",True)
         daily=money(r[3],f"Table 4b {r[0]} daily",True)
         if monthly is not None and weekly is not None:
-            require(abs(weekly-monthly/Decimal("4.333")) <= Decimal("0.62"),f"Table 4b {r[0]} weekly conversion mismatch")
+            require(abs(weekly-monthly*12/52) <= Decimal("0.62"),f"Table 4b {r[0]} weekly conversion mismatch")
         if monthly is not None and daily is not None:
             require(abs(daily-monthly/Decimal("20")) <= Decimal("0.53"),f"Table 4b {r[0]} daily conversion mismatch")
     for j in (1,2,3):
@@ -276,13 +285,13 @@ def validate(t):
         else:
             expected_binding=None
         if expected_binding is not None:
-            require(t6[2][1] == expected_binding or t6[2][1].startswith(expected_binding+"; CONSERVATIVE:"),"Table 6: wrong binding constraint")
+            require(t6[2][1] == expected_binding or t6[2][1].startswith((expected_binding+"; CONSERVATIVE:", expected_binding+"; material uncertainty:")),"Table 6: wrong binding constraint")
     for r in t6[:2]:
         m=money(r[1],f"Table 6 {r[0]} monthly",True)
         w=money(r[2],f"Table 6 {r[0]} weekly",True)
         d=money(r[3],f"Table 6 {r[0]} daily",True)
         if m is not None and w is not None:
-            require(abs(w-m/Decimal("4.333")) <= Decimal("0.62"),f"Table 6 {r[0]} weekly conversion mismatch")
+            require(abs(w-m*12/52) <= Decimal("0.62"),f"Table 6 {r[0]} weekly conversion mismatch")
         if m is not None and d is not None:
             require(abs(d-m/Decimal("20")) <= Decimal("0.53"),f"Table 6 {r[0]} daily conversion mismatch")
         pct=r[4]
@@ -316,7 +325,7 @@ def validate(t):
         require(declared == prefix+suffixes[worst],"Table 8: incorrect data-status suffix")
     if len(counted) < 2 and counted is not None:
         require(t8[0][0].startswith("INSUFFICIENT DATA"),"Table 8: fewer than two counted months requires INSUFFICIENT DATA")
-    elif headline is not None and len(counted)>=2:
+    elif headline is not None and len(counted)>=2 and not t8[0][0].startswith("INSUFFICIENT DATA"):
         require(t8[0][0].startswith("YES" if headline>0 else "NO"),"Table 8: capacity decision disagrees with HEADLINE")
 
     t9=t[SPEC[9][0]]

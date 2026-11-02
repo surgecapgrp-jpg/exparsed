@@ -22,7 +22,9 @@ Give at most one answer per `question_id`. Leave a question out, or answer `"tag
 
 One credit (a funding candidate) or a group of credits (transfer wording from an account that was not supplied). Pick one tag:
 
-`REV_PROCESSOR`, `REV_ACH`, `REV_WIRE`, `REV_DEPOSIT`, `REV_PAYER`, `STRIP_FUNDING`, `STRIP_TRANSFER`, `STRIP_REFUND`, `STRIP_OWNER`, `STRIP_RECREDIT`, `unsure`.
+`REV_PROCESSOR`, `REV_ACH`, `REV_WIRE`, `REV_DEPOSIT`, `REV_PAYER`, `STRIP_FUNDING`, `STRIP_TRANSFER`, `STRIP_REFUND`, `STRIP_OWNER`, `STRIP_RECREDIT`, `STRIP_UNRESOLVED`, `unsure`.
+
+The default for every credit question is `STRIP_UNRESOLVED`: the credit stays out of revenue and is not called financing. Answer a `REV_*` tag when the description or a document supports customer revenue, so the credit counts. `STRIP_UNRESOLVED` needs no evidence.
 
 `STRIP_FUNDING`, `STRIP_TRANSFER` and `STRIP_OWNER` remove money from revenue, so they need `evidence`:
 
@@ -32,7 +34,7 @@ One credit (a funding candidate) or a group of credits (transfer wording from an
 
 The engine rejects the whole file when a quote is not a verbatim substring of the source. Do not paraphrase.
 
-Never answer `STRIP_FUNDING` because a credit is a wire, is large, or lands near a new debit series. Those facts are already in the score, and policy V2.2 says they do not prove financing.
+Never answer `STRIP_FUNDING` because a credit is a wire, is large, or lands near a new debit series. Those facts are already in the score, and policy V1.7 says they do not prove financing.
 
 ### `debit_group`
 
@@ -43,7 +45,7 @@ All debits to one payee. Pick one tag:
 - `MCA` needs `funder`: the funder's name as a short plain string. Fixed daily, weekly or biweekly debits to a funding, capital or advance company are the usual pattern.
 - `DIRECT_COST` is a recurring supplier tied to cost of revenue. Isolated retail purchases stay `OTHER`.
 - `AMBIGUOUS_<LABEL>` (for example `AMBIGUOUS_CARD_PAYMENT`) is a recurring obligation whose nature is unclear. It is shown in Table 5 and kept out of the obligation total.
-- Add `terminated` only when a document or a transaction description proves the position was paid off or closed. Use the same `kind`/`quote`/`doc_id` shape as `evidence`. An estimated payoff is not proof.
+- Add `terminated` only when a document or a transaction description proves the position was paid off or closed. Use the same `kind`/`quote`/`doc_id` shape as `evidence`. An estimated payoff is not proof. Without `terminated`, a position whose debits stopped is reported U (unresolved) with a scenario cost, and a material U position blocks a YES verdict.
 
 ### `core_operation`
 

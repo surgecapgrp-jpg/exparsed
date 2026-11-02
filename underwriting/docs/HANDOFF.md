@@ -94,6 +94,8 @@ The three V2.2 overrides are enforced by self-checks that fail the run:
 
 ### 4.1 Interpretations that need underwriter sign-off
 
+Policy V1.7 is being adopted in batches. `docs/V1_7_MATRIX.md` maps every V1.7 rule to the engine, lists what batch 1 changed, and adds interpretations B1 to B7 for sign-off.
+
 V2.2 leaves these points open. The engine picks one reading and states it here so it can be reviewed in one place.
 
 | # | V2.2 text | Engine reading |
@@ -104,15 +106,15 @@ V2.2 leaves these points open. The engine picks one reading and states it here s
 | 4 | Peak week "5 business days of statement coverage" | Monday to Friday all inside a statement period. Holiday weeks stay eligible. |
 | 5 | THIN_BALANCE and lowest balance | Thin days use combined end-of-day balance across accounts, business days only. Lowest balance is the lowest single-account end-of-day balance. |
 | 6 | T3 "small discretionary debits" | Every Class A chain that is not T1 or T2. No dollar cutoff exists in V2.2. |
-| 7 | "Pre-file requires evidence" | First cleared debit within 2 normal payment gaps of coverage start. |
+| 7 | "Pre-file requires evidence" | V1.7 batch 1: no longer inferred. A first debit within 2 payment gaps of coverage start gets the note "funding may precede coverage (unproven)"; Funding Date shows Not found. |
 | 8 | Mixed calendar and statement-period accounts | Days Counted is the larger of the two counts for that month label. |
 | 9 | Balance field | Exparsed balance is the balance after that row. |
 | 10 | Funding columns with several fundings | Columns show the latest attached funding. Earlier ones are listed in Notes. |
 | 11 | Return pairing | A recredit matches a debit with the same account and amount in the prior 5 business days. Re-presentments within 10 business days form one chain. |
-| 12 | Defaults for unanswered questions | Credits stay revenue and unknown payees stay OTHER (outside obligations). HEADLINE with no answers vs with answers: sample $17,578 vs $5,218; real ledger $91,569 vs $44,883. Recommendation: Exparsed should not show a report to an underwriter while any question is open. |
+| 12 | Defaults for unanswered questions | V1.7 batch 1: unanswered candidate credits become STRIP_UNRESOLVED (out of revenue, not called financing). Unknown payees stay OTHER (outside obligations). |
 | 13 | Payment level for share-of-sales remittance (V2.2 assumes fixed payments) | A confirmed series where same-amount runs cover under 80% of payments is VARIABLE. Monthly cost = cleared debits in the last 20 business days. No amount events. The real ledger has two: DoorDash Capital and Rewards Network. |
 | 14 | Concurrent contracts from one payee | Split only when 3+ days have same-day debits that differ by more than 10%. Same-amount doubles are catch-up payments. A split whose tracks are not fixed-amount stays one VARIABLE position. |
-| 15 | Backward search on a Pre-file start | Skipped and logged as such. The real start precedes coverage, so credits in that window cannot be its funding. |
+| 15 | Backward search on a Pre-file start | V1.7 batch 1: every START trigger is searched, since Pre-file is no longer inferred. |
 | 16 | Descriptor change | Payee groups the judgments give the same funder name merge into one position (real ledger: `KAPITUS` and `KAPITUS SERVICIN`). |
 | 17 | "Large/unusual credits" for the forward search | 3x median deposit counts only for payers without an established pattern (3+ credits in 2+ months). Credits from a payee the business also pays are always candidates. |
 | 18 | Statement-cycle grouping | Applies only to statements of 35 days or less. A 13-month printout starting on the 29th uses calendar months. |
@@ -139,9 +141,9 @@ V2.2 leaves these points open. The engine picks one reading and states it here s
 
 | Check | Result |
 | :--- | :--- |
-| `python -m unittest discover -s tests` | 32 tests pass |
+| `python -m unittest discover -s tests` | 37 tests pass |
 | Legacy V2.2 validator on every report the tests render | PASS (run inside `engine()` in the tests) |
-| Self-checks per run (unrounded) | 13 pass on the sample |
+| Self-checks per run (unrounded) | 15 pass on the sample |
 | Fixtures against JSON Schemas | Pass with `jsonschema` 4.26 |
 | Real Exparsed ledger, gross credits per month | Equal to Exparsed `computed.months[].grossInflows` to the cent, 13 of 13 full months |
 | Real Exparsed ledger, overdraft days | 5, equal to the sum of Exparsed `businessDaysNegative` |
