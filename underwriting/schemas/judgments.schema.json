@@ -16,7 +16,7 @@
         "required": ["question_id"],
         "properties": {
           "question_id": {"type": "string", "pattern": "^Q-(credit|debit|core)-[0-9a-f]{10}$"},
-          "tag": {"type": "string", "description": "credit: a credit tag or unsure. debit_group: MCA, a debit tag, AMBIGUOUS_<LABEL> or unsure."},
+          "tag": {"type": "string", "description": "credit: a credit tag (STRIP_UNRESOLVED is the default) or unsure. debit_group: MCA, a debit tag, AMBIGUOUS_<LABEL> or unsure."},
           "funder": {"type": "string", "maxLength": 40},
           "evidence": {"$ref": "#/$defs/evidence"},
           "terminated": {"$ref": "#/$defs/evidence"},

@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""MCA capacity underwriting engine. Policy V2.2, engine V3.0.
+"""MCA capacity underwriting engine. Policy V2.2 with V1.7 batch 1, engine V3.1.
+
+V1.7 batch 1 (docs/V1_7_MATRIX.md): unanswered candidate credits are STRIP_UNRESOLVED;
+Table 4 status is Y/N/U and only closure evidence makes N; material U positions and
+unresolved credits gate the verdict; weeks and biweeks per month are exactly 52/12 and 26/12;
+Pre-file needs evidence, so the engine no longer infers it.
 
 Code computes every number in the report from ledger rows. The LLM answers
 only the questions this engine writes to questions.json (prompt: prompts/judge.md).
@@ -28,15 +33,17 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 
 D = Decimal
-ENGINE_VERSION = "3.0"
-POLICY_VERSION = "V2.2"
+ENGINE_VERSION = "3.1"
+POLICY_VERSION = "V2.2+V1.7b1"
 
 # Policy V2.2 parameters. Changing any value is a policy change: bump POLICY_VERSION.
 BUSINESS_DAYS_PER_MONTH = D(20)
-WEEKS_PER_MONTH = D("4.333")
-BIWEEKS_PER_MONTH = D("2.167")
+WEEKS_PER_MONTH = D(52) / D(12)  # V1.7: exact, rounded only for display
+BIWEEKS_PER_MONTH = D(26) / D(12)
 FULL_MONTH_DAYS = 18
 LIVE_WINDOW_BD = 10
+PROLONGED_SILENCE_BD = 30  # V1.7: covered business days without collections before Y becomes U
+MATERIAL_SHARE = D("0.05")  # V1.7: an uncertainty is material at >=5% of BASIS (operational policy)
 FUNDING_WINDOW_BD = 7
 UNATTACHED_WINDOW_CAL = 14
 SERIES_MIN_DEBITS = 3
@@ -72,6 +79,7 @@ CREDIT_TAGS = (
     "STRIP_REFUND",
     "STRIP_OWNER",
     "STRIP_RECREDIT",
+    "STRIP_UNRESOLVED",  # V1.7: excluded from revenue for lack of evidence; not a funding claim
 )
 DEBIT_TAGS = (
     "MCA",
@@ -373,8 +381,11 @@ class Position:
     level: Decimal = D(0)
     cost: Decimal = D(0)
     status: str = ""
-    prefile: bool = False
-    live: bool = False
+    live: bool = False  # live_status == "Y"
+    live_status: str = ""  # V1.7 Table 4: Y active, N closed on evidence, U unresolved
+    status_basis: str = ""
+    scenario: Decimal | None = None  # U only: plausible monthly cost, never in the stack
+    material: bool = False
     terminated: str = ""
     events: list = field(default_factory=list)
     triggers: list = field(default_factory=list)
@@ -582,6 +593,7 @@ class _Engine:
         self.by_id = {t.id: t for t in self.txns}
         self.end = self.txns[-1].date
         self.live_start = self.cal.add(self.end, -LIVE_WINDOW_BD)
+        self.acct_end = {aid: max(e for _, e in a["statements"]) for aid, a in self.accts.items()}
         for a, n in self.dropped.items():
             self.notes[a].append(f"{n} duplicate transaction id(s) dropped")
 
@@ -840,7 +852,7 @@ class _Engine:
                     txn_ids=[t.id],
                     transactions=[self.txn_view(t)],
                     why=why + near,
-                    default=t.tag,
+                    default="STRIP_UNRESOLVED",
                 )
             )
         unclear = defaultdict(list)
@@ -856,7 +868,7 @@ class _Engine:
                     transactions=[self.txn_view(t) for t in ts[:5]],
                     count=len(ts),
                     why=["transfer wording; sending account not supplied"],
-                    default="REV_DEPOSIT",
+                    default="STRIP_UNRESOLVED",
                 )
             )
         for name, g in sorted(self.groups.items()):
@@ -1066,7 +1078,7 @@ class _Engine:
             )
         # Different-name refinance hints (4E).
         for p in self.positions:
-            if p.prefile or not p.cleared:
+            if not p.cleared:
                 continue
             for o in self.positions:
                 if (
@@ -1080,7 +1092,8 @@ class _Engine:
                     p.notes.append(f"Possible refi of {o.funder}")
                     if p.live and o.live:
                         p.notes.append("Refi overlap, both counted")
-        self.positions.sort(key=lambda p: (not p.live, -p.cost, p.pid))
+        rank = {"Y": 0, "U": 1, "N": 2}
+        self.positions.sort(key=lambda p: (rank[p.live_status], -p.cost, p.pid))
 
     def analyse(self, p):
         c = p.cleared
@@ -1092,6 +1105,8 @@ class _Engine:
             else "PROVISIONAL"
         )
         standard = len(c) >= SERIES_MIN_DEBITS and cadence in CADENCE_FACTOR
+        end = self.acct_end[(c or p.txns)[-1].acct]  # coverage end of the debit account
+        observed = bool(c) and c[-1].date >= self.cal.add(end, -LIVE_WINDOW_BD)
         variable = standard and fixed_share(c) < FIXED_SHARE
         trig = lambda kind, t: p.triggers.append(
             dict(
@@ -1104,20 +1119,22 @@ class _Engine:
         )
         if c:
             start_cov = min(self.accts[t.acct]["statements"][0][0] for t in p.txns)
-            p.prefile = (
-                normal is not None and self.cal.diff(start_cov, c[0].date) <= 2 * normal
-            )
+            # V1.7: Pre-file needs a source; nearness to coverage start is only a note.
+            if normal is not None and self.cal.diff(start_cov, c[0].date) <= 2 * normal:
+                p.notes.append("Debits start near coverage start; funding may precede coverage (unproven)")
             trig("START", c[0])
         if variable:
-            # Share-of-sales remittance: cost is the observed last 20 business days, not a level x factor.
-            lo = self.cal.add(self.end, -int(BUSINESS_DAYS_PER_MONTH))
+            # Share-of-sales remittance: cost is the cleared debits of 20 business days, not a level x factor.
+            # The window ends at coverage end while collections are current, else at the last debit.
+            w_end = end if observed else c[-1].date
+            lo = self.cal.add(w_end, -int(BUSINESS_DAYS_PER_MONTH))
             recent = [t.amt for t in c if t.date > lo]
             p.cadence, p.status = "VARIABLE", "CONFIRMED"
             p.level = sum(recent, D(0)) / len(recent) if recent else D(0)
             p.cost = sum(recent, D(0))
-            p.notes.append(f"Variable remittance: cost = cleared debits in the 20 bd to {mdy(self.end)}")
-            if self.cal.diff(c[-1].date, self.end) > 2 * normal:
-                self.event(p, "STOPPED", c[-1], f"No debit for {self.cal.diff(c[-1].date, self.end)} bd",
+            p.notes.append(f"Variable remittance: cost = cleared debits in the 20 bd to {mdy(w_end)}")
+            if self.cal.diff(c[-1].date, end) > 2 * normal:
+                self.event(p, "STOPPED", c[-1], f"No debit for {self.cal.diff(c[-1].date, end)} bd",
                            "no payoff debit seen")
         elif standard:
             # Amount levels: a level change needs >10% for SUSTAIN_PAYMENTS payments.
@@ -1184,12 +1201,12 @@ class _Engine:
                         "debits resume",
                     )
                     trig("RESTARTED", b)
-            if self.cal.diff(c[-1].date, self.end) > 2 * normal:
+            if self.cal.diff(c[-1].date, end) > 2 * normal:
                 self.event(
                     p,
                     "STOPPED",
                     c[-1],
-                    f"No debit for {self.cal.diff(c[-1].date, self.end)} bd",
+                    f"No debit for {self.cal.diff(c[-1].date, end)} bd",
                     "no payoff debit seen",
                 )
             p.cost = p.level * CADENCE_FACTOR[p.cadence]
@@ -1202,16 +1219,38 @@ class _Engine:
             p.notes.append(
                 f"Provisional cadence: {len(c)} cleared debit(s); stress cost = max debit x20"
             )
-        p.live = bool(c) and c[-1].date >= self.live_start and not p.terminated
-        if p.terminated:
-            p.notes.append(f"Terminated per evidence: {p.terminated}")
-        elif c and not p.live:
-            p.notes.append(
-                f"Not live: last cleared {mdy(c[-1].date)} before live window {mdy(self.live_start)}"
-            )
-        if not p.live:
-            p.cost = D(0)
+        self.set_status(p, end, observed)
         p.events.sort(key=lambda e: e["date"])
+
+    def covered_bd(self, acct, after, end):
+        """Business days after `after` through `end` that fall inside the account's statements."""
+        spans = self.accts[acct]["statements"]
+        return sum(
+            1
+            for i in range(1, (end - after).days + 1)
+            if self.cal.is_bd(d := after + timedelta(i)) and any(s <= d <= e for s, e in spans)
+        )
+
+    def set_status(self, p, end, observed):
+        """V1.7 Table 4 status. Only closure evidence makes N; silence or an estimated payoff never does."""
+        c = p.cleared
+        if p.terminated:
+            st, basis = "N", f"Closed per evidence: {p.terminated}"
+        elif not c:
+            st, basis = "U", "No cleared collection"
+        elif p.cadence == "PROVISIONAL":
+            st, basis = "U", f"Cadence unverified ({len(c)} cleared); STRESS scenario = max debit x20"
+        elif observed:
+            st, basis = "Y", f"Observed: cleared collection within {LIVE_WINDOW_BD} bd of coverage end"
+        elif (silent := self.covered_bd(c[-1].acct, c[-1].date, end)) <= PROLONGED_SILENCE_BD:
+            st, basis = "Y", f"Assumed open; collections absent {silent} covered bd; last sustained cost carried"
+        else:
+            st, basis = "U", f"Collections absent {silent} covered bd; no closure evidence"
+        p.live_status, p.status_basis, p.live = st, basis, st == "Y"
+        if st == "U":
+            p.scenario = p.cost  # last sustained (or STRESS) monthly cost, shown as a scenario only
+        if st != "Y":
+            p.cost = D(0)
 
     def event(self, p, kind, t, change, detail):
         p.events.append(
@@ -1231,10 +1270,13 @@ class _Engine:
         self.gate = {}
         for q in self.questions:
             a = self.answers.get(q["question_id"])
-            if q["type"] != "credit" or not a:
+            if q["type"] != "credit":
                 continue
             for i in q["txn_ids"]:
                 t = self.by_id[i]
+                if not a:  # V1.7: unanswered candidate credits stay out of revenue
+                    t.tag, t.tag_source = "STRIP_UNRESOLVED", "default"
+                    continue
                 t.tag, t.tag_source = a["tag"], "judgment"
                 if a["tag"] == "STRIP_FUNDING":
                     self.gate[i] = a["evidence"]
@@ -1262,8 +1304,7 @@ class _Engine:
         for tr in triggers:
             lo = self.cal.add(tr["date"], -FUNDING_WINDOW_BD)
             found = []
-            skip = tr["kind"] == "START" and pos[tr["position"]].prefile
-            for c in [] if skip else credits:
+            for c in credits:
                 if lo <= c.date <= tr["date"]:
                     sc = self.score(c, pos[tr["position"]], tr)
                     if sc["points"] >= 1:
@@ -1279,7 +1320,7 @@ class _Engine:
                     accounts=list(self.accts),
                     credits_scanned=sum(lo <= c.date <= tr["date"] for c in credits),
                     candidates=found,
-                    outcome="skipped: Pre-file start, funding precedes coverage" if skip else "",
+                    outcome="",
                 )
             )
         # Proposals: best gated credit per trigger; ties or cross-position reuse become AMBIGUOUS.
@@ -1385,7 +1426,11 @@ class _Engine:
                 if hits:
                     self.notes[c.acct].append(
                         f"Unresolved funding candidate {mdy(c.date)} {usd(c.amt)} "
-                        f"kept as {c.tag}; True Revenue sensitivity {usd(c.amt)}"
+                        + (
+                            "excluded from revenue (STRIP_UNRESOLVED; not called financing)"
+                            if c.tag == "STRIP_UNRESOLVED"
+                            else f"kept as {c.tag}; True Revenue sensitivity {usd(c.amt)}"
+                        )
                     )
             self.forward.append(
                 dict(
@@ -1444,7 +1489,11 @@ class _Engine:
             stripped = sum(strips.values(), D(0))
             top = max(strips.items(), key=lambda kv: kv[1])[0] if strips else None
             self.month_rows[k] = dict(
-                gross=gross, stripped=stripped, top_strip=top, true=gross - stripped
+                gross=gross,
+                stripped=stripped,
+                top_strip=top,
+                true=gross - stripped,
+                unresolved=strips.get("STRIP_UNRESOLVED", D(0)),
             )
         tr = [self.month_rows[k]["true"] for k in self.counted]
         self.tor = mean(tr)
@@ -1573,23 +1622,24 @@ class _Engine:
             else None
         )
 
-    def capacity(self):
-        self.stack = sum((p.cost for p in self.positions if p.live), D(0))
-        b, s, o = self.basis, self.stack, self.total_ob
-        w = self.month_rows[self.worst_month]["true"] if self.worst_month else None
-        self.room = dict(
+    def rooms(self, b, w, s):
+        """Rooms A-D, HEADLINE and CONSERVATIVE for a BASIS, worst-month True Revenue and stack."""
+        o = self.total_ob
+        r = dict(
             A=b - s if b is not None else None,
             B=HOLDBACK_SHARE * b - s if b is not None else None,
             C=b - s - o if b is not None and o is not None else None,
             D=HOLDBACK_SHARE * w - s if w is not None else None,
         )
+        headline = max(D(0), min(r["B"], r["C"])) if None not in (r["B"], r["C"]) else None
+        conservative = max(D(0), min(r["C"], r["D"])) if None not in (r["C"], r["D"]) else None
+        return r, headline, conservative
+
+    def capacity(self):
+        self.stack = sum((p.cost for p in self.positions if p.live), D(0))
+        w = self.month_rows[self.worst_month]["true"] if self.worst_month else None
+        self.room, self.headline, self.conservative = self.rooms(self.basis, w, self.stack)
         r = self.room
-        self.headline = (
-            max(D(0), min(r["B"], r["C"])) if None not in (r["B"], r["C"]) else None
-        )
-        self.conservative = (
-            max(D(0), min(r["C"], r["D"])) if None not in (r["C"], r["D"]) else None
-        )
         if self.headline is None:
             self.binding = "Insufficient counted months"
         elif self.headline == 0:
@@ -1607,12 +1657,69 @@ class _Engine:
                 else f"Room D <= 0 (worst month {mon(self.worst_month)})"
             )
             self.binding += f"; CONSERVATIVE: {lim}"
+        self.readiness()
+        if self.uncertain_block:
+            self.binding += "; material uncertainty: " + "; ".join(self.uncertain_block)
         status = (
             "INSUFFICIENT DATA"
-            if len(self.counted) < 2
+            if len(self.counted) < 2 or self.uncertain_block
             else "YES" if self.headline > 0 else "NO"
         )
         self.status = status + SUFFIX[self.worst]
+
+    def readiness(self):
+        """V1.7 rules 6 and 7: test each U position and the unresolved credits against the verdict.
+
+        Material = could change the verdict or the binding room, or moves >= 5% of BASIS. Any material
+        item blocks YES. A NO stands only when no unresolved item could reverse it.
+        """
+        self.uncertain, self.uncertain_block = [], []
+        if self.headline is None or len(self.counted) < 2:
+            return
+
+        def view(b, w, s):
+            r, hl, _ = self.rooms(b, w, s)
+            return (hl > 0, "zero" if hl == 0 else "B" if r["B"] <= r["C"] else "C"), hl
+
+        w = self.month_rows[self.worst_month]["true"]
+        base, _ = view(self.basis, w, self.stack)
+        five = MATERIAL_SHARE * self.basis if self.basis > 0 else D(0)
+        u = [p for p in self.positions if p.live_status == "U"]
+        for p in u:
+            flips, hl = view(self.basis, w, self.stack + p.scenario)
+            p.material = p.scenario >= five or flips != base
+            self.uncertain.append(
+                dict(kind="U position", ref=p.display, monthly=p.scenario, headline_if=hl, material=p.material)
+            )
+        if len(u) > 1 and not any(p.material for p in u):
+            total = sum((p.scenario for p in u), D(0))
+            flips, hl = view(self.basis, w, self.stack + total)
+            if total >= five or flips != base:
+                for p in u:
+                    p.material = True
+                self.uncertain.append(
+                    dict(kind="U positions combined", ref=f"{len(u)} positions", monthly=total, headline_if=hl, material=True)
+                )
+        unres = sum((self.month_rows[k]["unresolved"] for k in self.months), D(0))
+        if unres:
+            alt = {k: self.month_rows[k]["true"] + self.month_rows[k]["unresolved"] for k in self.counted}
+            b2 = mean([alt[k] for k in self.counted][-3:])
+            flips, hl = view(b2, min(alt.values()), self.stack)
+            material = abs(b2 - self.basis) >= five or flips != base
+            self.uncertain.append(
+                dict(kind="unresolved credits", ref="STRIP_UNRESOLVED", amount=unres, basis_if=b2, headline_if=hl,
+                     material=material, reverses_no=not base[0] and flips[0])
+            )
+        if base[0]:
+            self.uncertain_block = [
+                f"{x['ref']} " + (f"U scenario {usd(x['monthly'])}/mo" if "monthly" in x else f"{usd(x['amount'])} excluded")
+                for x in self.uncertain
+                if x["material"]
+            ]
+        else:
+            self.uncertain_block = [
+                f"unresolved credits {usd(x['amount'])} could reverse NO" for x in self.uncertain if x.get("reverses_no")
+            ]
 
     # ---- 9. peak load -----------------------------------------------------------------------------
     def peak(self):
@@ -1816,6 +1923,8 @@ class _Engine:
                 f"HEADLINE turns positive when BASIS exceeds {usd(max(s / HOLDBACK_SHARE, s + o))} "
                 f"at current stack and obligations, or Live Stack falls below {usd(min(HOLDBACK_SHARE * b, b - o))}."
             )
+        if self.uncertain_block:
+            flip = "Resolve " + "; ".join(self.uncertain_block) + ". " + flip
         core = next(
             (
                 self.answers[q["question_id"]]["text"]
@@ -1894,6 +2003,19 @@ class _Engine:
             all(p.cost == 0 for p in self.positions if not p.live),
         )
         ok(
+            "status is Y, N or U; N only with closure evidence; U carries a scenario",
+            all(
+                (p.live_status == "N") == bool(p.terminated)
+                and (p.live_status == "U") == (p.scenario is not None)
+                and p.live == (p.live_status == "Y")
+                for p in self.positions
+            ),
+        )
+        ok(
+            "no YES while a material uncertainty is open",
+            not (self.status.startswith("YES") and any(x["material"] for x in self.uncertain)),
+        )
+        ok(
             "no live cost removed by payoff estimate",
             all(p.cost > 0 for p in self.positions if p.live),
         )
@@ -1947,7 +2069,10 @@ class _Engine:
                 level=p.level,
                 monthly_cost=p.cost,
                 live=p.live,
-                prefile=p.prefile,
+                live_status=p.live_status,
+                status_basis=p.status_basis,
+                scenario_cost=p.scenario,
+                material=p.material,
                 terminated=p.terminated,
                 tag_source=p.source,
                 last_debit=p.cleared[-1].date if p.cleared else None,
@@ -2013,6 +2138,7 @@ class _Engine:
                 conservative=self.conservative,
                 binding=self.binding,
                 status=self.status,
+                uncertainty=self.uncertain,
                 worst_month=mkey(self.worst_month) if self.worst_month else None,
             ),
             streams=self.stream_rows,
@@ -2218,6 +2344,18 @@ def tables(a):
             open_q = [q for q in a["questions"] if q["type"] != "core_operation" and not q["answered"]]
             if open_q:
                 notes.append(f"{len(open_q)} judgment question(s) unanswered; engine defaults applied")
+            unres = [m for m in months if m["unresolved"]]
+            if unres:
+                notes.append(
+                    f"STRIP_UNRESOLVED {usd(sum(m['unresolved'] for m in unres))} in {len(unres)} month(s): "
+                    "excluded from revenue for lack of evidence, not called financing"
+                )
+            notes += [
+                f"{x['ref']}: U scenario {usd(x['monthly'])}/mo would set HEADLINE {usd(x['headline_if'])}"
+                + (" (material)" if x["material"] else "")
+                for x in cap["uncertainty"]
+                if "monthly" in x
+            ]
             notes += [
                 f"{p['display']}: {n}"
                 for p in positions
@@ -2239,7 +2377,9 @@ def tables(a):
             m["month"],
             str(m["days"]),
             usd(m["gross"]),
-            f"{usd(m['stripped'])} ({m['top_strip']})" if m["top_strip"] else usd(m["stripped"]),
+            (f"{usd(m['stripped'])} ({m['top_strip']}" + (f"; unresolved {usd(m['unresolved'])}" if m["unresolved"] and m["top_strip"] != "STRIP_UNRESOLVED" else "") + ")")
+            if m["top_strip"]
+            else usd(m["stripped"]),
             usd(m["true"]),
             "Yes" if m["counted"] else "No",
         ]
@@ -2263,8 +2403,9 @@ def tables(a):
     t4 = []
     for p in positions:
         f = p["fundings"][-1] if p["fundings"] else None
-        fdate = mdy(f["credit_date"]) if f else "Pre-file" if p["prefile"] else "Not found"
-        notes = [p["status"]]
+        fdate = mdy(f["credit_date"]) if f else "Not found"
+        st = p["live_status"]
+        notes = [p["status"], p["status_basis"]]
         for fx in p["fundings"]:
             notes.append(
                 f"{fx['confidence']} {fx['points']} pts: {mdy(fx['credit_date'])} {usd(fx['credit_amount'])} -> "
@@ -2272,14 +2413,14 @@ def tables(a):
             )
         for c in p["possible_fundings"]:
             notes.append(f"Possible {mdy(c['date'])} {usd(c['amount'])} ({c['confidence']}); {c['outcome']}")
-        if f and p["live"]:
+        if st == "U":
+            notes.append(
+                f"SCENARIO {usd(p['scenario_cost'])}/mo, not in stack" + ("; material" if p["material"] else "")
+            )
+        if f and st != "N":
             rem = f["credit_amount"] * PAYBACK_FACTOR - p["paid_since_latest_funding"]
-            notes.append(f"Est. remaining {usd(rem)} (1.4x model, unverified); counted live")
-        elif p["live"]:
-            notes.append("Balance unknown, counted live")
+            notes.append(f"SCENARIO est. remaining {usd(rem)} (1.4x model); not closure evidence")
         notes += [n for n in p["notes"] if not n.startswith("Provisional")]
-        if p["cadence"] == "PROVISIONAL":
-            notes.append("provisional stress cost max debit x20")
         t4.append(
             [
                 p["display"],
@@ -2287,9 +2428,9 @@ def tables(a):
                 usd(f["credit_amount"]) if f else dash,
                 f"{p['cadence'].title()} {usd(p['level'])}",
                 mdy(p["last_debit"]) if p["last_debit"] else dash,
-                "Y" if p["live"] else "N",
+                st,
                 "; ".join(notes),
-                usd(p["monthly_cost"]),
+                dash if st == "U" else usd(p["monthly_cost"]),
             ]
         )
         for e in p["events"]:
@@ -2304,7 +2445,7 @@ def tables(a):
     ]
     pw = a["peak_week"]
     cw, cd = stack / WEEKS_PER_MONTH, stack / BUSINESS_DAYS_PER_MONTH
-    current = ["Current Live Stack", usd(stack), usd(cw), usd(cd), f"{sum(p['live'] for p in positions)} live positions"]
+    current = ["Current Live Stack", usd(stack), usd(cw), usd(cd), f"{sum(p['live'] for p in positions)} Y positions" + (f"; {sum(p['live_status'] == 'U' for p in positions)} U not in stack" if any(p["live_status"] == "U" for p in positions) else "")]
     if pw:
         pm = pw["weekly"] * WEEKS_PER_MONTH
         mk = mkey((pw["monday"].year, pw["monday"].month))
