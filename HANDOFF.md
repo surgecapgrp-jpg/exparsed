@@ -135,6 +135,24 @@ Tests for these are E13 to E15 in `tests/edge.js`.
 - The FUNDED set (about 7,300 files) was not rerun after this round. Many of its files are applications,
   IDs, credit reports and contracts.
 
+## AI providers, underwriting and chat (2026-11-02, branch `underwriting-in-page`)
+
+| Item | Where |
+|---|---|
+| Keys | Settings > AI providers: one Claude key and model, one OpenRouter key and model. Held in memory only, as before. |
+| Provider per job | OCR keeps its own pick (Mac OCR, Claude, OpenRouter). Underwriting and chat share a second pick (Claude or OpenRouter). |
+| Underwrite button | Opens a panel over the output pane. Run: ledger export > engine through Pyodide > judgments from the model > engine again > ten-table report. |
+| Engine | `underwriting/` (Python). `underwriting/embed.py` copies it into the page between the `UW-EMBED` markers. |
+| Model calls | `aiRequest` / `aiCall` in the AI CALLS section of the page (pure functions, tested in `tests/ai.js`). Non-streaming, 16,000 max tokens, Claude system prompt cached. |
+| Chat | Same panel. Tools run in the page: `search_rows`, `read_document`, `read_audit`. |
+
+- Claude Opus 5.5, Sonnet 5.5 and Fable 5.1 reject forced `tool_choice`, so judgments use structured output (`output_config.format`).
+- Claude requests to Opus 5.5, Opus 5, Sonnet 5.5 and Fable 5.1 carry server-side refusal fallback (`fallbacks: "default"`, beta header `server-side-fallback-2026-07-01`).
+- First Run downloads Pyodide 0.27.2 (about 10 MB) from cdn.jsdelivr.net; Chrome caches it. Offline, Run fails with a message and chat still works.
+- Python runs on the page's main thread. The real 3,069-row ledger takes 0.4 s in CPython; Pyodide is typically 2 to 5 times slower. Move it to a Web Worker if the page freezes noticeably.
+- Tests: `node tests/run-node.js` gives 207 passed (20 new in `tests/ai.js`). `python3 -m unittest discover -s underwriting/tests` gives 30 passed. `tests/run.sh` (JSC) was not run.
+- Not verified: Pyodide loading in a real browser, and live Claude or OpenRouter calls. A headless-Chrome run with mocked Pyodide (the real engine behind a local server), mocked Claude endpoints and a 3-month CSV passed 15 of 15 checks.
+
 ## Test harness (not in the repo)
 
 The batch runs used a local harness in the Claude session scratchpad:

@@ -5,6 +5,8 @@ and checks each one against the statement's own totals and balances. Open it in 
 
 - `mac_ocr_server.py` + `mac_ocr.swift`: the local OCR server the page uses for scans (Apple Vision, port 8091).
   Run `python3 mac_ocr_server.py`; it compiles the Swift helper (`mac_ocr`) on first start.
+- `underwriting/`: the MCA underwriting engine (Python). The page runs it through Pyodide from the Underwrite button;
+  the model answers only the questions the engine asks, with the key from Settings > AI providers. See `underwriting/README.md`.
 - `tests/`: unit tests. Run `bash tests/run.sh` (macOS) or `node tests/run-node.js`.
   `tests/README.md` also describes real statement batches (`../test-statements/...`); those hold customer
   documents and are not in this repo.
