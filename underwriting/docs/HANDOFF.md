@@ -94,13 +94,13 @@ The three V2.2 overrides are enforced by self-checks that fail the run:
 
 ### 4.1 Interpretations that need underwriter sign-off
 
-Policy V1.7 is being adopted in batches. `docs/V1_7_MATRIX.md` maps every V1.7 rule to the engine, lists what batch 1 changed, and adds interpretations B1 to B7 for sign-off.
+Policy V1.7 is being adopted in batches. `docs/V1_7_MATRIX.md` maps every V1.7 rule to the engine, lists what batch 1 changed, and adds interpretations B1 to B16 for sign-off.
 
 V2.2 leaves these points open. The engine picks one reading and states it here so it can be reviewed in one place.
 
 | # | V2.2 text | Engine reading |
 | ---: | :--- | :--- |
-| 1 | "Detect MCA series" | Default MCA when a payee has 3+ cleared debits at daily/weekly/biweekly cadence, same-amount runs of 3+ cover 80% of them, and the name has a funder word or the cadence is daily. 1 to 2 debits qualify only with a funder word and a debit inside the live window. The LLM can overrule both. |
+| 1 | "Detect MCA series" | Default MCA when a payee has 3+ cleared debits at daily/weekly/biweekly cadence, same-amount runs of 3+ cover 80% of them, and the name has a funder word or the cadence is daily. 1 to 2 debits qualify only with a funder word and a debit inside the live window. The LLM can overrule both. V1.7 batch 2: monthly cadence counts, finance words inside a token count, and unanswered finance-looking payees become WATCH rows (matrix B8 to B13). |
 | 2 | Class B "debit paid into overdraft" | The debit that moves the balance from 0 or above to below 0. Later debits while overdrawn are not separate events. |
 | 3 | FLIGHT "an inflow" | Funding candidates and STRIP_FUNDING credits of at least 3x the median deposit. On the real ledger, applying it to every candidate gave 155 events, mostly $300 inflows. |
 | 4 | Peak week "5 business days of statement coverage" | Monday to Friday all inside a statement period. Holiday weeks stay eligible. |
@@ -115,7 +115,7 @@ V2.2 leaves these points open. The engine picks one reading and states it here s
 | 13 | Payment level for share-of-sales remittance (V2.2 assumes fixed payments) | A confirmed series where same-amount runs cover under 80% of payments is VARIABLE. Monthly cost = cleared debits in the last 20 business days. No amount events. The real ledger has two: DoorDash Capital and Rewards Network. |
 | 14 | Concurrent contracts from one payee | Split only when 3+ days have same-day debits that differ by more than 10%. Same-amount doubles are catch-up payments. A split whose tracks are not fixed-amount stays one VARIABLE position. |
 | 15 | Backward search on a Pre-file start | V1.7 batch 1: every START trigger is searched, since Pre-file is no longer inferred. |
-| 16 | Descriptor change | Payee groups the judgments give the same funder name merge into one position (real ledger: `KAPITUS` and `KAPITUS SERVICIN`). |
+| 16 | Descriptor change | V1.7 batch 2: payees given the same funder join only on a shared originator ID, sequential continuity, or open payment slots (matrix B12). `KAPITUS SERVICIN` joins `KAPITUS` on open slots. |
 | 17 | "Large/unusual credits" for the forward search | 3x median deposit counts only for payers without an established pattern (3+ credits in 2+ months). Credits from a payee the business also pays are always candidates. |
 | 18 | Statement-cycle grouping | Applies only to statements of 35 days or less. A 13-month printout starting on the 29th uses calendar months. |
 | 19 | Table 4 "Possible" notes | Shown for MED or HIGH leading candidates only. LOW candidates stay in `audit.json`. |
@@ -141,9 +141,9 @@ V2.2 leaves these points open. The engine picks one reading and states it here s
 
 | Check | Result |
 | :--- | :--- |
-| `python -m unittest discover -s tests` | 37 tests pass |
+| `python -m unittest discover -s tests` | 45 tests pass |
 | Legacy V2.2 validator on every report the tests render | PASS (run inside `engine()` in the tests) |
-| Self-checks per run (unrounded) | 15 pass on the sample |
+| Self-checks per run (unrounded) | 17 pass on the sample |
 | Fixtures against JSON Schemas | Pass with `jsonschema` 4.26 |
 | Real Exparsed ledger, gross credits per month | Equal to Exparsed `computed.months[].grossInflows` to the cent, 13 of 13 full months |
 | Real Exparsed ledger, overdraft days | 5, equal to the sum of Exparsed `businessDaysNegative` |

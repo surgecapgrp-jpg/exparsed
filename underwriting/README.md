@@ -12,7 +12,7 @@ Code computes every number. The LLM answers a short list of classification quest
 - `adapter/exparsed_adapter.py`: Exparsed `ledger-v1` export to normalized ledger, plus `page_run()`, the entry point `exparsed.html` calls. Checked against one real export.
 - `embed.py`: copies the engine, validator, adapter and judge prompt into `exparsed.html`. Run it after changing any of them; a test fails while the page copy is stale.
 - `legacy/validate_uw_report_v2_2.py`: the V2.2 validator, unchanged. The engine runs it on every report.
-- `tests/`: synthetic fixture builder, sample ledger and judgments, 37 tests, all through `underwrite()`.
+- `tests/`: synthetic fixture builder, sample ledger and judgments, 45 tests, all through `underwrite()`.
 
 ## Quick start
 
