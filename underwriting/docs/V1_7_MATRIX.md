@@ -27,7 +27,7 @@ Count: 150 rows. 26 B1, 33 B2, 42 Met, 29 Partial, 17 Gap, 3 Page.
 | H6 | Analyze readable files; record every unreadable source | The adapter skips non-statement and row-less files without listing them | Gap | B3: inventory unreadable files in Table 1 |
 | H7 | Recompute all dependents after any change | Every run recomputes everything from ledger plus judgments | Met | — |
 | H8 | Ten fixed sections; Live? is Y/N/U; material U shown | Y/N/U rows render. The table format is still V2.2. | B1 | B3: V1.7 template |
-| H9 | Say INSUFFICIENT DATA when evidence is insufficient | Fewer than 2 counted months, material U positions or material unresolved credits | B1 | B3: missing accounts, coverage gaps |
+| H9 | Say INSUFFICIENT DATA when evidence is insufficient | Fewer than 2 counted months, a material U position, or unresolved credits that could reverse a NO (B2) | B1 | B3: missing accounts, coverage gaps |
 | H10 | Internal audit record; output is the ten tables only | `audit.json` plus a report holding the tables and fixed lines | Met | — |
 | H11 | Execution order steps 1 to 11 | Same order, but there is no account-link step and no separate debit-first sweep | Partial | B2, B3 |
 
@@ -182,7 +182,7 @@ Count: 150 rows. 26 B1, 33 B2, 42 Met, 29 Partial, 17 Gap, 3 Page.
 | V8 | Rooms A to D, HEADLINE, CONSERVATIVE from unrounded cents | As written (self-check on HEADLINE) | Met | — |
 | V9 | Weekly = monthly/(52/12), daily = monthly/20 | Yes | B1 | — |
 | V10 | Binding texts | As written; material uncertainty appended when it blocks the verdict | B1 | — |
-| V11 | Readiness: <2 months, an essential unavailable amount, or material uncertainty gives INSUFFICIENT DATA | Months and material uncertainty only | Partial | B3: missing accounts and coverage gaps |
+| V11 | Readiness: <2 months, an essential unavailable amount, or material uncertainty gives INSUFFICIENT DATA | Months, material U positions, and unresolved credits that could reverse a NO | Partial | B3: missing accounts and coverage gaps |
 | V12 | Data-status suffix | Worst integrity across accounts | Met | — |
 
 ## 8. Peak, returns and liquidity
@@ -240,8 +240,8 @@ Count: 150 rows. 26 B1, 33 B2, 42 Met, 29 Partial, 17 Gap, 3 Page.
 | # | V1.7 text | Engine reading |
 | ---: | :--- | :--- |
 | B1 | STRIP_UNRESOLVED for a "material receipt lacking sufficient evidence" | Every unanswered or "unsure" candidate credit becomes STRIP_UNRESOLVED. No per-credit dollar threshold applies. |
-| B2 | "material U/excluded-revenue ... uncertainty affecting capacity => INSUFFICIENT DATA" | Unresolved credits use the U test: material if adding them back changes the verdict or binding room, or moves BASIS by >=5%. A material item blocks YES even though stripping lowers capacity. |
-| B3 | "An incomplete or unverified cadence has a STRESS-only rate" | A position without a standard cadence (fewer than 3 cleared debits, or irregular gaps) is U with STRESS = max cleared debit x20. |
+| B2 | "material U/excluded-revenue ... uncertainty affecting capacity => INSUFFICIENT DATA" | **Decided 2026-11-02, changed:** unresolved credits never block YES. They are already out of BASIS, so adding them back can only raise capacity. They block NO only when adding them back would reverse it. Their BASIS and HEADLINE sensitivity stays in `capacity.uncertainty`. Material U positions still block YES. |
+| B3 | "An incomplete or unverified cadence has a STRESS-only rate" | A position without a standard cadence (fewer than 3 cleared debits, or irregular gaps) is U with STRESS = max cleared debit x20. **Decided 2026-11-02: kept.** A material U row blocks YES, so leaving its STRESS cost out of the stack cannot produce an unsafe YES. |
 | B4 | U scenario cost | The last sustained monthly cost. For VARIABLE, cleared debits in the 20 bd ending at the last debit. |
 | B5 | "30 covered business days without collections" | Business days after the last cleared debit, through coverage end, inside the debit account's statement periods. |
 | B6 | Current window "through the end of the relevant account's available coverage" | The debit account's last statement end date. |
@@ -262,9 +262,9 @@ The $1 HEADLINE moves come from 52/12 replacing 4.333. With V1.7, a real ledger 
 
 | # | V1.7 text | Engine reading |
 | ---: | :--- | :--- |
-| B8 | D4 "rescan all subsequent and nearby debits" after a suspected financing credit | A payee whose first debit falls within 30 days after an explicit financing credit is nominated only if it repeats at daily, weekly or biweekly gaps, or shares a word with the sender. Without that filter the real ledger nominated a bar, a convenience store and Zelle payments. |
+| B8 | D4 "rescan all subsequent and nearby debits" after a suspected financing credit | A payee whose first debit falls within 30 days after an explicit financing credit is nominated only if it repeats at daily, weekly or biweekly gaps, or shares a word with the sender. Without that filter the real ledger nominated a bar, a convenience store and Zelle payments. **Decided 2026-11-02: kept.** |
 | B9 | D3 "repeated same or similar collection amounts under changing descriptors" | 2+ debits at a default MCA series' most common amount, forming at least half the payee's cleared debits, within 30 days of the series. One $390 check among 194 checks does not count. |
-| B10 | D2 cadence without a funder name | An unanswered fixed daily, weekly or biweekly series becomes a WATCH row. Fixed monthly series without a finance word (rent-like bills) stay NON-MCA. On the real ledger, this catches KAPITUS and ACCORD BUSINESS when no answers exist. |
+| B10 | D2 cadence without a funder name | An unanswered fixed daily, weekly or biweekly series becomes a WATCH row. Fixed monthly series without a finance word (rent-like bills) stay NON-MCA. On the real ledger, this catches KAPITUS and ACCORD BUSINESS when no answers exist. **Decided 2026-11-02: kept.** It catches KAPITUS and ACCORD BUSINESS; a model answer removes a false WATCH row. |
 | B11 | Expanded window "plausible out-of-window relationships" | Credits scoring 3+ points (MED or HIGH) within ±30 calendar days. They are listed as INVESTIGATE and never attached. |
 | B12 | "A descriptor change with a corroborated originator ID and continuity is usually the same position" | Two payees given the same funder join when they share an `ORIG ID`, when one starts within 10 business days after the other stops, or when one's debits fall inside the other's span on days without its debits. The real ledger joins KAPITUS SERVICIN into KAPITUS on the third rule. ZLUR FUNDING LLC shares a day with ZLUR FUNDING, so it stays separate (U, $1,980 STRESS). |
 | B13 | D1 finance language | Word matches, plus CAPITAL, FUNDING, FINANC, LENDING, ADVANCE or MERCHANT inside a token. This finds HEADWAYCAPITAL and FORWARD FINANCIN. It also nominates EMPIRE MERCHANTS (a liquor distributor) until the model answers. |

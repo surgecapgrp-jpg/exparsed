@@ -287,6 +287,12 @@ class Scenarios(unittest.TestCase):
         r = run(led, with_judgments(r0, answers))
         self.assertEqual(pos(r, "SUNCAP")[0]["live_status"], "N")
         self.assertEqual(r.status, "YES")
+        # Sign-off B2: the unanswered $30,000 wire stays out of BASIS and does not block YES.
+        jkl = q(r0, kind="credit")
+        r = run(led, with_judgments(r0, [a for a in answers if a["question_id"] != jkl]))
+        self.assertEqual(tags(r, led, "JKL"), ["STRIP_UNRESOLVED"])
+        self.assertEqual(r.status, "YES")
+        self.assertTrue(any(x["kind"] == "unresolved credits" for x in r.audit["capacity"]["uncertainty"]))
 
     def test_no_stands_when_uncertainty_cannot_reverse_it(self):
         led = copy.deepcopy(LEDGER)

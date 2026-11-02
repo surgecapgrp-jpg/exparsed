@@ -472,8 +472,8 @@
 """MCA capacity underwriting engine. Policy V2.2 with V1.7 batches 1 and 2, engine V3.2.
 
 V1.7 batch 1 (docs/V1_7_MATRIX.md): unanswered candidate credits are STRIP_UNRESOLVED;
-Table 4 status is Y/N/U and only closure evidence makes N; material U positions and
-unresolved credits gate the verdict; weeks and biweeks per month are exactly 52/12 and 26/12;
+Table 4 status is Y/N/U and only closure evidence makes N; material U positions block YES and
+unresolved credits block only a NO they could reverse (sign-off B2); weeks and biweeks per month are exactly 52/12 and 26/12;
 Pre-file needs evidence, so the engine no longer infers it.
 
 V1.7 batch 2: debit-first sweep (D1 name/ID, D2 cadence, D3 same amount under another
@@ -2338,8 +2338,9 @@ class _Engine:
     def readiness(self):
         """V1.7 rules 6 and 7: test each U position and the unresolved credits against the verdict.
 
-        Material = could change the verdict or the binding room, or moves >= 5% of BASIS. Any material
-        item blocks YES. A NO stands only when no unresolved item could reverse it.
+        Material = could change the verdict or the binding room, or moves >= 5% of BASIS. A material U
+        position blocks YES. Unresolved credits are already out of BASIS, so they only block a NO they
+        could reverse. Their sensitivity is still reported.
         """
         self.uncertain, self.uncertain_block = [], []
         if self.headline is None or len(self.counted) < 2:
@@ -2379,10 +2380,10 @@ class _Engine:
                      material=material, reverses_no=not base[0] and flips[0])
             )
         if base[0]:
+            # Sign-off B2 (2026-11-02): unresolved credits are already out of BASIS, so adding them back can
+            # only raise capacity. They never block YES; material U positions do.
             self.uncertain_block = [
-                f"{x['ref']} " + (f"U scenario {usd(x['monthly'])}/mo" if "monthly" in x else f"{usd(x['amount'])} excluded")
-                for x in self.uncertain
-                if x["material"]
+                f"{x['ref']} U scenario {usd(x['monthly'])}/mo" for x in self.uncertain if x["material"] and "monthly" in x
             ]
         else:
             self.uncertain_block = [
@@ -2727,8 +2728,8 @@ class _Engine:
             all(s["expanded_outcome"] for s in self.searches) and all(f["expanded_outcome"] for f in self.forward),
         )
         ok(
-            "no YES while a material uncertainty is open",
-            not (self.status.startswith("YES") and any(x["material"] for x in self.uncertain)),
+            "no YES while a material U position is open",
+            not (self.status.startswith("YES") and any(x["material"] and "monthly" in x for x in self.uncertain)),
         )
         ok(
             "no live cost removed by payoff estimate",
