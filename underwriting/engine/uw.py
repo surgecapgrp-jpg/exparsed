@@ -463,7 +463,7 @@ def split_concurrent(ts):
     return tracks
 
 
-class Engine:
+class _Engine:
     def __init__(self, raw: bytes, judgments=None):
         self.sha = hashlib.sha256(raw).hexdigest()
         try:
@@ -481,6 +481,7 @@ class Engine:
         self.build_positions()
         self.gate_and_attribute()
         self.revenue()
+        self.crosscheck_exparsed()
         self.streams()
         self.obligations()
         self.capacity()
@@ -504,6 +505,8 @@ class Engine:
         self.owners = [o.upper() for o in led.get("owner_names", []) if o.strip()]
         self.owner_rx = rx(*map(re.escape, self.owners)) if self.owners else None
         self.docs = {d["doc_id"]: d for d in led.get("documents", [])}
+        self.computed = led.get("exparsed_computed", [])
+        require(isinstance(self.computed, list), "ledger: exparsed_computed must be a list")
         self.accts = {}
         for a in led["accounts"]:
             for k in ("account_id", "name", "last4", "integrity", "statements"):
@@ -1453,6 +1456,32 @@ class Engine:
             else None
         )
 
+    def crosscheck_exparsed(self):
+        """Gross credits per account and calendar month against Exparsed's own computed figures.
+
+        Both sides sum the same posted credits, so any difference means rows were dropped or
+        doubled on the way here. A mismatch becomes a Table 1 note; the run continues.
+        """
+        compared, mismatches = 0, []
+        for c in self.computed:
+            a = self.accts.get(c.get("account"))
+            if not a or a["period_mode"] or c.get("partial"):
+                continue  # Exparsed leaves a partial first day out of its sum
+            k = tuple(map(int, c["month"].split("-")))
+            ours = sum(
+                (t.amt for t in self.txns if t.acct == c["account"] and t.dir == "credit" and t.month == k),
+                D(0),
+            )
+            theirs = D(str(c["gross_inflows"]))
+            compared += 1
+            if ours != theirs:
+                mismatches.append(dict(account=c["account"], month=c["month"], engine=ours, exparsed=theirs))
+                self.notes[c["account"]].append(
+                    f"Gross credits {mon(k)}: engine ${ours:,.2f}, Exparsed computed ${theirs:,.2f}; "
+                    "rows were dropped or doubled before underwriting"
+                )
+        self.crosscheck = dict(months_compared=compared, mismatches=mismatches)
+
     def streams(self):
         groups = defaultdict(list)
         for t in self.txns:
@@ -1880,362 +1909,66 @@ class Engine:
         self.checks = checks
 
     # ---- 13. table rows and render ----------------------------------------------------------------
-    def tables(self):
-        dash = "—"
-        t1 = []
-        for aid, a in self.accts.items():
-            ks = sorted(self.acct_months[aid])
-            cov = f"{mon(ks[0])} to {mon(ks[-1])} ({len(ks)})" if ks else dash
-            cnt = [k for k in ks if k in self.counted]
-            partial = [
-                f"{mon(k)} ({v if isinstance(v, int) else len(v)} days)"
-                for k, v in sorted(self.acct_months[aid].items())
-                if (v if isinstance(v, int) else len(v)) < FULL_MONTH_DAYS
-            ]
-            notes = (
-                [f"Path A (Exparsed); source status {a['integrity']}"]
-                + ([a["integrity_note"]] if a.get("integrity_note") else [])
-                + self.notes[aid]
-            )
-            if aid == next(iter(self.accts)):
-                open_q = [
-                    q
-                    for q in self.questions
-                    if q["type"] != "core_operation"
-                    and q["question_id"] not in self.answers
-                ]
-                if open_q:
-                    notes.append(
-                        f"{len(open_q)} judgment question(s) unanswered; engine defaults applied"
-                    )
-                notes += [
-                    f"{p.display}: {n}"
-                    for p in self.positions
-                    for n in p.notes
-                    if n.startswith("Provisional")
-                ]
-            t1.append(
-                [
-                    f"{a['name']} ...{a['last4']}",
-                    cov,
-                    f"{len(cnt)}: " + (", ".join(map(mon, cnt)) if cnt else "None"),
-                    "Partial: " + ", ".join(partial) if partial else "None",
-                    a["integrity"],
-                    "; ".join(notes),
-                ]
-            )
-        t2 = []
-        for k in self.months:
-            r = self.month_rows[k]
-            strip = (
-                f"{usd(r['stripped'])} ({r['top_strip']})"
-                if r["top_strip"]
-                else usd(r["stripped"])
-            )
-            t2.append(
-                [
-                    mon(k),
-                    str(self.days[k]),
-                    usd(r["gross"]),
-                    strip,
-                    usd(r["true"]),
-                    "Yes" if k in self.counted else "No",
-                ]
-            )
-        t2 += [
-            ["TOR", dash, dash, dash, usd(self.tor), dash],
-            ["Last-3 Avg", dash, dash, dash, usd(self.last3), dash],
-            ["BASIS", dash, dash, dash, usd(self.basis), dash],
-        ]
-        t3 = [
-            [
-                r["name"],
-                r["cadence"],
-                f"{r['count']} items, avg {usd(r['avg'])}",
-                usd(r["total"]) + (f" (CV {r['cv']})" if r["cv"] is not None else ""),
-                f"{pct(r['share'])} of included revenue; in {r['present']} of {len(self.months)} months",
-            ]
-            for r in self.stream_rows
-        ] or [["None", dash, dash, dash, dash]]
-        t4 = []
-        for p in self.positions:
-            last = p.cleared[-1].date if p.cleared else None
-            f = p.fundings[-1] if p.fundings else None
-            fdate = (
-                mdy(self.by_id[f["credit"]].date)
-                if f
-                else "Pre-file" if p.prefile else "Not found"
-            )
-            famt = usd(self.by_id[f["credit"]].amt) if f else dash
-            notes = [p.status]
-            for fx in p.fundings:
-                c = self.by_id[fx["credit"]]
-                notes.append(
-                    f"{fx['confidence']} {fx['points']} pts: {mdy(c.date)} {usd(c.amt)} -> "
-                    f"{fx['trigger']['kind']} {mdy(fx['trigger']['date'])}, {fx['bd_gap']} bd, "
-                    f"gate {self.gate[c.id]['kind']}"
-                )
-            for s in self.searches:
-                if s["anchor"] in {tr["trigger_id"] for tr in p.triggers} and s[
-                    "outcome"
-                ].startswith(("AMBIGUOUS", "best")) and s["candidates"][0]["points"] >= 3:
-                    c = self.by_id[s["candidates"][0]["txn_id"]]
-                    notes.append(
-                        f"Possible {mdy(c.date)} {usd(c.amt)} ({s['candidates'][0]['confidence']}); "
-                        f"{s['outcome'].split(':')[0]}"
-                    )
-            if f and p.live:
-                paid = sum(
-                    (
-                        t.amt
-                        for t in p.cleared
-                        if t.date >= self.by_id[f["credit"]].date
-                    ),
-                    D(0),
-                )
-                rem = self.by_id[f["credit"]].amt * PAYBACK_FACTOR - paid
-                notes.append(
-                    f"Est. remaining {usd(rem)} (1.4x model, unverified); counted live"
-                )
-            elif p.live:
-                notes.append("Balance unknown, counted live")
-            notes += [n for n in p.notes if not n.startswith("Provisional")]
-            if p.cadence == "PROVISIONAL":
-                notes.append("provisional stress cost max debit x20")
-            cad = f"{p.cadence.title()} {usd(p.level)}"
-            t4.append(
-                [
-                    p.display,
-                    fdate,
-                    famt,
-                    cad,
-                    mdy(last) if last else dash,
-                    "Y" if p.live else "N",
-                    "; ".join(notes),
-                    usd(p.cost),
-                ]
-            )
-            for e in p.events:
-                t4.append(
-                    [
-                        f"↳ {mdy(e['date'])} {e['kind']}",
-                        dash,
-                        dash,
-                        e["change"],
-                        dash,
-                        dash,
-                        e["detail"],
-                        dash,
-                    ]
-                )
-        if not self.positions:
-            t4.append(["None"] + [dash] * 7)
-        hold = self.stack / self.basis if self.basis and self.basis > 0 else None
-        t4 += [
-            ["Total Live Stack"] + [dash] * 6 + [usd(self.stack)],
-            ["Holdback % of Basis"] + [dash] * 6 + [pct(hold)],
-        ]
-        pw = self.peak_week
-        cm, cw, cd = self.stack, self.cur_weekly, self.stack / BUSINESS_DAYS_PER_MONTH
-        n_live = sum(p.live for p in self.positions)
-        if pw:
-            pm = pw["weekly"] * WEEKS_PER_MONTH
-            mk = (pw["monday"].year, pw["monday"].month)
-            rev = self.month_rows.get(mk, {}).get("true")
-            detail = f"week of {mdy(pw['monday'])}; {len(pw['funders'])} positions; {', '.join(pw['funders'])}"
-            if pw["latest"]:
-                detail += "; Observed peak is latest full week"
-            drop_detail = (
-                f"Peak Holdback {pct(pm / rev) if rev else dash} of {mon(mk)} revenue"
-            )
-            if pw["weekly"] < cw:
-                drop_detail += (
-                    f"; Current exceeds observed peak by {usd(cw - pw['weekly'])}/wk"
-                )
-            t4b = [
-                [
-                    "Peak Handled",
-                    usd(pm),
-                    usd(pw["weekly"]),
-                    usd(pm / BUSINESS_DAYS_PER_MONTH),
-                    detail,
-                ],
-                [
-                    "Current Live Stack",
-                    usd(cm),
-                    usd(cw),
-                    usd(cd),
-                    f"{n_live} live positions",
-                ],
-                [
-                    "Drop Since Peak",
-                    usd(pm - cm),
-                    usd(pw["weekly"] - cw),
-                    usd(pm / BUSINESS_DAYS_PER_MONTH - cd),
-                    drop_detail,
-                ],
-            ]
-        else:
-            t4b = [
-                [
-                    "Peak Handled",
-                    dash,
-                    dash,
-                    dash,
-                    "No fully covered week with MCA debits",
-                ],
-                [
-                    "Current Live Stack",
-                    usd(cm),
-                    usd(cw),
-                    usd(cd),
-                    f"{n_live} live positions",
-                ],
-                ["Drop Since Peak", dash, dash, dash, "Observed peak unavailable"],
-            ]
-        t5 = [
-            [r["label"], usd(r["avg"]), r["basis"], "Yes" if r["ambiguous"] else "No"]
-            for r in self.ob_rows
-        ]
-        t5 += (
-            [["Total Average Obligations", usd(self.total_ob), dash, dash]]
-            + [[f"Room {k}", usd(self.room[k]), dash, dash] for k in "ABC"]
-            + [
-                [
-                    "Room D",
-                    usd(self.room["D"]),
-                    (
-                        f"worst month {mon(self.worst_month)}"
-                        if self.worst_month
-                        else dash
-                    ),
-                    dash,
-                ]
-            ]
-        )
+    def audit(self):
+        """Every fact the report shows, plus the provenance behind it. render() reads only this."""
+        searches_by_trigger = defaultdict(list)
+        for s in self.searches:
+            searches_by_trigger[s["anchor"]].append(s)
 
-        def tier(m):
-            if m is None:
-                return [dash] * 4
-            return [
-                usd(m),
-                usd(m / WEEKS_PER_MONTH),
-                usd(m / BUSINESS_DAYS_PER_MONTH),
-                pct(m / self.basis) if self.basis and self.basis > 0 else dash,
+        def position(p):
+            fundings = [
+                dict(
+                    f,
+                    credit_date=self.by_id[f["credit"]].date,
+                    credit_amount=self.by_id[f["credit"]].amt,
+                    gate=self.gate[f["credit"]]["kind"],
+                )
+                for f in p.fundings
             ]
+            possible = [
+                dict(
+                    date=self.by_id[s["candidates"][0]["txn_id"]].date,
+                    amount=self.by_id[s["candidates"][0]["txn_id"]].amt,
+                    confidence=s["candidates"][0]["confidence"],
+                    outcome=s["outcome"].split(":")[0],
+                )
+                for tr in p.triggers
+                for s in searches_by_trigger[tr["trigger_id"]]
+                if s["outcome"].startswith(("AMBIGUOUS", "best"))
+                and s["candidates"][0]["points"] >= 3
+            ]
+            latest = fundings[-1] if fundings else None
+            return dict(
+                pid=p.pid,
+                display=p.display,
+                funder=p.funder,
+                status=p.status,
+                cadence=p.cadence,
+                level=p.level,
+                monthly_cost=p.cost,
+                live=p.live,
+                prefile=p.prefile,
+                terminated=p.terminated,
+                tag_source=p.source,
+                last_debit=p.cleared[-1].date if p.cleared else None,
+                paid_since_latest_funding=(
+                    sum((t.amt for t in p.cleared if t.date >= latest["credit_date"]), D(0))
+                    if latest
+                    else None
+                ),
+                debit_ids=[t.id for t in p.txns],
+                cleared_ids=[t.id for t in p.cleared],
+                events=p.events,
+                triggers=p.triggers,
+                fundings=fundings,
+                possible_fundings=possible,
+                notes=p.notes,
+            )
 
-        t6 = [
-            ["HEADLINE (min B,C)"] + tier(self.headline),
-            ["CONSERVATIVE (min C,D)"] + tier(self.conservative),
-            ["Binding Constraint", self.binding, dash, dash, dash],
-        ]
-        t7 = [
-            [
-                mdy(e["date"]),
-                e["who"],
-                usd(e["amt"]),
-                e["cls"],
-                e["tier"],
-                e["desc"],
-                e["cured"],
-            ]
-            for e in self.t7
-        ] or [["None"] + [dash] * 6]
-        h = self.headline
-        t8 = [
-            [
-                self.status,
-                usd(h),
-                usd(h / WEEKS_PER_MONTH) if h is not None else dash,
-                usd(h / BUSINESS_DAYS_PER_MONTH) if h is not None else dash,
-                self.binding,
-            ]
-        ]
-        a_ev = [e for e in self.t7 if e["cls"] == "A"]
-        tiers = Counter(e["tier"] for e in a_ev)
-        od = sorted(self.od_days)
         low = min(
             ((b, d, a) for a, days in self.eod.items() for d, b in days.items()),
             default=None,
         )
-        big = max(self.flights, key=lambda f: f["outflow"]) if self.flights else None
-        fee_months = sorted({mon(t.month) for t in self.fees})
-        t9 = [
-            [
-                "Overdraft days",
-                str(len(od)),
-                ", ".join(map(mdy, od[:6])) + (" ..." if len(od) > 6 else "") or "None",
-            ],
-            [
-                "Returned/NSF debit events",
-                str(len(a_ev)),
-                f"Class A: T1 {tiers['T1']}, T2 {tiers['T2']}, T3 {tiers['T3']}",
-            ],
-            [
-                "NSF/OD fees",
-                f"{len(self.fees)}, {usd(sum((t.amt for t in self.fees), D(0)))}",
-                ", ".join(fee_months) or "None",
-            ],
-            [
-                "Days below THIN_BALANCE",
-                (
-                    str(sum(v < self.thin for v in self.combined.values()))
-                    if self.combined
-                    else dash
-                ),
-                f"threshold {usd(self.thin)}; combined end-of-day, business days",
-            ],
-            [
-                "Lowest balance",
-                usd(low[0]) if low else dash,
-                (
-                    f"{mdy(low[1])}, account ...{self.accts[low[2]]['last4']}"
-                    if low
-                    else "balances unavailable"
-                ),
-            ],
-            [
-                "FLIGHT events",
-                str(len(self.flights)),
-                (
-                    f"largest: {mdy(big['date'])}, {usd(big['inflow'])} in, {usd(big['outflow'])} out"
-                    if big
-                    else "None"
-                ),
-            ],
-        ]
-        return [t1, t2, t3, t4, t4b, t5, t6, t7, t8, t9]
-
-    def render(self):
-        out = []
-        for (title, header), rows in zip(SPEC, self.tables()):
-            out += [
-                f"### {title}",
-                "",
-                "| " + " | ".join(header) + " |",
-                "| " + " | ".join([":---"] * len(header)) + " |",
-            ]
-            for r in rows:
-                require(
-                    len(r) == len(header),
-                    f"{title}: row width {len(r)} != {len(header)}",
-                )
-                out.append("| " + " | ".join(cell(c) for c in r) + " |")
-            out.append("")
-            if title.startswith("Table 2 "):
-                out += [f"**Core Operation:** {cell(self.lines['core'])}", ""]
-            if title.startswith("Table 8 "):
-                out += [
-                    f"- **WILL-PAY READ:** {cell(self.lines['will'])}",
-                    f"- **Peak MCA Load:** {cell(self.lines['peak'])}",
-                    f"- **What Would Flip This:** {cell(self.lines['flip'])}",
-                    "",
-                    "Capacity test with return/OD exception log. Not a fund recommendation.",
-                    "",
-                ]
-        return "\n".join(out)
-
-    def audit(self):
         return dict(
             engine_version=ENGINE_VERSION,
             policy_version=POLICY_VERSION,
@@ -2243,8 +1976,25 @@ class Engine:
             data_end=self.end,
             live_window_start=self.live_start,
             worst_integrity=self.worst,
+            accounts=[
+                dict(
+                    account_id=aid,
+                    name=a["name"],
+                    last4=a["last4"],
+                    integrity=a["integrity"],
+                    months=[
+                        dict(key=mkey(k), days=v if isinstance(v, int) else len(v))
+                        for k, v in sorted(self.acct_months[aid].items())
+                    ],
+                    notes=[f"Path A (Exparsed); source status {a['integrity']}"]
+                    + ([a["integrity_note"]] if a.get("integrity_note") else [])
+                    + self.notes[aid],
+                )
+                for aid, a in self.accts.items()
+            ],
             months=[
                 dict(
+                    key=mkey(k),
                     month=mon(k),
                     days=self.days[k],
                     counted=k in self.counted,
@@ -2263,34 +2013,32 @@ class Engine:
                 conservative=self.conservative,
                 binding=self.binding,
                 status=self.status,
+                worst_month=mkey(self.worst_month) if self.worst_month else None,
             ),
-            positions=[
-                dict(
-                    pid=p.pid,
-                    display=p.display,
-                    funder=p.funder,
-                    status=p.status,
-                    cadence=p.cadence,
-                    level=p.level,
-                    monthly_cost=p.cost,
-                    live=p.live,
-                    prefile=p.prefile,
-                    terminated=p.terminated,
-                    tag_source=p.source,
-                    debit_ids=[t.id for t in p.txns],
-                    cleared_ids=[t.id for t in p.cleared],
-                    events=p.events,
-                    triggers=p.triggers,
-                    fundings=p.fundings,
-                    notes=p.notes,
-                )
-                for p in self.positions
-            ],
+            streams=self.stream_rows,
+            positions=[position(p) for p in self.positions],
             backward_searches=self.searches,
             forward_searches=self.forward,
             peak_week=self.peak_week,
+            obligations=self.ob_rows,
             returns=self.t7,
             flights=self.flights,
+            liquidity=dict(
+                od_days=sorted(self.od_days),
+                fees=[dict(txn_id=t.id, date=t.date, amount=t.amt) for t in self.fees],
+                thin=self.thin,
+                days_below_thin=(
+                    sum(v < self.thin for v in self.combined.values())
+                    if self.combined
+                    else None
+                ),
+                lowest=(
+                    dict(balance=low[0], date=low[1], last4=self.accts[low[2]]["last4"])
+                    if low
+                    else None
+                ),
+            ),
+            exparsed_crosscheck=self.crosscheck,
             transactions=[
                 dict(
                     txn_id=t.id,
@@ -2301,6 +2049,10 @@ class Engine:
                 )
                 for t in self.txns
             ],
+            questions=[
+                dict(question_id=q["question_id"], type=q["type"], answered=q["question_id"] in self.answers)
+                for q in self.questions
+            ],
             questions_answered=sorted(self.answers),
             questions_open=sorted(
                 q["question_id"]
@@ -2309,6 +2061,15 @@ class Engine:
             ),
             narrative=self.lines,
             self_checks=self.checks,
+        )
+
+    def questions_doc(self):
+        return dict(
+            ledger_sha256=self.sha,
+            policy_version=POLICY_VERSION,
+            owner_names=self.owners,
+            documents=list(self.docs.values()),
+            questions=self.questions,
         )
 
 
@@ -2426,6 +2187,256 @@ def legacy_gate(report_text):
     return "PASS"
 
 
+def mkey(k):
+    return f"{k[0]}-{k[1]:02d}"
+
+
+def kmon(key):
+    """'2026-06' -> 'Jun-26'."""
+    return mon((int(key[:4]), int(key[5:7])))
+
+
+def tables(a):
+    """The ten report tables as rows of cells, built from the audit alone."""
+    dash = "—"
+    cap, months = a["capacity"], a["months"]
+    counted = {m["key"] for m in months if m["counted"]}
+    true_by_key = {m["key"]: m["true"] for m in months}
+    positions = a["positions"]
+    t1 = []
+    for i, acct in enumerate(a["accounts"]):
+        ks = [m["key"] for m in acct["months"]]
+        cov = f"{kmon(ks[0])} to {kmon(ks[-1])} ({len(ks)})" if ks else dash
+        cnt = [k for k in ks if k in counted]
+        partial = [
+            f"{kmon(m['key'])} ({m['days']} days)"
+            for m in acct["months"]
+            if m["days"] < FULL_MONTH_DAYS
+        ]
+        notes = list(acct["notes"])
+        if i == 0:
+            open_q = [q for q in a["questions"] if q["type"] != "core_operation" and not q["answered"]]
+            if open_q:
+                notes.append(f"{len(open_q)} judgment question(s) unanswered; engine defaults applied")
+            notes += [
+                f"{p['display']}: {n}"
+                for p in positions
+                for n in p["notes"]
+                if n.startswith("Provisional")
+            ]
+        t1.append(
+            [
+                f"{acct['name']} ...{acct['last4']}",
+                cov,
+                f"{len(cnt)}: " + (", ".join(map(kmon, cnt)) if cnt else "None"),
+                "Partial: " + ", ".join(partial) if partial else "None",
+                acct["integrity"],
+                "; ".join(notes),
+            ]
+        )
+    t2 = [
+        [
+            m["month"],
+            str(m["days"]),
+            usd(m["gross"]),
+            f"{usd(m['stripped'])} ({m['top_strip']})" if m["top_strip"] else usd(m["stripped"]),
+            usd(m["true"]),
+            "Yes" if m["counted"] else "No",
+        ]
+        for m in months
+    ]
+    t2 += [
+        ["TOR", dash, dash, dash, usd(cap["tor"]), dash],
+        ["Last-3 Avg", dash, dash, dash, usd(cap["last3"]), dash],
+        ["BASIS", dash, dash, dash, usd(cap["basis"]), dash],
+    ]
+    t3 = [
+        [
+            r["name"],
+            r["cadence"],
+            f"{r['count']} items, avg {usd(r['avg'])}",
+            usd(r["total"]) + (f" (CV {r['cv']})" if r["cv"] is not None else ""),
+            f"{pct(r['share'])} of included revenue; in {r['present']} of {len(months)} months",
+        ]
+        for r in a["streams"]
+    ] or [["None", dash, dash, dash, dash]]
+    t4 = []
+    for p in positions:
+        f = p["fundings"][-1] if p["fundings"] else None
+        fdate = mdy(f["credit_date"]) if f else "Pre-file" if p["prefile"] else "Not found"
+        notes = [p["status"]]
+        for fx in p["fundings"]:
+            notes.append(
+                f"{fx['confidence']} {fx['points']} pts: {mdy(fx['credit_date'])} {usd(fx['credit_amount'])} -> "
+                f"{fx['trigger']['kind']} {mdy(fx['trigger']['date'])}, {fx['bd_gap']} bd, gate {fx['gate']}"
+            )
+        for c in p["possible_fundings"]:
+            notes.append(f"Possible {mdy(c['date'])} {usd(c['amount'])} ({c['confidence']}); {c['outcome']}")
+        if f and p["live"]:
+            rem = f["credit_amount"] * PAYBACK_FACTOR - p["paid_since_latest_funding"]
+            notes.append(f"Est. remaining {usd(rem)} (1.4x model, unverified); counted live")
+        elif p["live"]:
+            notes.append("Balance unknown, counted live")
+        notes += [n for n in p["notes"] if not n.startswith("Provisional")]
+        if p["cadence"] == "PROVISIONAL":
+            notes.append("provisional stress cost max debit x20")
+        t4.append(
+            [
+                p["display"],
+                fdate,
+                usd(f["credit_amount"]) if f else dash,
+                f"{p['cadence'].title()} {usd(p['level'])}",
+                mdy(p["last_debit"]) if p["last_debit"] else dash,
+                "Y" if p["live"] else "N",
+                "; ".join(notes),
+                usd(p["monthly_cost"]),
+            ]
+        )
+        for e in p["events"]:
+            t4.append([f"↳ {mdy(e['date'])} {e['kind']}", dash, dash, e["change"], dash, dash, e["detail"], dash])
+    if not positions:
+        t4.append(["None"] + [dash] * 7)
+    stack, basis = cap["live_stack"], cap["basis"]
+    hold = stack / basis if basis and basis > 0 else None
+    t4 += [
+        ["Total Live Stack"] + [dash] * 6 + [usd(stack)],
+        ["Holdback % of Basis"] + [dash] * 6 + [pct(hold)],
+    ]
+    pw = a["peak_week"]
+    cw, cd = stack / WEEKS_PER_MONTH, stack / BUSINESS_DAYS_PER_MONTH
+    current = ["Current Live Stack", usd(stack), usd(cw), usd(cd), f"{sum(p['live'] for p in positions)} live positions"]
+    if pw:
+        pm = pw["weekly"] * WEEKS_PER_MONTH
+        mk = mkey((pw["monday"].year, pw["monday"].month))
+        rev = true_by_key.get(mk)
+        detail = f"week of {mdy(pw['monday'])}; {len(pw['funders'])} positions; {', '.join(pw['funders'])}"
+        if pw["latest"]:
+            detail += "; Observed peak is latest full week"
+        drop_detail = f"Peak Holdback {pct(pm / rev) if rev else dash} of {kmon(mk)} revenue"
+        if pw["weekly"] < cw:
+            drop_detail += f"; Current exceeds observed peak by {usd(cw - pw['weekly'])}/wk"
+        t4b = [
+            ["Peak Handled", usd(pm), usd(pw["weekly"]), usd(pm / BUSINESS_DAYS_PER_MONTH), detail],
+            current,
+            ["Drop Since Peak", usd(pm - stack), usd(pw["weekly"] - cw), usd(pm / BUSINESS_DAYS_PER_MONTH - cd), drop_detail],
+        ]
+    else:
+        t4b = [
+            ["Peak Handled", dash, dash, dash, "No fully covered week with MCA debits"],
+            current,
+            ["Drop Since Peak", dash, dash, dash, "Observed peak unavailable"],
+        ]
+    t5 = [[r["label"], usd(r["avg"]), r["basis"], "Yes" if r["ambiguous"] else "No"] for r in a["obligations"]]
+    t5 += (
+        [["Total Average Obligations", usd(cap["total_obligations"]), dash, dash]]
+        + [[f"Room {k}", usd(cap["rooms"][k]), dash, dash] for k in "ABC"]
+        + [["Room D", usd(cap["rooms"]["D"]), f"worst month {kmon(cap['worst_month'])}" if cap["worst_month"] else dash, dash]]
+    )
+
+    def tier(m):
+        if m is None:
+            return [dash] * 4
+        return [
+            usd(m),
+            usd(m / WEEKS_PER_MONTH),
+            usd(m / BUSINESS_DAYS_PER_MONTH),
+            pct(m / basis) if basis and basis > 0 else dash,
+        ]
+
+    t6 = [
+        ["HEADLINE (min B,C)"] + tier(cap["headline"]),
+        ["CONSERVATIVE (min C,D)"] + tier(cap["conservative"]),
+        ["Binding Constraint", cap["binding"], dash, dash, dash],
+    ]
+    t7 = [
+        [mdy(e["date"]), e["who"], usd(e["amt"]), e["cls"], e["tier"], e["desc"], e["cured"]]
+        for e in a["returns"]
+    ] or [["None"] + [dash] * 6]
+    h = cap["headline"]
+    t8 = [
+        [
+            cap["status"],
+            usd(h),
+            usd(h / WEEKS_PER_MONTH) if h is not None else dash,
+            usd(h / BUSINESS_DAYS_PER_MONTH) if h is not None else dash,
+            cap["binding"],
+        ]
+    ]
+    liq = a["liquidity"]
+    a_ev = [e for e in a["returns"] if e["cls"] == "A"]
+    tiers = Counter(e["tier"] for e in a_ev)
+    od, low, flights = liq["od_days"], liq["lowest"], a["flights"]
+    big = max(flights, key=lambda f: f["outflow"]) if flights else None
+    fee_months = sorted({mon((f["date"].year, f["date"].month)) for f in liq["fees"]})
+    t9 = [
+        ["Overdraft days", str(len(od)), ", ".join(map(mdy, od[:6])) + (" ..." if len(od) > 6 else "") or "None"],
+        ["Returned/NSF debit events", str(len(a_ev)), f"Class A: T1 {tiers['T1']}, T2 {tiers['T2']}, T3 {tiers['T3']}"],
+        ["NSF/OD fees", f"{len(liq['fees'])}, {usd(sum((f['amount'] for f in liq['fees']), D(0)))}", ", ".join(fee_months) or "None"],
+        [
+            "Days below THIN_BALANCE",
+            str(liq["days_below_thin"]) if liq["days_below_thin"] is not None else dash,
+            f"threshold {usd(liq['thin'])}; combined end-of-day, business days",
+        ],
+        ["Lowest balance", usd(low["balance"]) if low else dash, f"{mdy(low['date'])}, account ...{low['last4']}" if low else "balances unavailable"],
+        [
+            "FLIGHT events",
+            str(len(flights)),
+            f"largest: {mdy(big['date'])}, {usd(big['inflow'])} in, {usd(big['outflow'])} out" if big else "None",
+        ],
+    ]
+    return [t1, t2, t3, t4, t4b, t5, t6, t7, t8, t9]
+
+
+def render(a):
+    """Ten-table Markdown report from the audit. A figure the audit lacks cannot reach the report."""
+    lines, out = a["narrative"], []
+    for (title, header), rows in zip(SPEC, tables(a)):
+        out += [
+            f"### {title}",
+            "",
+            "| " + " | ".join(header) + " |",
+            "| " + " | ".join([":---"] * len(header)) + " |",
+        ]
+        for r in rows:
+            require(len(r) == len(header), f"{title}: row width {len(r)} != {len(header)}")
+            out.append("| " + " | ".join(cell(c) for c in r) + " |")
+        out.append("")
+        if title.startswith("Table 2 "):
+            out += [f"**Core Operation:** {cell(lines['core'])}", ""]
+        if title.startswith("Table 8 "):
+            out += [
+                f"- **WILL-PAY READ:** {cell(lines['will'])}",
+                f"- **Peak MCA Load:** {cell(lines['peak'])}",
+                f"- **What Would Flip This:** {cell(lines['flip'])}",
+                "",
+                "Capacity test with return/OD exception log. Not a fund recommendation.",
+                "",
+            ]
+    return "\n".join(out)
+
+
+@dataclass
+class Result:
+    questions: dict  # the questions document the LLM answers (prompts/judge.md)
+    audit: dict  # every fact behind the report; Decimal and date values, see jsonable()
+    report: str  # ten-table Markdown, already passed through the V2.2 validator
+    status: str  # Table 8 CAN THEY PAY value
+    open_questions: int
+
+
+def underwrite(raw, judgments=None):
+    """The engine's interface. raw: normalized ledger bytes (schemas/ledger.schema.json).
+
+    judgments: answers to an earlier run's questions on the same bytes, or None for engine defaults.
+    Raises UWError on bad input, rejected judgments or a failed self-check.
+    """
+    e = _Engine(raw, judgments)
+    audit = e.audit()
+    report = render(audit)
+    audit["legacy_report_gate"] = legacy_gate(report)
+    return Result(e.questions_doc(), audit, report, e.status, len(audit["questions_open"]))
+
+
 def run(ledger_path, out_dir, judgments_path=None):
     raw = Path(ledger_path).read_bytes()
     judgments = (
@@ -2433,27 +2444,17 @@ def run(ledger_path, out_dir, judgments_path=None):
         if judgments_path
         else None
     )
-    e = Engine(raw, judgments)
-    report = e.render()
-    audit = e.audit()
-    audit["legacy_report_gate"] = legacy_gate(report)
+    r = underwrite(raw, judgments)
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    qdoc = dict(
-        ledger_sha256=e.sha,
-        policy_version=POLICY_VERSION,
-        owner_names=e.owners,
-        documents=list(e.docs.values()),
-        questions=e.questions,
-    )
     (out / "questions.json").write_text(
-        json.dumps(qdoc, indent=2, default=jsonable), encoding="utf-8"
+        json.dumps(r.questions, indent=2, default=jsonable), encoding="utf-8"
     )
     (out / "audit.json").write_text(
-        json.dumps(audit, indent=2, default=jsonable), encoding="utf-8"
+        json.dumps(r.audit, indent=2, default=jsonable), encoding="utf-8"
     )
-    (out / "report.md").write_text(report, encoding="utf-8")
-    return e
+    (out / "report.md").write_text(r.report, encoding="utf-8")
+    return r
 
 
 def main(argv=None):
@@ -2463,14 +2464,14 @@ def main(argv=None):
     ap.add_argument("--judgments")
     args = ap.parse_args(argv)
     try:
-        e = run(args.ledger, args.out, args.judgments)
+        r = run(args.ledger, args.out, args.judgments)
     except (OSError, UWError, json.JSONDecodeError) as err:
         print(f"FAIL: {err}", file=sys.stderr)
         return 1
-    open_q = len(e.questions) - len(e.answers)
     print(
-        f"OK: {e.status}; HEADLINE {usd(e.headline)}/mo; {len(e.checks)} self-checks passed; "
-        f"legacy report gate PASS; {open_q} question(s) open"
+        f"OK: {r.status}; HEADLINE {usd(r.audit['capacity']['headline'])}/mo; "
+        f"{len(r.audit['self_checks'])} self-checks passed; legacy report gate PASS; "
+        f"{r.open_questions} question(s) open"
     )
     return 0
 

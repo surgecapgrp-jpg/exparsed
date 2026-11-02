@@ -7,8 +7,8 @@ tests/run.sh            # macOS (JavaScriptCore)
 node tests/run-node.js  # anywhere with node
 ```
 
-It cuts the parsing functions out of `exparsed.html` (no build step, no node — it uses macOS's
-built-in JavaScriptCore) and runs:
+It cuts the regions marked `/* @test-begin NAME */` ... `/* @test-end */` out of `exparsed.html` (no build step,
+no node — it uses macOS's built-in JavaScriptCore) and runs:
 
 | File | What it covers |
 |---|---|
@@ -18,6 +18,7 @@ built-in JavaScriptCore) and runs:
 | `formats.js` | CSV (preamble, debit/credit columns, headerless), account-number formats, OCR page numbering, broken-text detection (including icon-font glyphs that are not broken text), Markdown table layout and re-reading it, statement-period formats, Spanish headings / summary labels / account label / period |
 | `macocr.js` | Mac OCR page JSON → lines (amounts split out of joined lines, turned pages), the repairs made to its readings (alternate date by column order, one-letter month, slash-for-digit date, padded boxes that overlap), a ConnectOne Bank scan (M21) and a scanned Chase statement in Spanish (M22) |
 | `analytics.js` | computed figures (arithmetic only, no labels): a CSV / printout with no account number joins an account when its opening balance equals a statement's ending balance to the cent (and its oldest day then counts as complete); month gross inflows / outflows as plain sums; the printed average balance checked over the statement period; the printed NSF/returned-fee itemization read and passed through as printed |
+| `ai.js` | model calls for underwriting and chat: Claude and OpenRouter request and reply shapes, structured-output fallback, chat tools (`search_rows`, `read_document`, `read_audit`), `lgOwnRows`, and the underwrite / chat loops against a fake model |
 
 Payee grouping (`lgFamily`), credit-source flags, cadence / LIVE tests and fee detection were removed from the page: those are labels, applied by the LLM step downstream. Their old tests are in `families.js.removed`.
 
