@@ -11,8 +11,8 @@ Code computes every number. The LLM answers a short list of classification quest
 - `schemas/judgments.schema.json`: structured-output schema for the LLM call.
 - `adapter/exparsed_adapter.py`: Exparsed `ledger-v1` export to normalized ledger, plus `page_run()`, the entry point `exparsed.html` calls. Checked against one real export.
 - `embed.py`: copies the engine, validator, adapter and judge prompt into `exparsed.html`. Run it after changing any of them; a test fails while the page copy is stale.
-- `legacy/validate_uw_report_v2_2.py`: the V2.2 validator, unchanged. The engine runs it on every report.
-- `tests/`: synthetic fixture builder, sample ledger and judgments, 45 tests, all through `underwrite()`.
+- `checker/validate_report.py`: the V1.7 report checker (started as the V2.2 validator). The engine runs it on every report.
+- `tests/`: synthetic fixture builder, sample ledger and judgments, 56 tests, all through `underwrite()`.
 
 ## Quick start
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MCA capacity underwriting engine. Policy V2.2 with V1.7 batches 1 and 2, engine V3.2.
+"""MCA capacity underwriting engine. Policy V1.7 (batches 1 to 3 over the V2.2 engine), engine V3.3.
 
 V1.7 batch 1 (docs/V1_7_MATRIX.md): unanswered candidate credits are STRIP_UNRESOLVED;
 Table 4 status is Y/N/U and only closure evidence makes N; material U positions block YES and
@@ -12,6 +12,11 @@ every nominated debit; unresolved finance-looking payees are WATCH rows (U); pay
 merge into one position only on a shared originator ID or sequential continuity; backward
 and forward searches add a +/-30 calendar-day INVESTIGATE window; monthly cadence; evidence
 levels; completeness metrics.
+
+V1.7 batch 3: calendar months for every account and 18 days per material account;
+unreadable files inventoried; unprovided accounts from transfer text (REQUEST REQUIRED, VERIFY
+OWNERSHIP) gate the verdict when material; commingling per account-month; credit-line transfers
+are debt service; Class UNKNOWN returns; Commingling and Additional Accounts lines in Table 8.
 
 Code computes every number in the report from ledger rows. The LLM answers
 only the questions this engine writes to questions.json (prompt: prompts/judge.md).
@@ -40,10 +45,10 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 
 D = Decimal
-ENGINE_VERSION = "3.2"
-POLICY_VERSION = "V2.2+V1.7b2"
+ENGINE_VERSION = "3.3"
+POLICY_VERSION = "V1.7b3"
 
-# Policy V2.2 parameters. Changing any value is a policy change: bump POLICY_VERSION.
+# Policy parameters (V2.2 values with the V1.7 changes marked). Changing any value is a policy change: bump POLICY_VERSION.
 BUSINESS_DAYS_PER_MONTH = D(20)
 WEEKS_PER_MONTH = D(52) / D(12)  # V1.7: exact, rounded only for display
 BIWEEKS_PER_MONTH = D(26) / D(12)
@@ -274,6 +279,19 @@ MCA_WORD_INSIDE = re.compile(r"CAPITAL|FUNDING|FINANC|LENDING|ADVANCE|MERCHANT")
 ORIG_CO = re.compile(r"ORIG CO NAME:\s*(.*?)\s+ORIG ID")
 ORIG_ID = re.compile(r"ORIG ID:\s*([A-Z0-9]{4,})")
 LEVY = rx("LEVY", "LIEN", r"GARNISH\w*")
+# V1.7 section 9: masked account numbers in transfer text, financing accounts, possible personal use.
+MASKED = re.compile(
+    r"(?:\.{2,}|X{2,}|\*+)\s*(\d{4})\b|\b(?:CHK|CHECKING|SAV|SAVINGS|LOC|ACCT|ACCOUNT|LINE|CARD)\s*(?:NO\.?|#)?\s*(\d{4})\b"
+)
+FIN_ACCT = rx("LOC", "CREDIT LINE", "LINE OF CREDIT", "LOAN")
+LINK_NOISE = re.compile(
+    r"\b(?:ONLINE|REALTIME|REAL TIME|TRANSFER|XFER|TFR|TRNSFR|TO|FROM|ACH|ODP|OD|PROTECTION)\b"
+)
+P2P = rx("ZELLE", "VENMO", "CASH APP", "CASHAPP")
+PERSONAL_HINT = rx(
+    "GROCERY", "SUPERMARKET", "WHOLE FOODS", "TRADER JOE", "NETFLIX", "SPOTIFY", "HULU",
+    "DISNEY PLUS", "AMAZON PRIME", "GYM", "SALON", "MORTGAGE", "HOA",
+)
 T1 = rx(
     "STOP PAY",
     "STOP PAYMENT",
@@ -519,6 +537,9 @@ class _Engine:
         self.crosscheck_exparsed()
         self.streams()
         self.obligations()
+        self.account_links()
+        self.account_requests()
+        self.commingling()
         self.capacity()
         self.peak()
         self.returns_log()
@@ -562,8 +583,6 @@ class _Engine:
             self.accts[a["account_id"]] = dict(
                 a,
                 statements=st,
-                # Statement-cycle grouping applies to monthly statements only; a long printout uses calendar months.
-                period_mode=st[0][0].day > 5 and all((e - s).days <= 35 for s, e in st),
                 flagged_months=set(a.get("flagged_months", [])),
             )
         self.txns, seen, self.dropped = [], {}, Counter()
@@ -622,39 +641,57 @@ class _Engine:
         for a, n in self.dropped.items():
             self.notes[a].append(f"{n} duplicate transaction id(s) dropped")
 
-        # Month keys and covered days. Period-mode accounts (cycle starts after day 5) use statement periods.
-        covered, plen, self.acct_months = defaultdict(set), Counter(), defaultdict(dict)
+        # V1.7: revenue uses calendar posting months for every account, whatever the statement cycle.
+        covered, self.acct_months = defaultdict(set), defaultdict(dict)
         for aid, a in self.accts.items():
             for s, e in a["statements"]:
-                if a["period_mode"]:
-                    k = (e.year, e.month)
-                    plen[k] = max(plen[k], (e - s).days + 1)
-                    self.acct_months[aid][k] = (e - s).days + 1
-                else:
-                    d = s
-                    while d <= e:
-                        covered[(d.year, d.month)].add(d)
-                        self.acct_months[aid].setdefault((d.year, d.month), set()).add(
-                            d
-                        )
-                        d += timedelta(1)
+                d = s
+                while d <= e:
+                    covered[(d.year, d.month)].add(d)
+                    self.acct_months[aid].setdefault((d.year, d.month), set()).add(d)
+                    d += timedelta(1)
         for t in self.txns:
-            t_key = self.month_key(t)
-            covered.setdefault(t_key, set())
+            covered.setdefault(t.month, set())
         flagged = {
             tuple(map(int, m.split("-")))
             for a in self.accts.values()
             for m in a["flagged_months"]
         }
-        self.months = sorted(set(covered) | set(plen))
-        self.days = {
-            k: max(len(covered.get(k, ())), plen.get(k, 0)) for k in self.months
-        }
+        self.months = sorted(covered)
+        self.days = {k: len(covered[k]) for k in self.months}
+        # V1.7 section 1: a month counts only with >=18 covered days on every material account whose
+        # statement span includes it. A union of other accounts cannot stand in for a missing one.
+        credits = Counter()
+        for t in self.txns:
+            if t.dir == "credit":
+                credits[t.acct] += t.amt
+        total = sum(credits.values(), D(0))
+        self.material_accts = [aid for aid in self.accts if total and credits[aid] >= MATERIAL_SHARE * total]
+        self.month_gaps = {}
+        for k in self.months:
+            short = []
+            for aid in self.material_accts:
+                st = self.accts[aid]["statements"]
+                lo, hi = st[0][0], st[-1][1]
+                first, last = date(k[0], k[1], 1), date(k[0] + k[1] // 12, k[1] % 12 + 1, 1) - timedelta(1)
+                n = len(self.acct_months[aid].get(k, ()))
+                if lo <= last and hi >= first and n < FULL_MONTH_DAYS:
+                    short.append(f"...{self.accts[aid]['last4']} {n} days")
+            if short:
+                self.month_gaps[k] = short
         self.counted = [
             k
             for k in self.months
-            if self.days[k] >= FULL_MONTH_DAYS and k not in flagged
+            if self.days[k] >= FULL_MONTH_DAYS and k not in flagged and k not in self.month_gaps
         ]
+        for k in self.months:
+            if self.days[k] >= FULL_MONTH_DAYS and k in self.month_gaps:
+                self.notes[self.material_accts[0]].append(
+                    f"{mon(k)} not counted: " + ", ".join(self.month_gaps[k]) + " covered"
+                )
+        # V1.7 section 1: supplied files the extraction could not read stay in the inventory.
+        self.unread = led.get("sources_unread", [])
+        require(isinstance(self.unread, list), "ledger: sources_unread must be a list")
         self.worst = next(
             x
             for x in WORST_ORDER
@@ -662,11 +699,6 @@ class _Engine:
         )
 
     def month_key(self, t):
-        a = self.accts[t.acct]
-        if a["period_mode"]:
-            for s, e in a["statements"]:
-                if s <= t.date <= e:
-                    return (e.year, e.month)
         return t.month
 
     # ---- 2. provisional classification ------------------------------------------------------------
@@ -706,10 +738,11 @@ class _Engine:
     def debit_rule(self, u):
         if FEE.search(u):
             return "FEE_NSF_OD"
-        if TRANSFER.search(u) or OD_XFER.search(u):
-            return "TRANSFER_OUT"
         if self.owner_rx and self.owner_rx.search(u):
-            return "OWNER_DRAW"
+            return "OWNER_DRAW"  # V1.7: a transfer to the owner is an owner/personal item
+        if TRANSFER.search(u) or OD_XFER.search(u):
+            # V1.7: a transfer paying a credit line or loan account is established non-MCA financing.
+            return "DEBT_SERVICE" if FIN_ACCT.search(u) else "TRANSFER_OUT"
         return next((tag for tag, r in DEBIT_RULES if r.search(u)), "OTHER")
 
     def pair_returns(self):
@@ -1712,7 +1745,7 @@ class _Engine:
         compared, mismatches = 0, []
         for c in self.computed:
             a = self.accts.get(c.get("account"))
-            if not a or a["period_mode"] or c.get("partial"):
+            if not a or c.get("partial"):
                 continue  # Exparsed leaves a partial first day out of its sum
             k = tuple(map(int, c["month"].split("-")))
             ours = sum(
@@ -1820,6 +1853,107 @@ class _Engine:
             else None
         )
 
+    def account_links(self):
+        """V1.7 section 9: unprovided accounts named in transfer text, with flows, months and evidence."""
+        mine = {a["last4"] for a in self.accts.values()}
+        links, seen = {}, []
+        for t in self.txns:
+            u = t.desc.upper()
+            if not (TRANSFER.search(u) or OD_XFER.search(u)) or t.returned_by:
+                continue
+            m = MASKED.search(u)
+            digits = m and (m.group(1) or m.group(2))
+            if digits in mine:
+                continue  # a supplied account
+            o = ORIG_CO.search(u)
+            head = o.group(1) if o else re.split(r"\d|\*|TRANSACTION|REFERENCE|CONF|\.\.\.", u)[0]
+            name = " ".join(re.sub(r"[^A-Z ]", " ", LINK_NOISE.sub(" ", head)).split()[:3])
+            seen.append((t, digits, name))
+        # A row without a printed number joins a numbered account with the same name.
+        named = {nm: d for _, d, nm in seen if d and nm}
+        for t, digits, name in seen:
+            u = t.desc.upper()
+            digits = digits or named.get(name)
+            key = f"...{digits}" if digits else (name or "unidentified account")
+            k = links.setdefault(
+                key, dict(account=key, label=name, n_in=0, n_out=0, amt_in=D(0), amt_out=D(0), months=set(),
+                          financing=False, txn_ids=[])
+            )
+            side = "in" if t.dir == "credit" else "out"
+            k[f"n_{side}"] += 1
+            k[f"amt_{side}"] += t.amt
+            k["months"].add(t.month)
+            k["financing"] |= bool(FIN_ACCT.search(u))
+            k["txn_ids"].append(t.id)
+        self.links = sorted(links.values(), key=lambda k: -(k["amt_in"] + k["amt_out"]))
+
+    def account_requests(self):
+        """REQUEST REQUIRED or VERIFY OWNERSHIP per linked account; material ones gate the verdict (G5)."""
+        n = max(len(self.counted), 1)
+        five = MATERIAL_SHARE * self.basis if self.basis and self.basis > 0 else D(0)
+        self.requests = []
+        for k in self.links:
+            recurring = k["n_in"] + k["n_out"] >= 2
+            monthly = (k["amt_in"] + k["amt_out"]) / n
+            if not (recurring or k["financing"] or monthly >= five):
+                continue
+            kind = "VERIFY OWNERSHIP" if k["n_in"] and k["n_out"] else "REQUEST REQUIRED"
+            ms = sorted(k["months"])
+            why = ("financing account; " if k["financing"] else "") + (
+                "two-way transfers" if kind == "VERIFY OWNERSHIP" else "recurring transfers" if recurring else "material transfer"
+            )
+            self.requests.append(
+                dict(k, kind=kind, why=why, monthly=monthly, material=monthly >= five,
+                     span=f"{mon(ms[0])} to {mon(ms[-1])}", months=[mkey(m) for m in ms])
+            )
+        self.coverage_block = [
+            f"unprovided account {r['account']} moves {usd(r['monthly'])}/mo (could hold MCA payments or revenue)"
+            for r in self.requests
+            if r["material"]
+        ] + [f"unreadable statement {u['name']}" for u in self.unread if u.get("statement", True)]
+
+    def commingling(self):
+        """V1.7 section 9: confirmed personal items per account-month, possible items reported apart."""
+        gross = Counter()
+        for t in self.txns:
+            if t.dir == "credit":
+                gross[(t.acct, t.month)] += t.amt
+        conf, poss = defaultdict(list), []
+        for t in self.txns:
+            if t.returned_by:
+                continue
+            if t.tag in ("OWNER_DRAW", "STRIP_OWNER"):
+                conf[(t.acct, t.month)].append(t)
+            elif t.dir == "debit" and t.tag in ("OTHER", "TRANSFER_OUT") and (
+                P2P.search(t.desc.upper()) or PERSONAL_HINT.search(t.desc.upper())
+            ):
+                poss.append(t)
+
+        def severity(items, share):
+            if len(items) > 10 or (share is not None and share > D("0.15")):
+                return "High"
+            if len(items) >= 3 or (share is not None and share >= MATERIAL_SHARE):
+                return "Moderate"
+            return "Low"
+
+        rows = []
+        for (aid, k), items in sorted(conf.items()):
+            amt = sum((t.amt for t in items), D(0))
+            share = amt / gross[(aid, k)] if gross[(aid, k)] else None
+            rows.append(dict(account=aid, month=mkey(k), count=len(items), amount=amt, share=share,
+                             severity=severity(items, share)))
+        order = ["Low", "Moderate", "High"]
+        worst = max(rows, key=lambda r: (order.index(r["severity"]), r["amount"]), default=None)
+        self.comm = dict(
+            rows=rows,
+            status=f"Present — {worst['severity']}" if worst else "None",
+            confirmed=sum(r["count"] for r in rows),
+            confirmed_amount=sum((r["amount"] for r in rows), D(0)),
+            worst=worst,
+            possible=len(poss),
+            possible_amount=sum((t.amt for t in poss), D(0)),
+        )
+
     def rooms(self, b, w, s):
         """Rooms A-D, HEADLINE and CONSERVATIVE for a BASIS, worst-month True Revenue and stack."""
         o = self.total_ob
@@ -1858,9 +1992,11 @@ class _Engine:
         self.readiness()
         if self.uncertain_block:
             self.binding += "; material uncertainty: " + "; ".join(self.uncertain_block)
+        if self.coverage_block and self.headline is not None:
+            self.binding += "; coverage: " + "; ".join(self.coverage_block)
         status = (
             "INSUFFICIENT DATA"
-            if len(self.counted) < 2 or self.uncertain_block
+            if len(self.counted) < 2 or self.uncertain_block or self.coverage_block
             else "YES" if self.headline > 0 else "NO"
         )
         self.status = status + SUFFIX[self.worst]
@@ -1922,9 +2058,11 @@ class _Engine:
 
     # ---- 9. peak load -----------------------------------------------------------------------------
     def peak(self):
+        # V1.7 K2: eligible weeks need 5 covered business days on the accounts that carry MCA collections.
+        coll = {t.acct for p in self.positions if not p.watch for t in p.cleared} or set(self.accts)
         covered = set()
-        for a in self.accts.values():
-            for s, e in a["statements"]:
+        for aid in coll:
+            for s, e in self.accts[aid]["statements"]:
                 covered |= {s + timedelta(i) for i in range((e - s).days + 1)}
         weeks = defaultdict(list)
         for p in self.positions:
@@ -2039,6 +2177,16 @@ class _Engine:
                         attempts=[t.id],
                     )
                 )
+        # V1.7 K6: a return credit with no matching debit shows a returned attempt whose outcome is unknown.
+        for c in self.txns:
+            u = c.desc.upper()
+            if c.dir == "credit" and c.tag == "STRIP_RECREDIT" and not c.returns and (RETURN_CODE.search(u) or "RETURN" in u):
+                code = RETURN_CODE.search(c.desc.upper())
+                self.t7.append(
+                    dict(date=c.date, who=c.norm, amt=c.amt, cls="UNKNOWN", tier="n/a",
+                         desc=(f"ACH Rev {code.group(0)}; " if code else "") + "return credit, debit not found",
+                         cured="n/a", attempts=[c.id])
+                )
         self.t7.sort(key=lambda e: (e["date"], e["cls"]))
 
     def liquidity(self):
@@ -2124,8 +2272,16 @@ class _Engine:
                 f"HEADLINE turns positive when BASIS exceeds {usd(max(s / HOLDBACK_SHARE, s + o))} "
                 f"at current stack and obligations, or Live Stack falls below {usd(min(HOLDBACK_SHARE * b, b - o))}."
             )
-        if self.uncertain_block:
-            flip = "Resolve " + "; ".join(self.uncertain_block) + ". " + flip
+        if self.uncertain_block or self.coverage_block:
+            flip = "Resolve " + "; ".join(self.uncertain_block + self.coverage_block) + ". " + flip
+        # V1.7 section 7: outflows kept out of obligations are disclosed with their effect on Room C.
+        out = [r for r in self.ob_rows if (r["tag"] == "OWNER_DRAW" or r["ambiguous"]) and r["avg"]]
+        if out and self.room["C"] is not None:
+            extra = sum((r["avg"] for r in out), D(0))
+            flip += (
+                f" Excluded outflows ({', '.join(r['label'] for r in out)}) average {usd(extra)}/mo; "
+                f"counting them sets Room C to {usd(self.room['C'] - extra)}."
+            )
         core = next(
             (
                 self.answers[q["question_id"]]["text"]
@@ -2141,7 +2297,26 @@ class _Engine:
                 if top
                 else "No included revenue observed."
             )
-        self.lines = dict(core=core, will=will, peak=pk, flip=flip)
+        c = self.comm
+        comm = f"Commingling Status: {c['status']}; " + (
+            f"{c['confirmed']} confirmed item(s), {usd(c['confirmed_amount'])}; worst {kmon(c['worst']['month'])} "
+            f"{c['worst']['count']} item(s) {usd(c['worst']['amount'])}"
+            + (f" ({pct(c['worst']['share'])} of gross credits)" if c["worst"]["share"] is not None else "")
+            if c["worst"]
+            else "0 confirmed items in the supplied accounts"
+        ) + f"; possible: {c['possible']} P2P or consumer item(s), {usd(c['possible_amount'])}; not proof of personal use."
+        if self.requests:
+            kinds = {r["kind"] for r in self.requests}
+            more = len(self.requests) - 5
+            acc = ("REQUEST REQUIRED" if "REQUEST REQUIRED" in kinds else "VERIFY OWNERSHIP") + "; " + "; ".join(
+                f"{i}) {r['account']}" + (f" ({r['label']})" if r["label"] and r["label"] not in r["account"] else "")
+                + f": {r['kind']}, {r['why']}; in {r['n_in']} / {usd(r['amt_in'])}, out {r['n_out']} / {usd(r['amt_out'])}; "
+                f"{r['span']}; full statements for underwriting months"
+                for i, r in enumerate(self.requests[:5], 1)
+            ) + (f"; {more} more in audit.json" if more > 0 else "")
+        else:
+            acc = "COMPLETE OBSERVED; no unprovided account implicated by the supplied rows."
+        self.lines = dict(core=core, will=will, peak=pk, flip=flip, commingling=comm, accounts=acc)
 
     # ---- 11b. V1.7 section 10 completeness audit --------------------------------------------------
     def completeness_audit(self):
@@ -2388,6 +2563,7 @@ class _Engine:
                 binding=self.binding,
                 status=self.status,
                 uncertainty=self.uncertain,
+                coverage_block=self.coverage_block,
                 worst_month=mkey(self.worst_month) if self.worst_month else None,
             ),
             streams=self.stream_rows,
@@ -2415,6 +2591,11 @@ class _Engine:
             ),
             exparsed_crosscheck=self.crosscheck,
             debit_dispositions=self.debit_dispositions,
+            account_requests=self.requests,
+            commingling=self.comm,
+            sources_unread=self.unread,
+            material_accounts=self.material_accts,
+            month_gaps={mkey(k): v for k, v in self.month_gaps.items()},
             completeness=self.completeness,
             transactions=[
                 dict(
@@ -2549,18 +2730,18 @@ def jsonable(o):
     raise TypeError(type(o))
 
 
-def legacy_gate(report_text):
-    """Run the unchanged V2.2 report validator as a secondary format gate."""
+def report_gate(report_text):
+    """Run checker/validate_report.py (V1.7 report checker) on the rendered report."""
     path = (
-        Path(__file__).resolve().parent.parent / "legacy" / "validate_uw_report_v2_2.py"
+        Path(__file__).resolve().parent.parent / "checker" / "validate_report.py"
     )
-    spec = importlib.util.spec_from_file_location("legacy_validator", path)
+    spec = importlib.util.spec_from_file_location("report_checker", path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     try:
         mod.validate(mod.parse_report(report_text))
     except mod.ReportError as e:
-        raise UWError(f"legacy report gate failed: {e}")
+        raise UWError(f"report check failed: {e}")
     return "PASS"
 
 
@@ -2595,6 +2776,14 @@ def tables(a):
             open_q = [q for q in a["questions"] if q["type"] != "core_operation" and not q["answered"]]
             if open_q:
                 notes.append(f"{len(open_q)} judgment question(s) unanswered; engine defaults applied")
+            notes += [
+                f"{'Unreadable' if u.get('statement', True) else 'Not a statement'}: {u['name']} ({u.get('reason', 'not extracted')})"
+                for u in a["sources_unread"]
+            ]
+            notes += [
+                f"Unprovided account {r['account']}: {r['kind']}" + (" (material)" if r["material"] else "")
+                for r in a["account_requests"]
+            ]
             unres = [m for m in months if m["unresolved"]]
             if unres:
                 notes.append(
@@ -2762,7 +2951,7 @@ def tables(a):
     fee_months = sorted({mon((f["date"].year, f["date"].month)) for f in liq["fees"]})
     t9 = [
         ["Overdraft days", str(len(od)), ", ".join(map(mdy, od[:6])) + (" ..." if len(od) > 6 else "") or "None"],
-        ["Returned/NSF debit events", str(len(a_ev)), f"Class A: T1 {tiers['T1']}, T2 {tiers['T2']}, T3 {tiers['T3']}"],
+        ["Returned/NSF debit events", str(len(a_ev)), f"Class A: T1 {tiers['T1']}, T2 {tiers['T2']}, T3 {tiers['T3']}; UNKNOWN {sum(e['cls'] == 'UNKNOWN' for e in a['returns'])}"],
         ["NSF/OD fees", f"{len(liq['fees'])}, {usd(sum((f['amount'] for f in liq['fees']), D(0)))}", ", ".join(fee_months) or "None"],
         [
             "Days below THIN_BALANCE",
@@ -2800,6 +2989,8 @@ def render(a):
                 f"- **WILL-PAY READ:** {cell(lines['will'])}",
                 f"- **Peak MCA Load:** {cell(lines['peak'])}",
                 f"- **What Would Flip This:** {cell(lines['flip'])}",
+                f"- **Commingling:** {cell(lines['commingling'])}",
+                f"- **Additional Accounts to Request:** {cell(lines['accounts'])}",
                 "",
                 "Capacity test with return/OD exception log. Not a fund recommendation.",
                 "",
@@ -2811,7 +3002,7 @@ def render(a):
 class Result:
     questions: dict  # the questions document the LLM answers (prompts/judge.md)
     audit: dict  # every fact behind the report; Decimal and date values, see jsonable()
-    report: str  # ten-table Markdown, already passed through the V2.2 validator
+    report: str  # ten-table Markdown, already passed through checker/validate_report.py
     status: str  # Table 8 CAN THEY PAY value
     open_questions: int
 
@@ -2825,7 +3016,7 @@ def underwrite(raw, judgments=None):
     e = _Engine(raw, judgments)
     audit = e.audit()
     report = render(audit)
-    audit["legacy_report_gate"] = legacy_gate(report)
+    audit["report_gate"] = report_gate(report)
     return Result(e.questions_doc(), audit, report, e.status, len(audit["questions_open"]))
 
 
@@ -2862,7 +3053,7 @@ def main(argv=None):
         return 1
     print(
         f"OK: {r.status}; HEADLINE {usd(r.audit['capacity']['headline'])}/mo; "
-        f"{len(r.audit['self_checks'])} self-checks passed; legacy report gate PASS; "
+        f"{len(r.audit['self_checks'])} self-checks passed; report check PASS; "
         f"{r.open_questions} question(s) open"
     )
     return 0

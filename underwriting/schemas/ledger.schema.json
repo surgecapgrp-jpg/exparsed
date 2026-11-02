@@ -173,6 +173,15 @@
         }
       }
     },
+    "sources_unread": {
+      "type": "array",
+      "description": "V1.7 inventory: supplied files that gave no transaction rows. statement=false marks a non-statement document.",
+      "items": {
+        "type": "object",
+        "required": ["name", "reason"],
+        "properties": {"name": {"type": "string"}, "reason": {"type": "string"}, "statement": {"type": "boolean"}}
+      }
+    },
     "exparsed_computed": {
       "type": "array",
       "description": "Exparsed computed.months[] gross inflows per account and calendar month. The engine compares its own sums and notes any mismatch in Table 1.",

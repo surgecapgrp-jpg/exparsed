@@ -1,19 +1,20 @@
 # Policy V1.7 compliance matrix
 
-Each row maps one V1.7 requirement (MCA Capacity Underwriter V1.7, 2026-11-02) to `engine/uw.py` and `adapter/exparsed_adapter.py` on branch `v17-batch2`.
+Each row maps one V1.7 requirement (MCA Capacity Underwriter V1.7, 2026-11-02) to `engine/uw.py` and `adapter/exparsed_adapter.py` on branch `v17-batch3`.
 
 Status values:
 
 - **Met**: the engine already does what the rule says.
 - **B1**: changed in batch 1.
-- **B2**: changed in batch 2 (this branch).
+- **B2**: changed in batch 2.
+- **B3**: changed in batch 3 (this branch).
 - **Partial**: part of the rule is implemented; the gap is named.
 - **Gap**: not implemented.
 - **Page**: handled by Exparsed extraction before the engine runs.
 
 Batch 2 covered debit-first discovery (D1 to D5), WATCH rows, the ±30-day two-way match, evidence levels and position identity. Rows still marked B2 in the Fix column were deferred: off-bank collections, contractual cost, payoff ties and variable adverse scenarios. **B3** covers accounts, commingling, missing-account requests, the V1.7 ten-table format and its checker.
 
-Count: 150 rows. 26 B1, 33 B2, 42 Met, 29 Partial, 17 Gap, 3 Page.
+Count: 150 rows. 24 B1, 33 B2, 25 B3, 42 Met, 20 Partial, 3 Gap, 3 Page.
 
 ## Contract hard rules
 
@@ -24,10 +25,10 @@ Count: 150 rows. 26 B1, 33 B2, 42 Met, 29 Partial, 17 Gap, 3 Page.
 | H3 | Missing debit or 1.4x payback never proves closure | N requires `terminated` evidence. Silence gives Y (assumed open) or U. | B1 | — |
 | H4 | Keep unresolved candidates with unknown funder, 1 to 2 payments, varying amounts or no funding | Unanswered payees with a finance word, a D3/D4 link or a fixed daily/weekly/biweekly series are WATCH rows. A varying payee without those signals is not nominated. | B2 | Sign-off B10 |
 | H5 | Code does arithmetic and checks; never claim an unrun check | `self_checks` lists only executed checks. The LLM answers questions only. | Met | — |
-| H6 | Analyze readable files; record every unreadable source | The adapter skips non-statement and row-less files without listing them | Gap | B3: inventory unreadable files in Table 1 |
+| H6 | Analyze readable files; record every unreadable source | The adapter lists every file that gave no rows in `sources_unread`; Table 1 shows it as Unreadable or Not a statement | B3 | — |
 | H7 | Recompute all dependents after any change | Every run recomputes everything from ledger plus judgments | Met | — |
-| H8 | Ten fixed sections; Live? is Y/N/U; material U shown | Y/N/U rows render. The table format is still V2.2. | B1 | B3: V1.7 template |
-| H9 | Say INSUFFICIENT DATA when evidence is insufficient | Fewer than 2 counted months, a material U position, or unresolved credits that could reverse a NO (B2) | B1 | B3: missing accounts, coverage gaps |
+| H8 | Ten fixed sections; Live? is Y/N/U; material U shown | Y/N/U rows and the V1.7 Table 8 lines render; `checker/validate_report.py` enforces them | B3 | — |
+| H9 | Say INSUFFICIENT DATA when evidence is insufficient | Fewer than 2 counted months, a material U position, a material unprovided account, an unreadable statement, or unresolved credits that could reverse a NO | B3 | — |
 | H10 | Internal audit record; output is the ten tables only | `audit.json` plus a report holding the tables and fixed lines | Met | — |
 | H11 | Execution order steps 1 to 11 | Same order, but there is no account-link step and no separate debit-first sweep | Partial | B2, B3 |
 
@@ -38,7 +39,7 @@ Count: 150 rows. 26 B1, 33 B2, 42 Met, 29 Partial, 17 Gap, 3 Page.
 | P1 | BUSINESS_DAYS_PER_MONTH = 20 | 20 | Met | — |
 | P2 | WEEKS_PER_MONTH = 52/12 | `D(52) / D(12)`; was 4.333 | B1 | — |
 | P3 | BIWEEKS_PER_MONTH = 26/12 | `D(26) / D(12)`; was 2.167 | B1 | — |
-| P4 | FULL_MONTH_DAYS = 18 on material accounts | 18, counted on the union of all accounts | Partial | B3: per-account counting |
+| P4 | FULL_MONTH_DAYS = 18 on material accounts | 18 days per material account (S11) | B3 | — |
 | P5 | CURRENT_COLLECTION_WINDOW = 10 bd to the debit account's coverage end | 10 bd to that account's last statement end; was the last transaction date of any account | B1 | — |
 | P6 | PRIMARY_FUNDING_WINDOW = 7 bd on or before the first debit | 7 bd, holidays excluded | Met | — |
 | P7 | EXPANDED_DISCOVERY_WINDOW = ±30 calendar days, investigation only | Backward and forward searches list MED/HIGH credits or triggers within ±30 calendar days as INVESTIGATE | B2 | — |
@@ -50,15 +51,15 @@ Count: 150 rows. 26 B1, 33 B2, 42 Met, 29 Partial, 17 Gap, 3 Page.
 | P13 | CURE_WINDOW = 2 bd | 2 | Met | — |
 | P14 | THIN_BALANCE = EOD < 3 x (stack / 20) | Same; the stack holds Y positions only | Met | — |
 | P15 | FLIGHT = >30% of one inflow leaves within 48 h | >30% within 2 calendar days; inflows limited per HANDOFF interpretation 3 | Partial | Sign-off: inflow scope |
-| P16 | COMMINGLING severity thresholds | None | Gap | B3 |
+| P16 | COMMINGLING severity thresholds | LOW, MODERATE and HIGH per account-month on confirmed items | B3 | — |
 | P17 | CAPACITY_UNCERTAINTY: material if it changes verdict, binding, or >=5% of BASIS | `MATERIAL_SHARE = 0.05`, tested by `readiness()` | B1 | — |
 
 ## Records and evidence
 
 | ID | V1.7 rule | Engine now | Status | Fix |
 | :--- | :--- | :--- | :--- | :--- |
-| R1 | SOURCE record per file | Account `integrity_note` lists files and Exparsed status | Partial | B3 |
-| R2 | ACCOUNT record with ownership evidence and links | ID, name, last4, statements, integrity. No ownership or links. | Partial | B3 |
+| R1 | SOURCE record per file | Account `integrity_note` plus `sources_unread` for files without rows | Partial | Per-file record with pages and reconciliation |
+| R2 | ACCOUNT record with ownership evidence and links | ID, name, last4, statements, integrity; unprovided linked accounts in `account_requests` | Partial | Ownership evidence per account |
 | R3 | TX record with originator ID, trace ID, sequence, evidence level | Adds `orig_id` from printed `ORIG ID:`. No trace ID; evidence level is on positions and strips. | Partial | Parse trace IDs when printed |
 | R4 | DEBIT_CANDIDATE and CREDIT_CANDIDATE with a disposition each | `debit_dispositions` gives each nominated payee POSITION, WATCH or NON-MCA; forward searches give each candidate credit a V1.7 disposition | B2 | — |
 | R5 | MATCH with business and calendar gaps, rivals, decision | Backward candidates log business-day and calendar-day gaps, rivals and outcome | B2 | — |
@@ -72,17 +73,17 @@ Count: 150 rows. 26 B1, 33 B2, 42 Met, 29 Partial, 17 Gap, 3 Page.
 | ID | V1.7 rule | Engine now | Status | Fix |
 | :--- | :--- | :--- | :--- | :--- |
 | S1 | Route paths A to D by content | Exparsed extracts PDFs, CSVs and scans; the engine reads Path A only | Page | — |
-| S2 | Inventory every file, page and account; unreadable files stay listed | Unreadable files are dropped by the adapter | Gap | B3 |
+| S2 | Inventory every file, page and account; unreadable files stay listed | Unread statements and non-statement documents stay in the inventory (Table 1, `audit.sources_unread`) | B3 | — |
 | S3 | Pending rows kept as non-cleared observations | Excluded and counted in a Table 1 note | Partial | B3 |
 | S4 | Sign and date conventions from labels and balances | Exparsed extraction | Page | — |
-| S5 | Last four alone never prove the same account | The adapter groups files by `accountLast4` | Gap | B3: group by full number or balance continuity |
-| S6 | Early account-link evidence | None | Gap | B3 |
+| S5 | Last four alone never prove the same account | The adapter still groups files by `accountLast4`; Exparsed drops overlapping printouts of one account first | Partial | Group by full number or balance continuity when the export carries them |
+| S6 | Early account-link evidence | `account_links()` collects unprovided accounts from transfer text (masked numbers, names, ORIG CO), with flows and months | B3 | — |
 | S7 | Dedupe across copies with a crosswalk; keep identical distinct rows | Exparsed drops overlapping printouts (`lgOwnRows`). The adapter keeps identical rows as distinct IDs. No crosswalk in the audit. | Partial | B3 |
 | S8 | Reconcile balances, totals and continuity | Exparsed checks; the engine takes the status and cross-checks gross credits per month | Page | — |
 | S9 | Integrity labels and suffix order | Exparsed status mapped to Pass, Pass with flag, Unverified, Break; worst account sets the suffix | Met | — |
-| S10 | Calculation eligibility separate from integrity | Flagged months are excluded from counting | Partial | B3: per-account material gaps |
-| S11 | Coverage per relevant account; no union hides a missing account | Days counted on the union of accounts | Gap | B3 |
-| S12 | Custom cycles keep dates but revenue uses calendar months | Period-mode statements (35 days or less, start after day 5) group by statement period | Gap | B3 |
+| S10 | Calculation eligibility separate from integrity | A month is excluded when a material account is short, whatever the integrity label; the reason is in Table 1 | B3 | — |
+| S11 | Coverage per relevant account; no union hides a missing account | A month counts only with >=18 days on every material account (>=5% of credits) whose statement span includes it | B3 | Sign-off B17 |
+| S12 | Custom cycles keep dates but revenue uses calendar months | All accounts use calendar posting months; statement-cycle grouping is removed | B3 | — |
 
 ## 2. Provisional classification
 
@@ -172,17 +173,17 @@ Count: 150 rows. 26 B1, 33 B2, 42 Met, 29 Partial, 17 Gap, 3 Page.
 
 | ID | V1.7 rule | Engine now | Status | Fix |
 | :--- | :--- | :--- | :--- | :--- |
-| V1 | Consolidated calendar months after dedupe | Calendar months, except period-mode statements (S12) | Partial | B3 |
+| V1 | Consolidated calendar months after dedupe | Calendar posting months for every account | B3 | — |
 | V2 | Stripped includes STRIP_UNRESOLVED, shown as unresolved | Table 2 shows "unresolved $X"; Table 1 totals it | B1 | — |
-| V3 | Counted needs >=18 days and eligibility | 18 days on the union; flagged months excluded | Partial | B3 |
+| V3 | Counted needs >=18 days and eligibility | 18 days on each material account; flagged months excluded | B3 | — |
 | V4 | TOR, Last-3, BASIS | As written | Met | — |
 | V5 | Table 3 over all months equals Table 2 all-month True Revenue | Self-check | Met | — |
 | V6 | Obligations include zero months; OWNER_DRAW and AMBIGUOUS excluded | As written | Met | — |
-| V7 | Material excluded outflows disclosed with sensitivity | Listed in Table 5 without a sensitivity | Partial | B3 |
+| V7 | Material excluded outflows disclosed with sensitivity | What Would Flip This gives owner draws and AMBIGUOUS outflows per month and Room C with them counted | B3 | — |
 | V8 | Rooms A to D, HEADLINE, CONSERVATIVE from unrounded cents | As written (self-check on HEADLINE) | Met | — |
 | V9 | Weekly = monthly/(52/12), daily = monthly/20 | Yes | B1 | — |
 | V10 | Binding texts | As written; material uncertainty appended when it blocks the verdict | B1 | — |
-| V11 | Readiness: <2 months, an essential unavailable amount, or material uncertainty gives INSUFFICIENT DATA | Months, material U positions, and unresolved credits that could reverse a NO | Partial | B3: missing accounts and coverage gaps |
+| V11 | Readiness: <2 months, an essential unavailable amount, or material uncertainty gives INSUFFICIENT DATA | Months, material U positions, material unprovided accounts, unreadable statements, and unresolved credits that could reverse a NO | B3 | — |
 | V12 | Data-status suffix | Worst integrity across accounts | Met | — |
 
 ## 8. Peak, returns and liquidity
@@ -190,11 +191,11 @@ Count: 150 rows. 26 B1, 33 B2, 42 Met, 29 Partial, 17 Gap, 3 Page.
 | ID | V1.7 rule | Engine now | Status | Fix |
 | :--- | :--- | :--- | :--- | :--- |
 | K1 | Peak over all cleared MCA collections by Monday-to-Sunday week | Yes, including U and N positions | Met | — |
-| K2 | Skip weeks with <5 covered bd on the collection accounts | All of Monday to Friday must be covered on the union of accounts | Partial | B3 |
+| K2 | Skip weeks with <5 covered bd on the collection accounts | Monday to Friday covered on the accounts that carry MCA collections | B3 | — |
 | K3 | Peak = max(observed, modeled current); peak holdback | As written | Met | — |
 | K4 | Returns classified once per attempt chain | Chains within 10 bd | Met | — |
 | K5 | FEE_NSF_OD is a fee, never a return | Yes | Met | — |
-| K6 | Class A, B and UNKNOWN | A and B. UNKNOWN is not produced. | Partial | B3 |
+| K6 | Class A, B and UNKNOWN | A return credit with no matching debit is Class UNKNOWN, tier and cure n/a; Table 9 counts it apart | B3 | — |
 | K7 | T1, T2, T3 codes | T1 stop-pay and R05/R07/R08/R10/R29; T2 R01/R09 on finance and essentials; T3 the rest | Met | — |
 | K8 | Cure only within 2 bd with balance; MCA stop-pay never cured | As written | Met | — |
 | K9 | Table 9 metrics; absent balances are "unavailable" | Six fixed rows | Met | — |
@@ -203,11 +204,11 @@ Count: 150 rows. 26 B1, 33 B2, 42 Met, 29 Partial, 17 Gap, 3 Page.
 
 | ID | V1.7 rule | Engine now | Status | Fix |
 | :--- | :--- | :--- | :--- | :--- |
-| G1 | Confirmed vs possible personal items per account-month | None | Gap | B3 |
-| G2 | Severity LOW, MODERATE, HIGH | None | Gap | B3 |
-| G3 | REQUEST REQUIRED for unprovided accounts tied to material flows | Unclear transfers become credit questions; no request line | Gap | B3 |
-| G4 | VERIFY OWNERSHIP for owner or affiliate accounts | None | Gap | B3 |
-| G5 | Missing accounts that may hide MCA payments force INSUFFICIENT DATA | None | Gap | B3 |
+| G1 | Confirmed vs possible personal items per account-month | Confirmed: OWNER_DRAW debits and STRIP_OWNER credits (owner names, transfers to the owner, model answers). Possible: P2P and consumer-merchant debits, reported apart. | B3 | Sign-off B19 |
+| G2 | Severity LOW, MODERATE, HIGH | Per account-month count, $ and share of gross credits; worst month sets the status | B3 | — |
+| G3 | REQUEST REQUIRED for unprovided accounts tied to material flows | REQUEST REQUIRED for recurring, financing or material transfers to an unprovided account, with counts, $ and months | B3 | Sign-off B18 |
+| G4 | VERIFY OWNERSHIP for owner or affiliate accounts | VERIFY OWNERSHIP when transfers run both ways with the unprovided account | B3 | — |
+| G5 | Missing accounts that may hide MCA payments force INSUFFICIENT DATA | An unprovided account moving >=5% of BASIS per month blocks YES and NO | B3 | Sign-off B18 |
 
 ## 10. MCA completeness audit
 
@@ -218,21 +219,21 @@ Count: 150 rows. 26 B1, 33 B2, 42 Met, 29 Partial, 17 Gap, 3 Page.
 | A3 | Bidirectional link coverage | Primary and ±30-day windows in both directions | B2 | — |
 | A4 | Series and ID coverage | Each nominated payee maps to one position, WATCH row or NON-MCA tag; no debit in two positions (self-check) | B2 | — |
 | A5 | Live and closure coverage: every N has proof; every material U visible | Self-check "N only with closure evidence; U carries a scenario" | B1 | — |
-| A6 | Cross-account coverage | None | Gap | B3 |
+| A6 | Cross-account coverage | Transfers to and from unprovided accounts are listed and gate the verdict when material | B3 | — |
 | A7 | Reconciliation: stack = Table 4 = 4b = Table 6 to the cent | Self-check plus the report validator | Met | — |
-| A8 | Completeness metrics; audit FAIL if any eligible row lacks a disposition | `completeness` counts credits and debits scanned, candidates, positions, WATCH rows, material U, unattached and unresolved credits, closures | B2 | B3: missing-account requests |
+| A8 | Completeness metrics; audit FAIL if any eligible row lacks a disposition | `completeness` counts credits and debits scanned, candidates, positions, WATCH rows, material U, unattached and unresolved credits, closures | B2 | requested_missing_accounts still null; see `account_requests` |
 
 ## 11. Output and validation
 
 | ID | V1.7 rule | Engine now | Status | Fix |
 | :--- | :--- | :--- | :--- | :--- |
-| O1 | Ten sections with fixed titles, columns and widths | V2.2 template; widths match V1.7 | Partial | B3 |
+| O1 | Ten sections with fixed titles, columns and widths | V1.7 ten sections; widths match; fixed lines checked | B3 | — |
 | O2 | Table 4 row types POSITION, WATCH, EVENT, SUMMARY; order Y, U, N | Y, U, N order (validator); EVENT rows; WATCH rows are U with "UNRESOLVED WATCH" in Notes | B2 | — |
 | O3 | U Monthly Cost is —; N is $0 | Validator rejects a costed U row | B1 | — |
 | O4 | Formats: $12,345, 12.3%, MM/DD/YY, Mon-YY; pipes to slashes | As written | Met | — |
-| O5 | Table 8 Commingling and Additional Accounts lines | Missing | Gap | B3 |
+| O5 | Table 8 Commingling and Additional Accounts lines | Commingling and Additional Accounts lines render and are checked once, in order | B3 | — |
 | O6 | Table 8 fixed line "Capacity test ... Not a fund recommendation." | Present | Met | — |
-| O7 | Validator assertions 1 to 7 | V2.2 validator plus batch 1 deltas | Partial | B3: V1.7 checker |
+| O7 | Validator assertions 1 to 7 | `checker/validate_report.py` (V1.7 report checker, from the V2.2 validator) | B3 | — |
 | O8 | No fund or decline recommendation | None is produced | Met | — |
 
 ## Batch 1 interpretations for sign-off
@@ -282,3 +283,24 @@ Not in batch 2: same-day same-amount doubles stay one position (D8, HANDOFF inte
 | Sample, saved answers | INSUFFICIENT DATA, $5,217 | Same |
 | Real ledger, no answers | INSUFFICIENT DATA, $74,570; 5 positions | Same HEADLINE. 6 positions and 6 WATCH rows (KAPITUS, ACCORD BUSINESS, CAPITAL ONE, DOORDASH CAPITAL, EMPIRE MERCHANTS, ZLUR FUNDING LLC); HEADWAYCAPITAL found as an MCA position. 85 questions (was 81). |
 | Real ledger, saved answers | INSUFFICIENT DATA, $44,882 | Same HEADLINE. KAPITUS SERVICIN joins KAPITUS; ZLUR FUNDING LLC becomes ZLUR FUNDING #2 (U). 6 new questions are unanswered by the saved file. |
+
+## Batch 3 interpretations for sign-off
+
+| # | V1.7 text | Engine reading |
+| ---: | :--- | :--- |
+| B17 | "Months require >=18 covered days on the material revenue/collection accounts" | A material account holds 5% or more of all credits. Its short months inside its own statement span exclude the month. Months before its first statement or after its last are not held against it, because the engine cannot tell an account that did not exist from one that was not supplied. |
+| B18 | REQUEST REQUIRED, VERIFY OWNERSHIP, and "material missing accounts ... INSUFFICIENT DATA" | Any account named in transfer text and not supplied is listed when its transfers recur (2+), it is a financing account (LOC, credit line, loan), or it moves 5% of BASIS per month. Two-way transfers give VERIFY OWNERSHIP. A listed account moving 5% of BASIS or more per month blocks both YES and NO, because it could hold MCA payments or revenue. |
+| B19 | CONFIRMED vs POSSIBLE personal items | CONFIRMED = OWNER_DRAW debits and STRIP_OWNER credits. These come from the supplied owner names, transfers to the owner, or a model answer. POSSIBLE = Zelle, Venmo and Cash App debits, plus consumer merchants (grocery, streaming, gym, salon, mortgage, HOA). Possible items never set the status. |
+| B20 | Transfers paying a credit line | A transfer whose text names a LOC, credit line, line of credit or loan is DEBT_SERVICE, so it counts in obligations. On the real ledger, $75,672 to NST Credit Line 6298 adds about $5,800/mo to obligations, and HEADLINE drops from $44,882 to $39,061. |
+| B21 | Class UNKNOWN | A return credit (return wording or an R-code) with no matching debit. Tier and cure are n/a, and Table 9 counts it next to Class A. |
+
+Not in batch 3: account identity beyond the last four digits (S5), per-file source records (R1), ownership evidence (R2), alternative tags (T1), pending rows as observations (S3).
+
+## Batch 3 effect on saved runs
+
+| Run | Batch 2 | Batch 3 |
+| :--- | :--- | :--- |
+| Sample, no answers | INSUFFICIENT DATA, $11,577 | Same. Commingling Present — Low (4 owner draws, $8,000); accounts COMPLETE OBSERVED |
+| Sample, saved answers | INSUFFICIENT DATA, $5,217 | Same |
+| Real ledger, no answers | INSUFFICIENT DATA, $74,570 | INSUFFICIENT DATA; adds REQUEST REQUIRED for TD Convenience Checking ...1272 ($101,390 out, material) and NST Credit Line ...6298, and VERIFY OWNERSHIP for CHK ...1563 |
+| Real ledger, saved answers | INSUFFICIENT DATA, $44,882 | INSUFFICIENT DATA, $39,061 (credit-line transfers now count as debt service); same account requests |

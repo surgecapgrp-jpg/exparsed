@@ -95,7 +95,7 @@ class Sample(unittest.TestCase):
 
     def test_report_is_rendered_from_the_audit(self):
         self.assertEqual(self.j.report, uw.render(self.j.audit))
-        self.assertEqual(self.j.audit["legacy_report_gate"], "PASS")
+        self.assertEqual(self.j.audit["report_gate"], "PASS")
 
     def test_stack_is_exact_sum_of_live_costs(self):
         self.assertEqual(
@@ -310,7 +310,7 @@ class Scenarios(unittest.TestCase):
         row = next(l for l in r.report.splitlines() if "| U |" in l)
         bad = r.report.replace(row, row[: row.rindex("| —")] + "| $5 |")
         with self.assertRaisesRegex(uw.UWError, "U row must have Monthly Cost"):
-            uw.legacy_gate(bad)
+            uw.report_gate(bad)
 
     def test_explicit_loan_text_strips_without_judgment(self):
         led = copy.deepcopy(LEDGER)
@@ -417,6 +417,105 @@ class V17Batch2(unittest.TestCase):
         self.assertIn("every nominated debit group has a disposition; no debit in two positions", r.audit["self_checks"])
 
 
+def add_rows(led, rows, prefix):
+    led = copy.deepcopy(led)
+    led["transactions"] += [
+        dict(txn_id=f"{prefix}{i}", account_id=acct, date=d, amount=amt, direction=dr, description=desc, balance=None)
+        for i, (acct, d, amt, dr, desc) in enumerate(rows)
+    ]
+    return led
+
+
+class V17Batch3(unittest.TestCase):
+    """V1.7 accounts, coverage, commingling, missing-account requests, UNKNOWN returns, report checker."""
+
+    def transfers(self, amount):
+        months = ["2026-06-10", "2026-07-10", "2026-08-10", "2026-09-10"]
+        rows = [("OP", d, amount, "debit", "ONLINE TRANSFER TO CHK ...4455") for d in months]
+        rows.append(("OP", "2026-08-20", "100.00", "credit", "ONLINE TRANSFER FROM CHK ...4455"))
+        return add_rows(LEDGER, rows, "TR")
+
+    def test_material_unprovided_account_blocks_the_verdict(self):
+        r = run(self.transfers("5000.00"))
+        req = r.audit["account_requests"][0]
+        self.assertEqual((req["account"], req["kind"], req["material"]), ("...4455", "VERIFY OWNERSHIP", True))
+        self.assertTrue(r.status.startswith("INSUFFICIENT DATA"))
+        self.assertIn("coverage: unprovided account ...4455", r.audit["capacity"]["binding"])
+        self.assertIn("- **Additional Accounts to Request:** VERIFY OWNERSHIP; 1) ...4455", r.report)
+
+    def test_small_unprovided_account_is_listed_without_blocking(self):
+        r = run(self.transfers("50.00"))
+        self.assertFalse(r.audit["account_requests"][0]["material"])
+        self.assertEqual(r.audit["capacity"]["coverage_block"], [])
+
+    def test_supplied_account_transfer_is_not_a_request(self):
+        self.assertIn("- **Additional Accounts to Request:** COMPLETE OBSERVED", run().report)
+
+    def test_transfer_to_credit_line_is_debt_service(self):
+        led = add_rows(LEDGER, [("OP", "2026-07-15", "800.00", "debit", "ONLINE TRANSFER TO NST CREDIT LINE 6298")], "CL")
+        r = run(led)
+        self.assertEqual(tags(r, led, "NST CREDIT LINE"), ["DEBT_SERVICE"])
+        self.assertTrue(r.audit["account_requests"][0]["financing"])
+
+    def test_owner_draws_are_confirmed_commingling(self):
+        c = run().audit["commingling"]
+        self.assertEqual((c["status"], c["confirmed"], c["confirmed_amount"]), ("Present — Low", 4, D(8000)))
+        self.assertIn("Commingling Status: Present — Low; 4 confirmed item(s), $8,000", run().report)
+
+    def test_commingling_severity_thresholds(self):
+        led = add_rows(LEDGER, [("OP", f"2026-07-{d:02d}", "100.00", "debit", "ONLINE TRANSFER TO JANE DOE") for d in range(6, 17)], "OW")
+        c = run(led).audit["commingling"]
+        self.assertEqual(c["worst"]["month"], "2026-07")
+        self.assertEqual((c["worst"]["count"], c["status"]), (12, "Present — High"))  # 11 new + the July draw
+
+    def test_unreadable_statement_blocks_and_documents_do_not(self):
+        led = copy.deepcopy(LEDGER)
+        led["sources_unread"] = [dict(name="OP-202610.pdf", reason="Exparsed status needs-ocr", statement=True)]
+        r = run(led)
+        self.assertIn("coverage: unreadable statement OP-202610.pdf", r.audit["capacity"]["binding"])
+        self.assertIn("Unreadable: OP-202610.pdf (Exparsed status needs-ocr)", r.report)
+        led["sources_unread"] = [dict(name="application.pdf", reason="application; not a bank statement", statement=False)]
+        r = run(led)
+        self.assertEqual(r.audit["capacity"]["coverage_block"], [])
+        self.assertIn("Not a statement: application.pdf", r.report)
+
+    def test_union_of_accounts_cannot_hide_a_short_material_account(self):
+        led = copy.deepcopy(LEDGER)
+        op = next(a for a in led["accounts"] if a["account_id"] == "OP")
+        op["statements"] = [s if s["start"] != "2026-08-01" else dict(s, end="2026-08-09") for s in op["statements"]]
+        led["transactions"] = [t for t in led["transactions"] if not (t["account_id"] == "OP" and "2026-08-10" <= t["date"] <= "2026-08-31")]
+        r = run(led)
+        self.assertFalse(month(r, "2026-08")["counted"])
+        self.assertEqual(month(r, "2026-08")["days"], 31)  # SAV still covers the whole month
+        self.assertTrue(r.audit["month_gaps"]["2026-08"][0].endswith(" 9 days"))
+        self.assertIn("Aug-26 not counted", r.report)
+
+    def test_cycle_statements_still_use_calendar_months(self):
+        led = copy.deepcopy(LEDGER)
+        for a in led["accounts"]:
+            a["statements"] = [dict(start="2026-06-01", end="2026-06-14"), dict(start="2026-06-15", end="2026-07-14"),
+                               dict(start="2026-07-15", end="2026-08-14"), dict(start="2026-08-15", end="2026-09-14"),
+                               dict(start="2026-09-15", end="2026-09-30")]
+        r, base = run(led), run()
+        self.assertEqual([m["key"] for m in r.audit["months"]], [m["key"] for m in base.audit["months"]])
+        self.assertEqual([m["true"] for m in r.audit["months"]], [m["true"] for m in base.audit["months"]])
+
+    def test_unpaired_return_credit_is_class_unknown(self):
+        led = add_rows(LEDGER, [("OP", "2026-08-19", "612.00", "credit", "RETURN ITEM R01 ACME SUPPLY")], "RU")
+        ev = [e for e in run(led).audit["returns"] if e["cls"] == "UNKNOWN"]
+        self.assertEqual((len(ev), ev[0]["tier"], ev[0]["cured"]), (1, "n/a", "n/a"))
+
+    def test_checker_needs_both_v17_lines_once_and_in_order(self):
+        rep = run().report
+        line = next(l for l in rep.splitlines() if l.startswith("- **Commingling:**"))
+        with self.assertRaisesRegex(uw.UWError, "exactly once"):
+            uw.report_gate(rep.replace(line + "\n", ""))
+        with self.assertRaisesRegex(uw.UWError, "exactly once"):
+            uw.report_gate(rep.replace(line, line + "\n" + line))
+        with self.assertRaisesRegex(uw.UWError, "no valid status"):
+            uw.report_gate(rep.replace("Commingling Status: Present — Low", "Commingling Status: Some"))
+
+
 class RealDataShapes(unittest.TestCase):
     """Behaviors found on the first real Exparsed ledger (27 Oct 2026), rebuilt on synthetic rows."""
 
@@ -513,7 +612,7 @@ class RealDataShapes(unittest.TestCase):
         self.assertTrue(r["ok"], r.get("error"))
         self.assertTrue(r["status"].startswith("YES (UNVERIFIED DATA)"))
         self.assertIn("1 zero-amount row(s) excluded", r["report"])
-        self.assertEqual(r["audit"]["legacy_report_gate"], "PASS")
+        self.assertEqual(r["audit"]["report_gate"], "PASS")
         bad = json.loads(exparsed_adapter.page_run(json.dumps(src), json.dumps({"ledger_sha256": "x", "answers": []})))
         self.assertEqual((bad["ok"], "ledger_sha256" in bad["error"]), (False, True))
         src["files"][0]["rows"][0] = "2026-06-01|dep|abc||1|BROKEN"

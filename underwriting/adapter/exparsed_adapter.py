@@ -97,10 +97,15 @@ def page_run(ledger_text, judgments_text=None, owners=()):
 def convert(src, owners):
     if src.get("format") != "ledger-v1":
         fail(f"expected format ledger-v1, got {src.get('format')!r}")
-    by_acct = defaultdict(list)
+    by_acct, unread = defaultdict(list), []
     for f in src["files"]:
-        if f.get("docKind") or "rows" not in f:
-            continue  # not-statement files carry no ledger
+        # V1.7 section 1: every supplied file stays in the inventory, read or not.
+        if f.get("docKind"):
+            unread.append(dict(name=f["name"], reason=f"{f['docKind']}; not a bank statement", statement=False))
+            continue
+        if not f.get("rows") or f.get("status") in ("needs-ocr", "unparsed"):
+            unread.append(dict(name=f["name"], reason=f"Exparsed status {f.get('status', 'no rows')}", statement=True))
+            continue
         # No printed account number: the file stands alone as its own account.
         by_acct[f.get("accountLast4") or f"file {f['name']}"].append(f)
     accounts, txns = [], []
@@ -191,6 +196,7 @@ def convert(src, owners):
         schema="uw-ledger/1",
         owner_names=owners,
         holidays=HOLIDAYS,
+        sources_unread=unread,
         accounts=accounts,
         transactions=txns,
         documents=[],

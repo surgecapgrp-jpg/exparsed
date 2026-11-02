@@ -34,7 +34,7 @@ Exparsed ledger.json
   -> engine/uw.py --judgments ... --out run/
        validates judgments, verifies quotes, recomputes everything
        writes run/audit.json and run/report.md
-       runs legacy/validate_uw_report_v2_2.py on report.md (must PASS)
+       runs checker/validate_report.py (V1.7 report checker) on report.md (must PASS)
   -> underwriter reviews report.md and the open items in audit.json
 ```
 
@@ -60,7 +60,7 @@ The engine's interface is one function: `underwrite(raw, judgments=None) -> Resu
 | `questions.json` | engine | LLM | Question IDs are SHA-1 of their transaction IDs, so the same ledger always yields the same IDs |
 | `schemas/judgments.schema.json` | LLM | engine | `_Engine.read_judgments`: ledger hash, question IDs, enums, verbatim quotes, document amount |
 | `audit.json` | engine | Exparsed UI, auditors | Every report number traces to transaction IDs here |
-| `report.md` | engine | underwriter | `legacy/validate_uw_report_v2_2.py`, unchanged |
+| `report.md` | engine | underwriter | `checker/validate_report.py` (V1.7 report checker) |
 
 ### 3.1 Trust boundary on LLM output
 
@@ -94,7 +94,7 @@ The three V2.2 overrides are enforced by self-checks that fail the run:
 
 ### 4.1 Interpretations that need underwriter sign-off
 
-Policy V1.7 is being adopted in batches. `docs/V1_7_MATRIX.md` maps every V1.7 rule to the engine, lists what batch 1 changed, and adds interpretations B1 to B16 for sign-off.
+Policy V1.7 is being adopted in batches. `docs/V1_7_MATRIX.md` maps every V1.7 rule to the engine, lists what batches 1 to 3 changed, and adds interpretations B1 to B21 for sign-off.
 
 V2.2 leaves these points open. The engine picks one reading and states it here so it can be reviewed in one place.
 
@@ -103,11 +103,11 @@ V2.2 leaves these points open. The engine picks one reading and states it here s
 | 1 | "Detect MCA series" | Default MCA when a payee has 3+ cleared debits at daily/weekly/biweekly cadence, same-amount runs of 3+ cover 80% of them, and the name has a funder word or the cadence is daily. 1 to 2 debits qualify only with a funder word and a debit inside the live window. The LLM can overrule both. V1.7 batch 2: monthly cadence counts, finance words inside a token count, and unanswered finance-looking payees become WATCH rows (matrix B8 to B13). |
 | 2 | Class B "debit paid into overdraft" | The debit that moves the balance from 0 or above to below 0. Later debits while overdrawn are not separate events. |
 | 3 | FLIGHT "an inflow" | Funding candidates and STRIP_FUNDING credits of at least 3x the median deposit. On the real ledger, applying it to every candidate gave 155 events, mostly $300 inflows. |
-| 4 | Peak week "5 business days of statement coverage" | Monday to Friday all inside a statement period. Holiday weeks stay eligible. |
+| 4 | Peak week "5 business days of statement coverage" | Monday to Friday all inside a statement period of an account that carries MCA collections (V1.7 batch 3). Holiday weeks stay eligible. |
 | 5 | THIN_BALANCE and lowest balance | Thin days use combined end-of-day balance across accounts, business days only. Lowest balance is the lowest single-account end-of-day balance. |
 | 6 | T3 "small discretionary debits" | Every Class A chain that is not T1 or T2. No dollar cutoff exists in V2.2. |
 | 7 | "Pre-file requires evidence" | V1.7 batch 1: no longer inferred. A first debit within 2 payment gaps of coverage start gets the note "funding may precede coverage (unproven)"; Funding Date shows Not found. |
-| 8 | Mixed calendar and statement-period accounts | Days Counted is the larger of the two counts for that month label. |
+| 8 | Mixed calendar and statement-period accounts | V1.7 batch 3: every account uses calendar months; Days Counted is the union of covered days, and each material account needs 18 (matrix B17). |
 | 9 | Balance field | Exparsed balance is the balance after that row. |
 | 10 | Funding columns with several fundings | Columns show the latest attached funding. Earlier ones are listed in Notes. |
 | 11 | Return pairing | A recredit matches a debit with the same account and amount in the prior 5 business days. Re-presentments within 10 business days form one chain. |
@@ -117,7 +117,7 @@ V2.2 leaves these points open. The engine picks one reading and states it here s
 | 15 | Backward search on a Pre-file start | V1.7 batch 1: every START trigger is searched, since Pre-file is no longer inferred. |
 | 16 | Descriptor change | V1.7 batch 2: payees given the same funder join only on a shared originator ID, sequential continuity, or open payment slots (matrix B12). `KAPITUS SERVICIN` joins `KAPITUS` on open slots. |
 | 17 | "Large/unusual credits" for the forward search | 3x median deposit counts only for payers without an established pattern (3+ credits in 2+ months). Credits from a payee the business also pays are always candidates. |
-| 18 | Statement-cycle grouping | Applies only to statements of 35 days or less. A 13-month printout starting on the 29th uses calendar months. |
+| 18 | Statement-cycle grouping | Removed in V1.7 batch 3: revenue uses calendar posting months for every account. |
 | 19 | Table 4 "Possible" notes | Shown for MED or HIGH leading candidates only. LOW candidates stay in `audit.json`. |
 
 ### 4.2 Not implemented
@@ -141,13 +141,13 @@ V2.2 leaves these points open. The engine picks one reading and states it here s
 
 | Check | Result |
 | :--- | :--- |
-| `python -m unittest discover -s tests` | 45 tests pass |
-| Legacy V2.2 validator on every report the tests render | PASS (run inside `engine()` in the tests) |
+| `python -m unittest discover -s tests` | 56 tests pass |
+| V1.7 report checker on every report the tests render | PASS (run inside `underwrite()`) |
 | Self-checks per run (unrounded) | 17 pass on the sample |
 | Fixtures against JSON Schemas | Pass with `jsonschema` 4.26 |
 | Real Exparsed ledger, gross credits per month | Equal to Exparsed `computed.months[].grossInflows` to the cent, 13 of 13 full months |
 | Real Exparsed ledger, overdraft days | 5, equal to the sum of Exparsed `businessDaysNegative` |
-| Real Exparsed ledger, legacy validator | PASS |
+| Real Exparsed ledger, V1.7 report checker | PASS |
 
 The tests cover the V2.2 regression list: unknown wire near a new debit (not stripped), documented financing (stripped and attached), amount-up trigger anchored to the first new payment, stopped position, two concurrent contracts from one funder, duplicate rows, conflicting duplicates, one-month data, integrity suffix, payoff only with evidence, negative peak drop with provisional cadence, payroll return cured within 2 business days, overdraft Class B, and five rejected-judgment cases.
 
