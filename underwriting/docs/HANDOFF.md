@@ -50,11 +50,15 @@ Exit codes: 0 success, 1 bad input or failed self-check (message on stderr), 2 u
 
 ## 3. Contracts
 
+The engine's interface is one function: `underwrite(raw, judgments=None) -> Result`. `raw` is normalized ledger bytes; `judgments` answers an earlier run's questions on the same bytes. `Result` carries `questions` (the document the LLM answers), `audit`, `report`, `status` and `open_questions`. It raises `UWError` on bad input, rejected judgments or a failed self-check. `render(audit)` builds the report from the audit alone, so a figure the audit lacks cannot reach the report. The CLI, `page_run()` and the tests all go through `underwrite()`.
+
+`audit["exparsed_crosscheck"]` compares the engine's gross credits per account and calendar month with Exparsed's `computed.months[].grossInflows`. Exparsed leaves out partial months. A mismatch adds a Table 1 note naming the month and both sums. Overdraft days are not compared: Exparsed counts business days with a negative carried balance, and the engine counts dates with a negative end-of-day balance, an overdraft fee or an overdraft transfer.
+
 | File | Producer | Consumer | Checked by |
 | :--- | :--- | :--- | :--- |
-| `schemas/ledger.schema.json` | Exparsed adapter | engine | `Engine.load` re-checks every field in code |
+| `schemas/ledger.schema.json` | Exparsed adapter | engine | `_Engine.load` re-checks every field in code |
 | `questions.json` | engine | LLM | Question IDs are SHA-1 of their transaction IDs, so the same ledger always yields the same IDs |
-| `schemas/judgments.schema.json` | LLM | engine | `Engine.read_judgments`: ledger hash, question IDs, enums, verbatim quotes, document amount |
+| `schemas/judgments.schema.json` | LLM | engine | `_Engine.read_judgments`: ledger hash, question IDs, enums, verbatim quotes, document amount |
 | `audit.json` | engine | Exparsed UI, auditors | Every report number traces to transaction IDs here |
 | `report.md` | engine | underwriter | `legacy/validate_uw_report_v2_2.py`, unchanged |
 
@@ -135,7 +139,7 @@ V2.2 leaves these points open. The engine picks one reading and states it here s
 
 | Check | Result |
 | :--- | :--- |
-| `python -m unittest discover -s tests` | 28 tests pass |
+| `python -m unittest discover -s tests` | 32 tests pass |
 | Legacy V2.2 validator on every report the tests render | PASS (run inside `engine()` in the tests) |
 | Self-checks per run (unrounded) | 13 pass on the sample |
 | Fixtures against JSON Schemas | Pass with `jsonschema` 4.26 |

@@ -150,7 +150,9 @@ Tests for these are E13 to E15 in `tests/edge.js`.
 - Claude requests to Opus 5.5, Opus 5, Sonnet 5.5 and Fable 5.1 carry server-side refusal fallback (`fallbacks: "default"`, beta header `server-side-fallback-2026-07-01`).
 - First Run downloads Pyodide 0.27.2 (about 10 MB) from cdn.jsdelivr.net; Chrome caches it. Offline, Run fails with a message and chat still works.
 - Python runs on the page's main thread. The real 3,069-row ledger takes 0.4 s in CPython; Pyodide is typically 2 to 5 times slower. Move it to a Web Worker if the page freezes noticeably.
-- Tests: `node tests/run-node.js` gives 207 passed (20 new in `tests/ai.js`). `python3 -m unittest discover -s underwriting/tests` gives 30 passed. `tests/run.sh` (JSC) was not run.
+- Tests: `node tests/run-node.js` gives 208 passed (21 in `tests/ai.js`). `python3 -m unittest discover -s underwriting/tests` gives 32 passed. `tests/run.sh` (JSC) was not run.
+- `tests/extract.py` takes the regions marked `/* @test-begin NAME */` ... `/* @test-end */` in the page and stops when the markers do not pair up. Keep DOM code out of marked regions.
+- Chat reads row objects from `uwChatData`; the export and chat share `lgOwnRows`, so both drop the same duplicate printout rows.
 - Not verified: Pyodide loading in a real browser, and live Claude or OpenRouter calls. A headless-Chrome run with mocked Pyodide (the real engine behind a local server), mocked Claude endpoints and a 3-month CSV passed 15 of 15 checks.
 
 ## Test harness (not in the repo)

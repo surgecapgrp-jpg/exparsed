@@ -13,9 +13,11 @@ exparsed.html calls page_run() through Pyodide.
 """
 
 import argparse
+import functools
 import hashlib
 import json
 import sys
+import traceback
 from collections import Counter, defaultdict
 from decimal import Decimal
 from pathlib import Path
@@ -69,24 +71,28 @@ def period(f):
     return dict(start=dates[0], end=dates[-1])
 
 
+@functools.lru_cache(maxsize=2)
+def normalized(ledger_text, owners=()):
+    """ledger-v1 text -> engine ledger bytes. Cached: the page calls page_run twice per Run."""
+    return json.dumps(convert(json.loads(ledger_text), list(owners))).encode()
+
+
 def page_run(ledger_text, judgments_text=None, owners=()):
     """Entry point for exparsed.html (Pyodide). Returns JSON text; never raises."""
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "engine"))
     import uw
 
     try:
-        raw = json.dumps(convert(json.loads(ledger_text), list(owners))).encode()
-        e = uw.Engine(raw, json.loads(judgments_text) if judgments_text else None)
-        report = e.render()
-        audit = e.audit()
-        audit["legacy_report_gate"] = uw.legacy_gate(report)
-        qdoc = dict(ledger_sha256=e.sha, policy_version=uw.POLICY_VERSION, owner_names=e.owners,
-                    documents=list(e.docs.values()), questions=e.questions)
-        return json.dumps(dict(ok=True, status=e.status, open_questions=len(e.questions) - len(e.answers),
-                               questions=qdoc, report=report, audit=audit), default=uw.jsonable)
-    except (uw.UWError, SystemExit, ValueError, KeyError) as err:
+        r = uw.underwrite(normalized(ledger_text, tuple(owners)), json.loads(judgments_text) if judgments_text else None)
+        return json.dumps(
+            dict(ok=True, status=r.status, open_questions=r.open_questions, questions=r.questions, report=r.report, audit=r.audit),
+            default=uw.jsonable,
+        )
+    except (uw.UWError, SystemExit) as err:
         return json.dumps(dict(ok=False, error=str(err)))
-
+    except Exception as err:  # a bug or an export shape the adapter does not know: say where
+        frame = traceback.extract_tb(err.__traceback__)[-1]
+        return json.dumps(dict(ok=False, error=f"{type(err).__name__}: {err} ({Path(frame.filename).name}:{frame.lineno})"))
 
 def convert(src, owners):
     if src.get("format") != "ledger-v1":
@@ -188,6 +194,13 @@ def convert(src, owners):
         accounts=accounts,
         transactions=txns,
         documents=[],
+        # Exparsed's own gross credits per month; the engine cross-checks its sums against them.
+        exparsed_computed=[
+            dict(account=c["account"], month=m["month"], gross_inflows=m["grossInflows"], partial=m.get("partial", False))
+            for c in src.get("computed", [])
+            for m in c.get("months", [])
+            if "grossInflows" in m
+        ],
     )
 
 

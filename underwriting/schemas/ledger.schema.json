@@ -4,56 +4,201 @@
   "title": "Normalized ledger (engine input)",
   "description": "What adapter/exparsed_adapter.py must produce from Exparsed output. Money is a positive decimal string; direction carries the sign. balance is the account balance after the transaction. engine/uw.py re-checks every rule here in code.",
   "type": "object",
-  "required": ["schema", "accounts", "transactions"],
+  "required": [
+    "schema",
+    "accounts",
+    "transactions"
+  ],
   "properties": {
-    "schema": {"const": "uw-ledger/1"},
-    "business_name": {"type": "string"},
-    "owner_names": {"type": "array", "items": {"type": "string", "minLength": 2}},
-    "holidays": {"type": "array", "items": {"type": "string", "format": "date"}},
+    "schema": {
+      "const": "uw-ledger/1"
+    },
+    "business_name": {
+      "type": "string"
+    },
+    "owner_names": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 2
+      }
+    },
+    "holidays": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "date"
+      }
+    },
     "accounts": {
-      "type": "array", "minItems": 1,
+      "type": "array",
+      "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["account_id", "name", "last4", "integrity", "statements"],
+        "required": [
+          "account_id",
+          "name",
+          "last4",
+          "integrity",
+          "statements"
+        ],
         "properties": {
-          "account_id": {"type": "string", "minLength": 1},
-          "name": {"type": "string"},
-          "last4": {"type": "string", "pattern": "^[0-9]{4}$"},
-          "integrity": {"enum": ["Pass", "Pass with flag", "Unverified", "Break"]},
-          "integrity_note": {"type": "string"},
-          "flagged_months": {"type": "array", "items": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}$"},
-                             "description": "Months a material Pass-with-flag defect removes from counting."},
+          "account_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string"
+          },
+          "last4": {
+            "type": "string",
+            "pattern": "^[0-9]{4}$"
+          },
+          "integrity": {
+            "enum": [
+              "Pass",
+              "Pass with flag",
+              "Unverified",
+              "Break"
+            ]
+          },
+          "integrity_note": {
+            "type": "string"
+          },
+          "flagged_months": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}$"
+            },
+            "description": "Months a material Pass-with-flag defect removes from counting."
+          },
           "statements": {
-            "type": "array", "minItems": 1,
-            "items": {"type": "object", "required": ["start", "end"],
-                      "properties": {"start": {"type": "string", "format": "date"},
-                                     "end": {"type": "string", "format": "date"}}}
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "start",
+                "end"
+              ],
+              "properties": {
+                "start": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "end": {
+                  "type": "string",
+                  "format": "date"
+                }
+              }
+            }
           }
         }
       }
     },
     "transactions": {
-      "type": "array", "minItems": 1,
+      "type": "array",
+      "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["txn_id", "account_id", "date", "amount", "direction", "description"],
+        "required": [
+          "txn_id",
+          "account_id",
+          "date",
+          "amount",
+          "direction",
+          "description"
+        ],
         "properties": {
-          "txn_id": {"type": "string", "minLength": 1, "description": "Stable across re-exports of the same statement."},
-          "account_id": {"type": "string"},
-          "date": {"type": "string", "format": "date"},
-          "amount": {"type": "string", "pattern": "^[0-9]+(\\.[0-9]{1,2})?$"},
-          "direction": {"enum": ["credit", "debit"]},
-          "description": {"type": "string"},
-          "balance": {"type": ["string", "null"], "pattern": "^-?[0-9]+(\\.[0-9]{1,2})?$"},
-          "source_ref": {"type": "string", "description": "File and page the row came from."}
+          "txn_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Stable across re-exports of the same statement."
+          },
+          "account_id": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]{1,2})?$"
+          },
+          "direction": {
+            "enum": [
+              "credit",
+              "debit"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "balance": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^-?[0-9]+(\\.[0-9]{1,2})?$"
+          },
+          "source_ref": {
+            "type": "string",
+            "description": "File and page the row came from."
+          }
         }
       }
     },
     "documents": {
       "type": "array",
       "description": "Text of funding agreements, payoff letters and similar. Judgments may quote them as evidence.",
-      "items": {"type": "object", "required": ["doc_id", "kind", "text"],
-                "properties": {"doc_id": {"type": "string"}, "kind": {"type": "string"}, "text": {"type": "string"}}}
+      "items": {
+        "type": "object",
+        "required": [
+          "doc_id",
+          "kind",
+          "text"
+        ],
+        "properties": {
+          "doc_id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "exparsed_computed": {
+      "type": "array",
+      "description": "Exparsed computed.months[] gross inflows per account and calendar month. The engine compares its own sums and notes any mismatch in Table 1.",
+      "items": {
+        "type": "object",
+        "required": [
+          "account",
+          "month",
+          "gross_inflows"
+        ],
+        "properties": {
+          "account": {
+            "type": "string"
+          },
+          "month": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}$"
+          },
+          "gross_inflows": {
+            "type": "number"
+          },
+          "partial": {
+            "type": "boolean"
+          }
+        }
+      }
     }
   }
 }
