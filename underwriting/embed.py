@@ -12,7 +12,7 @@ HERE = Path(__file__).resolve().parent
 PAGE = HERE.parent / "exparsed.html"
 SOURCES = {
     "uw-src-engine": "engine/uw.py",
-    "uw-src-legacy": "legacy/validate_uw_report_v2_2.py",
+    "uw-src-checker": "checker/validate_report.py",
     "uw-src-adapter": "adapter/exparsed_adapter.py",
     "uw-src-judge": "prompts/judge.md",
 }

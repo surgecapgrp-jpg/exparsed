@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
-"""Validate UW V2.2 report structure and report-visible accounting.
+"""V1.7 report checker: ten-table structure and report-visible accounting.
 
-V1.7 batch 1 deltas (the only edits to the V2.2 rules): weekly = monthly x 12/52;
-Table 4 Live? accepts U with Monthly Cost "—", ordered Y, then U, then N; the binding line may end
-with "; material uncertainty: ..."; and INSUFFICIENT DATA is allowed with two or more counted
-months, because material uncertainty is not visible in the report. The V1.7 report checker
-replaces this file in batch 3.
+Started as the V2.2 validator. V1.7 changes:
+- weekly = monthly x 12/52;
+- Table 4 Live? accepts U with Monthly Cost "—", ordered Y, then U, then N;
+- the binding line may end with "; material uncertainty: ..." or "; coverage: ...";
+- INSUFFICIENT DATA is allowed with two or more counted months, because material uncertainty and
+  missing accounts are not fully visible in the report;
+- Table 7 Class accepts UNKNOWN (tier and cure n/a);
+- Commingling and Additional Accounts lines appear exactly once, in order, between What Would
+  Flip This and the capacity-test line, with their fixed status words.
 
-Usage: python validate_uw_report.py report.md
+Usage: python checker/validate_report.py report.md
 
 Limits: This validator does NOT verify transaction-to-funder attribution,
 statement completeness, independent matching, or unrounded audit math.
@@ -88,6 +92,21 @@ def parse_report(text):
         "Capacity test with return/OD exception log. Not a fund recommendation."
     ):
         require(required in text, f"Missing fixed output line: {required}")
+    # V1.7: two more fixed lines, each once, between What Would Flip This and the capacity-test line.
+    flip = text.index("**What Would Flip This:**")
+    cap = text.index("Capacity test with return/OD exception log.")
+    for label, starts in (
+        ("- **Commingling:** Commingling Status: ", ("None", "Present — Low", "Present — Moderate", "Present — High")),
+        ("- **Additional Accounts to Request:** ", ("COMPLETE OBSERVED", "REQUEST REQUIRED", "VERIFY OWNERSHIP")),
+    ):
+        require(text.count(label) == 1, f"V1.7 line must appear exactly once: {label.strip()}")
+        at = text.index(label)
+        require(flip < at < cap, f"V1.7 line out of place: {label.strip()}")
+        require(text[at + len(label):].startswith(starts), f"V1.7 line has no valid status: {label.strip()}")
+    require(
+        text.index("- **Commingling:**") < text.index("- **Additional Accounts to Request:**"),
+        "V1.7 lines out of order",
+    )
     return out
 
 
@@ -285,7 +304,7 @@ def validate(t):
         else:
             expected_binding=None
         if expected_binding is not None:
-            require(t6[2][1] == expected_binding or t6[2][1].startswith((expected_binding+"; CONSERVATIVE:", expected_binding+"; material uncertainty:")),"Table 6: wrong binding constraint")
+            require(t6[2][1] == expected_binding or t6[2][1].startswith(tuple(expected_binding+x for x in ("; CONSERVATIVE:", "; material uncertainty:", "; coverage:"))),"Table 6: wrong binding constraint")
     for r in t6[:2]:
         m=money(r[1],f"Table 6 {r[0]} monthly",True)
         w=money(r[2],f"Table 6 {r[0]} weekly",True)
@@ -303,7 +322,9 @@ def validate(t):
     for r in t7:
         if r[0]=="None":continue
         require(bool(DATE_RE.match(r[0])),"Table 7: invalid event date")
-        require(r[3] in ("A","B","—"),"Table 7: invalid class")
+        require(r[3] in ("A","B","UNKNOWN","—"),"Table 7: invalid class")
+        if r[3] == "UNKNOWN":
+            require(r[4] == "n/a" and r[6] == "n/a","Table 7: UNKNOWN class needs tier and cure n/a")
         require(r[4] in ("T1","T2","T3","n/a","—"),"Table 7: invalid tier")
         if r[3] == "B":
             require(r[4] == "n/a","Table 7: Class B cannot have return severity tier")
