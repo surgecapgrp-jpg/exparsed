@@ -84,7 +84,7 @@ Bank descriptions reach the LLM as data. Whatever text the LLM writes, only enum
 
 ## 4. Policy
 
-`engine/uw.py` lines 51 to 74 hold the policy parameters as named constants. Some V1.7 cutoffs are still inline (commingling, 3x median, cadence); see the root `HANDOFF.md` open items. Changing one is a policy change: bump `POLICY_VERSION` and get underwriting sign-off.
+`engine/uw.py` lines 51 to 83 hold the policy parameters as named constants, including the commingling, 3x median, cadence and thin-balance cutoffs. `checker/validate_report.py` keeps its own copy of 4 of them; a test fails when the copies differ. Changing one is a policy change: bump `POLICY_VERSION` and get underwriting sign-off.
 
 The three V2.2 overrides are enforced by self-checks that fail the run:
 
