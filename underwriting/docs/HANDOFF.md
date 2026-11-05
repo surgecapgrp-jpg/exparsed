@@ -1,4 +1,4 @@
-# MCA Underwriting V3.0 Engineering Handoff (policy V2.2)
+# MCA Underwriting V3.0 Engineering Handoff (policy V1.7, batches 1 to 4)
 
 Status: Experiment. Tested on one synthetic ledger, its variants, and one real Exparsed ledger (1 account, 3,069 posted rows, Sep 2025 to Oct 2026).
 Date: 27 October 2026.
@@ -19,7 +19,7 @@ V3.0 keeps the V2.2 policy word for word and moves the work to where it can be c
 | Table rendering | LLM, checked after the fact | `engine/uw.py`, from one row builder |
 | Ambiguous credits, unknown payees, funder names, Core Operation | LLM | LLM, through `prompts/judge.md` |
 | Proof that a credit is financing | LLM judgment of "independent evidence" | Engine verifies the quote is verbatim in bank text or a supplied document |
-| Report format check | `validate_uw_report_v2_2.py` | Same file, unchanged, run automatically after every render |
+| Report format check | `validate_uw_report_v2_2.py` | `checker/validate_report.py`, rewritten for V1.7, run automatically after every render |
 | Funding decision | Underwriter | Underwriter |
 
 The LLM never sees a dollar total and never writes a table. It answers a short list of questions. On the sample ledger it gets 9 questions for 321 transactions.
@@ -84,13 +84,13 @@ Bank descriptions reach the LLM as data. Whatever text the LLM writes, only enum
 
 ## 4. Policy
 
-`engine/uw.py` lines 35 to 54 hold every V2.2 parameter as a named constant. Changing one is a policy change: bump `POLICY_VERSION` and get underwriting sign-off.
+`engine/uw.py` lines 51 to 74 hold the policy parameters as named constants. Some V1.7 cutoffs are still inline (commingling, 3x median, cadence); see the root `HANDOFF.md` open items. Changing one is a policy change: bump `POLICY_VERSION` and get underwriting sign-off.
 
 The three V2.2 overrides are enforced by self-checks that fail the run:
 
 1. `every STRIP_FUNDING credit passed the evidence gate`.
 2. `no live cost removed by payoff estimate`. The 1.4x payback appears only as a Notes estimate.
-3. Peak Handled is the largest observed fully covered week. Negative Drop Since Peak renders as-is (test `test_negative_drop_since_peak_with_provisional_cadence`).
+3. Report Peak Weekly = max(observed peak week, modeled current weekly), per V1.7 K3 (batch 4). Drop Since Peak is never negative; the checker rejects one.
 
 ### 4.1 Interpretations that need underwriter sign-off
 
@@ -103,9 +103,9 @@ V2.2 leaves these points open. The engine picks one reading and states it here s
 | 1 | "Detect MCA series" | Default MCA when a payee has 3+ cleared debits at daily/weekly/biweekly cadence, same-amount runs of 3+ cover 80% of them, and the name has a funder word or the cadence is daily. 1 to 2 debits qualify only with a funder word and a debit inside the live window. The LLM can overrule both. V1.7 batch 2: monthly cadence counts, finance words inside a token count, and unanswered finance-looking payees become WATCH rows (matrix B8 to B13). |
 | 2 | Class B "debit paid into overdraft" | The debit that moves the balance from 0 or above to below 0. Later debits while overdrawn are not separate events. |
 | 3 | FLIGHT "an inflow" | Funding candidates and STRIP_FUNDING credits of at least 3x the median deposit. On the real ledger, applying it to every candidate gave 155 events, mostly $300 inflows. |
-| 4 | Peak week "5 business days of statement coverage" | Monday to Friday all inside a statement period of an account that carries MCA collections (V1.7 batch 3). Holiday weeks stay eligible. |
+| 4 | Peak week "5 business days of statement coverage" | At least 5 covered business days in the Mon to Sun week, on the accounts that carry MCA collections (V1.7 batches 3 and 4). Holiday weeks with 4 business days are skipped. |
 | 5 | THIN_BALANCE and lowest balance | Thin days use combined end-of-day balance across accounts, business days only. Lowest balance is the lowest single-account end-of-day balance. |
-| 6 | T3 "small discretionary debits" | Every Class A chain that is not T1 or T2. No dollar cutoff exists in V2.2. |
+| 6 | T3 "small discretionary debits" | Every Class A chain that is not T1 or T2. Since batch 4, every non-T1 return on MCA, loan, payroll, rent, tax or insurance is T2. |
 | 7 | "Pre-file requires evidence" | V1.7 batch 1: no longer inferred. A first debit within 2 payment gaps of coverage start gets the note "funding may precede coverage (unproven)"; Funding Date shows Not found. |
 | 8 | Mixed calendar and statement-period accounts | V1.7 batch 3: every account uses calendar months; Days Counted is the union of covered days, and each material account needs 18 (matrix B17). |
 | 9 | Balance field | Exparsed balance is the balance after that row. |

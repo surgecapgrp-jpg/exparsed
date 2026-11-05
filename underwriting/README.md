@@ -1,4 +1,4 @@
-# MCA UW V3.0 handoff package (policy V2.2)
+# MCA UW V3.0 handoff package (policy V1.7)
 
 Code computes every number. The LLM answers a short list of classification questions, and the engine checks each answer against source text before using it.
 
@@ -22,7 +22,7 @@ python engine/uw.py tests/fixtures/sample_ledger.json --judgments tests/fixtures
 python -m unittest discover -s tests -v
 ```
 
-The first run writes `run/questions.json` and a report on default answers (HEADLINE $17,578). The second applies the sample judgments (HEADLINE $5,218).
+The first run writes `run/questions.json` and a report on default answers (INSUFFICIENT DATA, HEADLINE $11,577). The second applies the sample judgments (INSUFFICIENT DATA, HEADLINE $5,217).
 
 In the page: Underwrite button > Run. Python runs in Chrome through Pyodide; the model call uses the key from Settings > AI providers.
 
