@@ -249,8 +249,8 @@ def validate(t):
         d=money(t4b[2][j],"drop",True)
         if None not in (p,c,d):
             require(rounded_equal(p-c,d,3),f"Table 4b: drop mismatch at column {j}")
-            # V2.2: Observed historical peak may be lower than modeled current.
-            # A negative drop is valid and must reconcile.
+            # V1.7 K3: Report Peak = max(observed, modeled current), so the drop is never negative.
+            require(d >= Decimal("-1"),f"Table 4b: peak below current at column {j}")
 
     t5=t[SPEC[5][0]]
     room_names=["Total Average Obligations","Room A","Room B","Room C","Room D"]
@@ -297,14 +297,19 @@ def validate(t):
     if conservative is not None and rooms["Room C"] is not None and rooms["Room D"] is not None:
         require(rounded_equal(conservative,max(Decimal(0),min(rooms["Room C"],rooms["Room D"])),3),"CONSERVATIVE formula mismatch")
     if headline is not None:
-        if headline == 0:
-            expected_binding="No headline room (Room B or C <= 0)"
+        if headline == 0 and rooms["Room B"] is not None and rooms["Room C"] is not None:
+            # V1.7 V10: name the room(s) at or below zero.
+            expected_binding="No headline room (Room B or C <= 0): "+" and ".join(x for x in ("Room B","Room C") if rooms[x] <= 0)+" <= 0"
         elif rooms["Room B"] is not None and rooms["Room C"] is not None:
             expected_binding="Room B: 60% revenue holdback" if rooms["Room B"] <= rooms["Room C"] else "Room C: operating obligations"
         else:
             expected_binding=None
         if expected_binding is not None:
             require(t6[2][1] == expected_binding or t6[2][1].startswith(tuple(expected_binding+x for x in ("; CONSERVATIVE:", "; material uncertainty:", "; coverage:"))),"Table 6: wrong binding constraint")
+        if conservative is not None and rooms["Room C"] is not None and rooms["Room D"] is not None:
+            # V1.7 V10: Conservative binding is Room C if C<=D, else Room D and the worst month.
+            cons="; CONSERVATIVE: Room C" if rooms["Room C"] <= rooms["Room D"] else "; CONSERVATIVE: Room D (worst month "
+            require(cons in t6[2][1],"Table 6: conservative binding room missing or wrong")
     for r in t6[:2]:
         m=money(r[1],f"Table 6 {r[0]} monthly",True)
         w=money(r[2],f"Table 6 {r[0]} weekly",True)
