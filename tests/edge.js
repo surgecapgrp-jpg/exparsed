@@ -141,3 +141,13 @@ print((r10.length===2 && r10[0].cents===263887 && r10[0].desc==='1056' && r10[1]
   eq('E15c phone-app rows: amount, date and payee, balance (and the orders OCR mixes up)', st && st.rows.map(function(r){ return [r.date, r.kind, r.cents, r.balance]; }),
     [['PENDING','debit',27125,null],['2026-10-13','debit',3600,-30695],['2026-10-09','debit',27125,-27095],['2026-10-08','credit',50000,30],['2026-10-07','debit',100000,50030],['2026-10-06','debit',218,150030]]);
 })();
+// E16: impossible dates read as null; underwriting exports the printed description whatever the toggles say
+(function(){
+  function eq(name, got, want){ var g=JSON.stringify(got), w=JSON.stringify(want); print((g===w?'PASS ':'FAIL ')+name+'  '+g); }
+  eq('E16a lgUSDate rejects impossible months and days', ['13/40/26','00/10/26','2/30/2026','4/31/26','2/29/2027'].map(lgUSDate), [null,null,null,null,null]);
+  eq('E16b lgUSDate keeps real dates, leap day included', ['9/3/26','2/29/2028','12/31/2026'].map(lgUSDate), ['2026-09-03','2028-02-29','2026-12-31']);
+  eq('E16c a day without a year allows Feb 29, not Feb 30', [lgDateTok('02/29'), lgDateTok('02/30'), lgDateTok('Apr 31')], [{ mmdd:'02/29', iso:null }, null, null]);
+  var r={ date:'2026-09-01', section:'wd', signed:-52500, balance:null, page:1, desc:'KAPITUS SERVICIN ORIG ID:1234567890 IND ID:ACME' };
+  eq('E16d raw export keeps ORIG ID', lgRowStr(r, { redact:false, compact:false }), '2026-09-01|wd|-525.00||1|KAPITUS SERVICIN ORIG ID:1234567890 IND ID:ACME');
+  eq('E16e compact export strips reference ids', lgRowStr(r, { redact:false, compact:true }).split('|')[5], 'KAPITUS SERVICIN ACME');
+})();

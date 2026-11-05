@@ -229,6 +229,12 @@ class Scenarios(unittest.TestCase):
         self.assertEqual((cfg["cadence"], cfg["live_status"], cfg["monthly_cost"]), ("PROVISIONAL", "U", 0))
         self.assertEqual(cfg["scenario_cost"], D(900) * 20)
 
+    def test_impossible_date_is_a_clear_error(self):
+        led = copy.deepcopy(LEDGER)
+        led["transactions"][0]["date"] = "2026-13-40"
+        with self.assertRaisesRegex(uw.UWError, "bad date '2026-13-40'"):
+            run(led)
+
     def test_duplicate_rows_dropped_and_conflicts_fail(self):
         led = copy.deepcopy(LEDGER)
         led["transactions"].append(dict(led["transactions"][0]))

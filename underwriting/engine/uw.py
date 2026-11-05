@@ -619,11 +619,15 @@ class _Engine:
                 self.dropped[r["account_id"]] += 1
                 continue
             seen[r["txn_id"]] = sig
+            try:
+                day = date.fromisoformat(r["date"])
+            except (TypeError, ValueError):
+                raise UWError(f"transaction {r['txn_id']}: bad date {r['date']!r}") from None
             self.txns.append(
                 Txn(
                     r["txn_id"],
                     r["account_id"],
-                    date.fromisoformat(r["date"]),
+                    day,
                     amt,
                     r["direction"],
                     r["description"],
