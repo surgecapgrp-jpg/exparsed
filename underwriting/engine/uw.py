@@ -45,8 +45,8 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 
 D = Decimal
-ENGINE_VERSION = "3.3"
-POLICY_VERSION = "V1.7b3"
+ENGINE_VERSION = "3.4"
+POLICY_VERSION = "V1.7b4"
 
 # Policy parameters (V2.2 values with the V1.7 changes marked). Changing any value is a policy change: bump POLICY_VERSION.
 BUSINESS_DAYS_PER_MONTH = D(20)
@@ -306,7 +306,6 @@ T1 = rx(
     "R10",
     "R29",
 )
-T2_FINANCE_CODES = rx("R01", "R09")
 RETURN_CODE = re.compile(r"\bR\d\d\b")
 NOISE = set(
     "ACH DEBIT CREDIT PPD CCD WEB TEL POS PURCHASE PMT PAYMENT ID REF TRN CO ENTRY DESCR IND ORIG DES "
@@ -428,6 +427,7 @@ class Position:
     groups: list = field(default_factory=list)
     evidence: str = ""  # V1.7 evidence level
     terminated: str = ""
+    terminated_date: date | None = None  # bank_text closure only; documents carry no engine-readable date
     events: list = field(default_factory=list)
     triggers: list = field(default_factory=list)
     fundings: list = field(default_factory=list)
@@ -636,7 +636,7 @@ class _Engine:
         self.txns.sort(key=lambda t: (t.date, t.seq))
         self.by_id = {t.id: t for t in self.txns}
         self.end = self.txns[-1].date
-        self.live_start = self.cal.add(self.end, -LIVE_WINDOW_BD)
+        self.live_start = self.cal.add(self.end, 1 - LIVE_WINDOW_BD)  # V1.7 P5: 10 bd counting the end day
         self.acct_end = {aid: max(e for _, e in a["statements"]) for aid, a in self.accts.items()}
         for a, n in self.dropped.items():
             self.notes[a].append(f"{n} duplicate transaction id(s) dropped")
@@ -1115,9 +1115,20 @@ class _Engine:
                     ev = dict(
                         a["terminated"], kind=a["terminated"].get("kind", "bank_text")
                     )
-                    ans["terminated"] = self.verify_quote(
-                        ev, [" ".join(t.desc for t in self.txns)], what
-                    )
+                    if ev["kind"] == "document":
+                        ans["terminated"] = self.verify_quote(ev, [], what)
+                    else:
+                        # V1.7 L6: closure text must sit on one transaction of this payee or one naming its funder.
+                        quote = str(ev.get("quote", "")).strip().upper()
+                        own = {t.id for t in self.groups[q["descriptor"]]["txns"]}
+                        tok = funder_tokens(ans.get("funder") or q["descriptor"])
+                        hits = [
+                            t for t in self.txns
+                            if quote and quote in t.desc.upper() and (t.id in own or has_token(t.desc, tok))
+                        ]
+                        require(hits, f"{what}: closure quote not on a transaction of this position or naming its funder")
+                        ans["terminated"] = self.verify_quote(ev, [hits[-1].desc], what)
+                        ans["terminated"]["date"] = hits[-1].date
                 out[q["question_id"]] = ans
         return out
 
@@ -1134,6 +1145,7 @@ class _Engine:
             g["tag"] = a["tag"]
             if a.get("terminated"):
                 g["terminated"] = a["terminated"]["quote"]
+                g["terminated_date"] = a["terminated"].get("date")
             if not g["mca"]:
                 for t in g["txns"]:
                     t.tag, t.tag_source = a["tag"], "judgment"
@@ -1175,6 +1187,9 @@ class _Engine:
                     terminated=next(
                         (m["terminated"] for _, m in members if m["terminated"]), ""
                     ),
+                    terminated_date=next(
+                        (m.get("terminated_date") for _, m in members if m["terminated"]), None
+                    ),
                 )
             tracks = split_concurrent(ts)
             if len(tracks) > 1 and any(fixed_share([t for t in tr if not t.returned_by]) < FIXED_SHARE for tr in tracks):
@@ -1184,7 +1199,7 @@ class _Engine:
                 p = Position(
                     f"P{len(self.positions) + 1}", g["funder"], name, s, cleared
                 )
-                p.terminated = g["terminated"]
+                p.terminated, p.terminated_date = g["terminated"], g.get("terminated_date")
                 p.source = g["source"]
                 p.groups = [n for n, _ in members]
                 self.analyse(p)
@@ -1279,7 +1294,7 @@ class _Engine:
         )
         standard = len(c) >= SERIES_MIN_DEBITS and cadence in CADENCE_FACTOR
         end = self.acct_end[(c or p.txns)[-1].acct]  # coverage end of the debit account
-        observed = bool(c) and c[-1].date >= self.cal.add(end, -LIVE_WINDOW_BD)
+        observed = bool(c) and c[-1].date >= self.cal.add(end, 1 - LIVE_WINDOW_BD)
         variable = standard and fixed_share(c) < FIXED_SHARE
         trig = lambda kind, t: p.triggers.append(
             dict(
@@ -1407,9 +1422,10 @@ class _Engine:
     def set_status(self, p, end, observed):
         """V1.7 Table 4 status. Only closure evidence makes N; silence or an estimated payoff never does."""
         c = p.cleared
+        after = [t for t in c if p.terminated_date and t.date > p.terminated_date]
         if p.watch:
             st, basis = "U", "WATCH: MCA identity unproved (" + "; ".join(self.groups[p.group]["passes"]) + ")"
-        elif p.terminated:
+        elif p.terminated and not after:
             st, basis = "N", f"Closed per evidence: {p.terminated}"
         elif not c:
             st, basis = "U", "No cleared collection"
@@ -1421,6 +1437,8 @@ class _Engine:
             st, basis = "Y", f"Assumed open; collections absent {silent} covered bd; last sustained cost carried"
         else:
             st, basis = "U", f"Collections absent {silent} covered bd; no closure evidence"
+        if after:
+            basis += f"; closure text {mdy(p.terminated_date)} ignored: {len(after)} cleared debit(s) after it"
         p.live_status, p.status_basis, p.live = st, basis, st == "Y"
         if st == "U":
             p.scenario = p.cost  # last sustained (or STRESS) monthly cost, shown as a scenario only
@@ -1678,12 +1696,14 @@ class _Engine:
 
     def score(self, c, p, tr):
         u, pts, basis = c.desc.upper(), 0, []
-        if has_token(u, funder_tokens(p.funder)):
+        named = has_token(u, funder_tokens(p.funder))
+        if named:
             pts += 3
             basis.append("+3 names funder")
-        if WIRE.search(u) or EXPLICIT_FIN.search(u):
+        if EXPLICIT_FIN.search(u) or (WIRE.search(u) and (named or MCA_WORD_INSIDE.search(u))):
+            # V1.7 M8: a wire scores only when it names the funder or carries finance wording.
             pts += 2
-            basis.append("+2 wire/explicit financing")
+            basis.append("+2 explicit financing / finance wire")
         if self.median and c.amt >= 3 * self.median:
             pts += 2
             basis.append("+2 >=3x median deposit")
@@ -1975,20 +1995,19 @@ class _Engine:
         if self.headline is None:
             self.binding = "Insufficient counted months"
         elif self.headline == 0:
-            self.binding = "No headline room (Room B or C <= 0)"
+            self.binding = "No headline room (Room B or C <= 0): " + " and ".join(
+                f"Room {x}" for x in "BC" if r[x] <= 0
+            ) + " <= 0"
         else:
             self.binding = (
                 "Room B: 60% revenue holdback"
                 if r["B"] <= r["C"]
                 else "Room C: operating obligations"
             )
-        if self.conservative == 0 and self.headline is not None:
-            lim = (
-                "Room C <= 0"
-                if r["C"] <= r["D"]
-                else f"Room D <= 0 (worst month {mon(self.worst_month)})"
-            )
-            self.binding += f"; CONSERVATIVE: {lim}"
+        if self.conservative is not None and self.headline is not None:
+            # V1.7 V10: Room C if C<=D, else Room D and the worst month.
+            lim = "Room C" if r["C"] <= r["D"] else f"Room D (worst month {mon(self.worst_month)})"
+            self.binding += f"; CONSERVATIVE: {lim}" + (" <= 0" if self.conservative == 0 else "")
         self.readiness()
         if self.uncertain_block:
             self.binding += "; material uncertainty: " + "; ".join(self.uncertain_block)
@@ -2073,7 +2092,7 @@ class _Engine:
         eligible = {
             m: v
             for m, v in weeks.items()
-            if all(m + timedelta(i) in covered for i in range(5))
+            if sum(self.cal.is_bd(d := m + timedelta(i)) and d in covered for i in range(7)) >= 5
         }
         self.peak_week = None
         if eligible:
@@ -2111,11 +2130,8 @@ class _Engine:
             is_mca = first.tag.startswith("MCA_")
             if T1.search(codes):
                 tier = "T1"
-            elif first.tag in ("PAYROLL", "RENT", "TAX", "INSURANCE") or (
-                (is_mca or first.tag == "DEBT_SERVICE")
-                and T2_FINANCE_CODES.search(codes)
-            ):
-                tier = "T2"
+            elif is_mca or first.tag in ("DEBT_SERVICE", "PAYROLL", "RENT", "TAX", "INSURANCE"):
+                tier = "T2"  # V1.7 K7: involuntary essential return, R01/R09 included
             else:
                 tier = "T3"
             hi = self.cal.add(rc.date, CURE_WINDOW_BD)
@@ -2132,8 +2148,8 @@ class _Engine:
                 ),
                 None,
             )
-            if is_mca and tier == "T1":
-                cured = "N (MCA stop-pay)"
+            if (is_mca or first.tag == "DEBT_SERVICE") and tier == "T1":
+                cured = "N (MCA/loan stop-pay)"
             elif cure and cure.bal is not None and cure.bal >= 0:
                 cured = f"Y (re-presented {cure.date:%m/%d} cleared)"
             elif cure:
@@ -2252,13 +2268,12 @@ class _Engine:
         )
         if levies:
             will += f" {levies} levy/lien/garnishment debit(s) in bank text."
-        if self.peak_week:
-            pk = (
-                f"Peak weekly {usd(self.peak_week['weekly'])} in week of {mdy(self.peak_week['monday'])} vs "
-                f"current weekly {usd(self.cur_weekly)}."
-            )
+        pw = self.peak_week
+        if pw and pw["weekly"] >= self.cur_weekly:
+            pk = f"Peak weekly {usd(pw['weekly'])} in week of {mdy(pw['monday'])} vs current weekly {usd(self.cur_weekly)}."
         else:
-            pk = f"Observed peak unavailable (no fully covered week); current weekly {usd(self.cur_weekly)}."
+            seen = f"observed peak {usd(pw['weekly'])} in week of {mdy(pw['monday'])}" if pw else "no fully covered week"
+            pk = f"Peak weekly {usd(self.cur_weekly)} is the modeled current floor ({seen}); current weekly {usd(self.cur_weekly)}."
         s, o, b = self.stack, self.total_ob, self.basis
         if len(self.counted) < 2:
             flip = f"Supply statements for at least 2 counted months (have {len(self.counted)})."
@@ -2351,7 +2366,7 @@ class _Engine:
             unmatched_finance_credits=fwd["FINANCING_UNATTACHED"],
             unresolved_credits=fwd["UNRESOLVED"],
             closed_with_proof=sum(p.live_status == "N" for p in self.positions),
-            requested_missing_accounts=None,  # V1.7 section 9: batch 3
+            requested_missing_accounts=sum(r["kind"] == "REQUEST REQUIRED" for r in self.requests),
         )
 
     # ---- 12. invariants on unrounded values -------------------------------------------------------
@@ -2417,7 +2432,7 @@ class _Engine:
         ok(
             "status is Y, N or U; N only with closure evidence; U carries a scenario",
             all(
-                (p.live_status == "N") == bool(p.terminated)
+                (p.live_status != "N" or bool(p.terminated))
                 and (p.live_status == "U") == (p.scenario is not None)
                 and p.live == (p.live_status == "Y")
                 for p in self.positions
@@ -2886,27 +2901,25 @@ def tables(a):
     pw = a["peak_week"]
     cw, cd = stack / WEEKS_PER_MONTH, stack / BUSINESS_DAYS_PER_MONTH
     current = ["Current Live Stack", usd(stack), usd(cw), usd(cd), f"{sum(p['live'] for p in positions)} Y positions" + (f"; {sum(p['live_status'] == 'U' for p in positions)} U not in stack" if any(p["live_status"] == "U" for p in positions) else "")]
-    if pw:
-        pm = pw["weekly"] * WEEKS_PER_MONTH
-        mk = mkey((pw["monday"].year, pw["monday"].month))
-        rev = true_by_key.get(mk)
-        detail = f"week of {mdy(pw['monday'])}; {len(pw['funders'])} positions; {', '.join(pw['funders'])}"
+    # V1.7 K3: Report Peak Weekly = max(Observed Peak Weekly, Modeled Current Weekly).
+    if pw and pw["weekly"] >= cw:
+        pk, mk = pw["weekly"], mkey((pw["monday"].year, pw["monday"].month))
+        detail = f"observed week of {mdy(pw['monday'])}; {len(pw['funders'])} positions; {', '.join(pw['funders'])}"
         if pw["latest"]:
             detail += "; Observed peak is latest full week"
-        drop_detail = f"Peak Holdback {pct(pm / rev) if rev else dash} of {kmon(mk)} revenue"
-        if pw["weekly"] < cw:
-            drop_detail += f"; Current exceeds observed peak by {usd(cw - pw['weekly'])}/wk"
-        t4b = [
-            ["Peak Handled", usd(pm), usd(pw["weekly"]), usd(pm / BUSINESS_DAYS_PER_MONTH), detail],
-            current,
-            ["Drop Since Peak", usd(pm - stack), usd(pw["weekly"] - cw), usd(pm / BUSINESS_DAYS_PER_MONTH - cd), drop_detail],
-        ]
     else:
-        t4b = [
-            ["Peak Handled", dash, dash, dash, "No fully covered week with MCA debits"],
-            current,
-            ["Drop Since Peak", dash, dash, dash, "Observed peak unavailable"],
-        ]
+        pk, mk = cw, max(counted, default=None)
+        detail = "modeled current floor (stack/(52/12)); " + (
+            f"observed peak {usd(pw['weekly'])}/wk in week of {mdy(pw['monday'])}" if pw else "no fully covered week with MCA debits"
+        )
+    pm = pk * WEEKS_PER_MONTH
+    rev = true_by_key.get(mk) if mk in counted else None
+    drop_detail = f"Peak Holdback {pct(pm / rev)} of {kmon(mk)} revenue" if rev else "Peak Holdback unavailable (no counted month)"
+    t4b = [
+        ["Peak Handled", usd(pm), usd(pk), usd(pm / BUSINESS_DAYS_PER_MONTH), detail],
+        current,
+        ["Drop Since Peak", usd(pm - stack), usd(pk - cw), usd(pm / BUSINESS_DAYS_PER_MONTH - cd), drop_detail],
+    ]
     t5 = [[r["label"], usd(r["avg"]), r["basis"], "Yes" if r["ambiguous"] else "No"] for r in a["obligations"]]
     t5 += (
         [["Total Average Obligations", usd(cap["total_obligations"]), dash, dash]]

@@ -22,7 +22,7 @@ def raw(led):
 
 
 def run(led=None, judgments=None):
-    """underwrite() through its interface. It also runs the unchanged V2.2 report validator."""
+    """underwrite() through its interface. It also runs the V1.7 report checker."""
     return uw.underwrite((FIX / "sample_ledger.json").read_bytes() if led is None else raw(led), judgments)
 
 
@@ -214,7 +214,7 @@ class TrustBoundary(unittest.TestCase):
     def test_termination_needs_verbatim_evidence(self):
         self.reject(
             [dict(question_id=q(self.e, "RAPIDFUND LLC"), tag="MCA", funder="RapidFund", terminated=dict(quote="PAID IN FULL"))],
-            "quote not in transaction text",
+            "closure quote not on a transaction of this position",
         )
 
 
@@ -514,6 +514,85 @@ class V17Batch3(unittest.TestCase):
             uw.report_gate(rep.replace(line, line + "\n" + line))
         with self.assertRaisesRegex(uw.UWError, "no valid status"):
             uw.report_gate(rep.replace("Commingling Status: Present — Low", "Commingling Status: Some"))
+
+
+class V17Batch4(unittest.TestCase):
+    """V1.7 fixes from the 2026-11 spec review: peak floor, closure evidence, return tiers, wires, windows, binding."""
+
+    def bigcap(self):
+        # A $3,000 daily MCA: 3 debits in the week of 08/31, 4 in the Labor Day week of 09/07.
+        days = ["2026-09-02", "2026-09-03", "2026-09-04", "2026-09-08", "2026-09-09", "2026-09-10", "2026-09-11"]
+        return run(add_debits(LEDGER, "BIGCAP FUNDING ACH DEBIT", "3000.00", days, "BIG"))
+
+    def test_holiday_week_is_not_eligible_for_peak(self):
+        # K2: the week of 09/07 has 4 business days (Labor Day), so its $12,000 of BIGCAP cannot be the peak.
+        self.assertNotEqual(self.bigcap().audit["peak_week"]["monday"].isoformat(), "2026-09-07")
+
+    def test_report_peak_is_floored_at_modeled_current(self):
+        # K3: Report Peak Weekly = max(observed, stack/(52/12)); the drop is never negative.
+        r = self.bigcap()
+        cw = r.audit["capacity"]["live_stack"] / W
+        self.assertLess(r.audit["peak_week"]["weekly"], cw)
+        row = next(l for l in r.report.splitlines() if l.startswith("| Peak Handled"))
+        self.assertIn("modeled current floor", row)
+        self.assertIn(uw.usd(cw), row)
+        drop_row = next(l for l in r.report.splitlines() if l.startswith("| Drop Since Peak"))
+        self.assertNotIn("-", drop_row.split("|")[2])
+
+    def test_live_window_is_ten_business_days_with_the_end_day(self):
+        # P5: 09/17 to 09/30 is the window; a last debit on 09/16 is the 11th business day back.
+        p = pos(run(drop(LEDGER, "RAPIDFUND", "2026-09-16")), "RAPIDFUND")[0]
+        self.assertIn("Assumed open; collections absent 10 covered bd", p["status_basis"])
+        p = pos(run(drop(LEDGER, "RAPIDFUND", "2026-09-17")), "RAPIDFUND")[0]
+        self.assertTrue(p["status_basis"].startswith("Observed"))
+
+    def test_bank_closure_text_must_belong_to_the_position(self):
+        led = add_rows(LEDGER, [("OP", "2026-08-20", "1.00", "credit", "SYSCO FOODS PAID IN FULL"),
+                                ("OP", "2026-09-30", "1.00", "credit", "RAPIDFUND LLC PAYOFF PAID IN FULL")], "CL")
+        r0 = run(led)
+        ans = lambda quote: [dict(question_id=q(r0, "RAPIDFUND LLC"), tag="MCA", funder="RapidFund",
+                                  terminated=dict(quote=quote))]
+        with self.assertRaisesRegex(uw.UWError, "closure quote not on a transaction"):
+            run(led, with_judgments(r0, ans("SYSCO FOODS PAID")))
+        self.assertEqual(pos(run(led, with_judgments(r0, ans("PAYOFF PAID IN FULL"))), "RAPIDFUND")[0]["live_status"], "N")
+
+    def test_collections_after_bank_closure_text_keep_the_position_open(self):
+        led = add_rows(LEDGER, [("OP", "2026-09-01", "1.00", "credit", "RAPIDFUND LLC PAYOFF QUOTE PAID IN FULL")], "CL")
+        r0 = run(led)
+        a = [dict(question_id=q(r0, "RAPIDFUND LLC"), tag="MCA", funder="RapidFund", terminated=dict(quote="PAID IN FULL"))]
+        p = pos(run(led, with_judgments(r0, a)), "RAPIDFUND")[0]
+        self.assertEqual(p["live_status"], "Y")
+        self.assertIn("closure text 09/01/26 ignored", p["status_basis"])
+
+    def returned(self, desc, code, then=None):
+        rows = [("OP", "2026-08-04", "800.00", "debit", desc), ("OP", "2026-08-05", "800.00", "credit", f"{desc} RETURN {code}")]
+        if then:
+            rows.append(("OP", "2026-08-06", "800.00", "debit", desc))
+        led = add_rows(LEDGER, rows, "RT")
+        for t in led["transactions"]:
+            if t["txn_id"].startswith("RT"):
+                t["balance"] = "5000.00"
+        return next(ev for ev in run(led).audit["returns"] if ev["who"].startswith(desc[:6]))
+
+    def test_finance_return_is_t2_whatever_the_code(self):
+        # K7: an involuntary finance return is T2, R01/R09 included but not required.
+        self.assertEqual(self.returned("SBA EIDL LOAN PMT", "R02")["tier"], "T2")
+
+    def test_loan_stop_pay_is_never_cured(self):
+        # K8: stop-pay MCA/loan never cured, even with a cleared re-presentment.
+        ev = self.returned("SBA EIDL LOAN PMT", "R08", then=True)
+        self.assertEqual((ev["tier"], ev["cured"][:1]), ("T1", "N"))
+
+    def test_plain_wire_gets_no_finance_points(self):
+        # M8: +2 needs explicit finance terms or a finance-origin wire.
+        led = add_rows(LEDGER, [("OP", "2026-07-30", "9000.00", "credit", "WIRE IN ORIG ACME CUSTOMER REF 9")], "WR")
+        cands = [c for b in run(led).audit["backward_searches"] for c in b["candidates"] if c["txn_id"] == "WR0"]
+        self.assertTrue(cands)
+        self.assertFalse(any("financ" in x for c in cands for x in c["basis"]))
+
+    def test_binding_names_the_conservative_room(self):
+        # V10: Conservative binding is Room C if C<=D, else Room D and the worst month, stated every time.
+        self.assertIn("; CONSERVATIVE: Room ", run().audit["capacity"]["binding"])
 
 
 class RealDataShapes(unittest.TestCase):

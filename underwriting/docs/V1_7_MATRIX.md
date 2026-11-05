@@ -1,20 +1,21 @@
 # Policy V1.7 compliance matrix
 
-Each row maps one V1.7 requirement (MCA Capacity Underwriter V1.7, 2026-11-02) to `engine/uw.py` and `adapter/exparsed_adapter.py` on branch `v17-batch3`.
+Each row maps one V1.7 requirement (MCA Capacity Underwriter V1.7, 2026-11-02) to `engine/uw.py` and `adapter/exparsed_adapter.py` on branch `v17-batch4`.
 
 Status values:
 
 - **Met**: the engine already does what the rule says.
 - **B1**: changed in batch 1.
 - **B2**: changed in batch 2.
-- **B3**: changed in batch 3 (this branch).
+- **B3**: changed in batch 3.
+- **B4**: changed in batch 4 (this branch), fixes from the 2026-11-02 spec review.
 - **Partial**: part of the rule is implemented; the gap is named.
 - **Gap**: not implemented.
 - **Page**: handled by Exparsed extraction before the engine runs.
 
 Batch 2 covered debit-first discovery (D1 to D5), WATCH rows, the ±30-day two-way match, evidence levels and position identity. Rows still marked B2 in the Fix column were deferred: off-bank collections, contractual cost, payoff ties and variable adverse scenarios. **B3** covers accounts, commingling, missing-account requests, the V1.7 ten-table format and its checker.
 
-Count: 150 rows. 24 B1, 33 B2, 25 B3, 42 Met, 20 Partial, 3 Gap, 3 Page.
+Count: 150 rows. 19 B1, 33 B2, 24 B3, 10 B4, 38 Met, 20 Partial, 3 Gap, 3 Page.
 
 ## Contract hard rules
 
@@ -40,7 +41,7 @@ Count: 150 rows. 24 B1, 33 B2, 25 B3, 42 Met, 20 Partial, 3 Gap, 3 Page.
 | P2 | WEEKS_PER_MONTH = 52/12 | `D(52) / D(12)`; was 4.333 | B1 | — |
 | P3 | BIWEEKS_PER_MONTH = 26/12 | `D(26) / D(12)`; was 2.167 | B1 | — |
 | P4 | FULL_MONTH_DAYS = 18 on material accounts | 18 days per material account (S11) | B3 | — |
-| P5 | CURRENT_COLLECTION_WINDOW = 10 bd to the debit account's coverage end | 10 bd to that account's last statement end; was the last transaction date of any account | B1 | — |
+| P5 | CURRENT_COLLECTION_WINDOW = 10 bd to the debit account's coverage end | 10 bd counting the coverage-end day; batch 1 counted 11 | B4 | — |
 | P6 | PRIMARY_FUNDING_WINDOW = 7 bd on or before the first debit | 7 bd, holidays excluded | Met | — |
 | P7 | EXPANDED_DISCOVERY_WINDOW = ±30 calendar days, investigation only | Backward and forward searches list MED/HIGH credits or triggers within ±30 calendar days as INVESTIGATE | B2 | — |
 | P8 | UNATTACHED_WINDOW = 14 calendar days | 14 | Met | — |
@@ -136,7 +137,7 @@ Count: 150 rows. 24 B1, 33 B2, 25 B3, 42 Met, 20 Partial, 3 Gap, 3 Page.
 | M5 | Credit after T disclosed as a contradiction | Expanded candidates after the trigger carry `after_trigger` and the outcome counts them as contradictions | B2 | — |
 | M6 | Coverage test A: every trigger has backward and expanded dispositions | Backward and expanded dispositions per trigger (self-check) | B2 | — |
 | M7 | Coverage test B: every candidate credit has forward and expanded dispositions | Forward and expanded dispositions per candidate credit (self-check) | B2 | — |
-| M8 | Pair score points +3, +2, +2, +1, -3; HIGH, MED, LOW, NONE | Same points and bands | Met | — |
+| M8 | Pair score points +3, +2, +2, +1, -3; HIGH, MED, LOW, NONE | +2 needs explicit finance terms or a wire that names the funder or carries finance wording; plain customer wires get 0 | B4 | — |
 | M9 | Proof gate: financing text, document, or independent evidence of the sender | `bank_text`, `document`, `named_funder_series`; `sender_identified` from the LLM is flagged for human verification | Partial | Sign-off: is LLM knowledge "independent evidence"? |
 | M10 | Link gate; rivals listed; ties are COMPETING | Rivals logged; ties and cross-position reuse are AMBIGUOUS | Met | — |
 | M11 | One credit cannot fund two unrelated positions | Self-check | Met | — |
@@ -155,9 +156,9 @@ Count: 150 rows. 24 B1, 33 B2, 25 B3, 42 Met, 20 Partial, 3 Gap, 3 Page.
 | L1 | One POSITION ID per credible series; one funder may own several | P1, P2 and so on; display adds #n | Met | — |
 | L2 | Dispositions ESTABLISHED, PROBABLE, NON-MCA SUPPORTED, UNRESOLVED WATCH | CONFIRMED, PROBABLE, NON-MCA (debit dispositions) and UNRESOLVED WATCH | B2 | — |
 | L3 | Unknown funder labeled "Unknown MCA-style #N" | "Unknown MCA-style #N" when the payee has no usable name | B2 | — |
-| L4 | Y: cleared within 10 bd of the debit account's coverage end | Yes | B1 | — |
+| L4 | Y: cleared within 10 bd of the debit account's coverage end | Yes, 10 bd counting the end day | B4 | — |
 | L5 | Y: established position silent up to 30 covered bd, "assumed open; collections absent" | Yes; the last sustained cost is carried | B1 | — |
-| L6 | N only with closure evidence; N costs $0 | `terminated` evidence (verbatim quote) | B1 | — |
+| L6 | N only with closure evidence; N costs $0 | Bank-text closure must sit on a transaction of the payee or naming its funder; cleared debits after that date keep the position open. Document closures carry no engine-readable date. | B4 | — |
 | L7 | U: unproved identity, silence over 30 covered bd, or visibility gaps; cost —, scenario in Notes | Silence over 30 bd, provisional cadence, no cleared debit, or WATCH (identity unproved) | B2 | — |
 | L8 | Total Live Stack sums Y only; U stays out | Yes (self-check) | B1 | — |
 | L9 | Cost: daily x20, weekly x52/12, biweekly x26/12, monthly x1 | Daily, weekly, biweekly and monthly (18 to 25 bd gaps, x1) | B2 | Sign-off B14 |
@@ -182,7 +183,7 @@ Count: 150 rows. 24 B1, 33 B2, 25 B3, 42 Met, 20 Partial, 3 Gap, 3 Page.
 | V7 | Material excluded outflows disclosed with sensitivity | What Would Flip This gives owner draws and AMBIGUOUS outflows per month and Room C with them counted | B3 | — |
 | V8 | Rooms A to D, HEADLINE, CONSERVATIVE from unrounded cents | As written (self-check on HEADLINE) | Met | — |
 | V9 | Weekly = monthly/(52/12), daily = monthly/20 | Yes | B1 | — |
-| V10 | Binding texts | As written; material uncertainty appended when it blocks the verdict | B1 | — |
+| V10 | Binding texts | Zero headline names Room B and/or C; the conservative binding (Room C, or Room D and the worst month) is always stated | B4 | — |
 | V11 | Readiness: <2 months, an essential unavailable amount, or material uncertainty gives INSUFFICIENT DATA | Months, material U positions, material unprovided accounts, unreadable statements, and unresolved credits that could reverse a NO | B3 | — |
 | V12 | Data-status suffix | Worst integrity across accounts | Met | — |
 
@@ -191,13 +192,13 @@ Count: 150 rows. 24 B1, 33 B2, 25 B3, 42 Met, 20 Partial, 3 Gap, 3 Page.
 | ID | V1.7 rule | Engine now | Status | Fix |
 | :--- | :--- | :--- | :--- | :--- |
 | K1 | Peak over all cleared MCA collections by Monday-to-Sunday week | Yes, including U and N positions | Met | — |
-| K2 | Skip weeks with <5 covered bd on the collection accounts | Monday to Friday covered on the accounts that carry MCA collections | B3 | — |
-| K3 | Peak = max(observed, modeled current); peak holdback | As written | Met | — |
+| K2 | Skip weeks with <5 covered bd on the collection accounts | Counts covered business days, so holiday weeks with 4 are skipped | B4 | — |
+| K3 | Peak = max(observed, modeled current); peak holdback | Report Peak floored at stack/(52/12) and labelled modeled current floor; holdback over a counted month only; checker rejects a negative drop | B4 | — |
 | K4 | Returns classified once per attempt chain | Chains within 10 bd | Met | — |
 | K5 | FEE_NSF_OD is a fee, never a return | Yes | Met | — |
 | K6 | Class A, B and UNKNOWN | A return credit with no matching debit is Class UNKNOWN, tier and cure n/a; Table 9 counts it apart | B3 | — |
-| K7 | T1, T2, T3 codes | T1 stop-pay and R05/R07/R08/R10/R29; T2 R01/R09 on finance and essentials; T3 the rest | Met | — |
-| K8 | Cure only within 2 bd with balance; MCA stop-pay never cured | As written | Met | — |
+| K7 | T1, T2, T3 codes | T1 stop-pay and R05/R07/R08/R10/R29; T2 every other return on MCA, loan, payroll, rent, tax, insurance; T3 the rest | B4 | — |
+| K8 | Cure only within 2 bd with balance; MCA stop-pay never cured | MCA and loan (DEBT_SERVICE) stop-pays never cured | B4 | — |
 | K9 | Table 9 metrics; absent balances are "unavailable" | Six fixed rows | Met | — |
 
 ## 9. Commingling and missing accounts
@@ -218,7 +219,7 @@ Count: 150 rows. 24 B1, 33 B2, 25 B3, 42 Met, 20 Partial, 3 Gap, 3 Page.
 | A2 | Credit coverage: every cleared credit scanned by C1 to C5 | Candidates get forward dispositions; other credits are not dispositioned | Partial | B2 |
 | A3 | Bidirectional link coverage | Primary and ±30-day windows in both directions | B2 | — |
 | A4 | Series and ID coverage | Each nominated payee maps to one position, WATCH row or NON-MCA tag; no debit in two positions (self-check) | B2 | — |
-| A5 | Live and closure coverage: every N has proof; every material U visible | Self-check "N only with closure evidence; U carries a scenario" | B1 | — |
+| A5 | Live and closure coverage: every N has proof; every material U visible | Self-check "N only with closure evidence; U carries a scenario"; closure tied to the position (L6) | B4 | — |
 | A6 | Cross-account coverage | Transfers to and from unprovided accounts are listed and gate the verdict when material | B3 | — |
 | A7 | Reconciliation: stack = Table 4 = 4b = Table 6 to the cent | Self-check plus the report validator | Met | — |
 | A8 | Completeness metrics; audit FAIL if any eligible row lacks a disposition | `completeness` counts credits and debits scanned, candidates, positions, WATCH rows, material U, unattached and unresolved credits, closures | B2 | requested_missing_accounts still null; see `account_requests` |
@@ -304,3 +305,29 @@ Not in batch 3: account identity beyond the last four digits (S5), per-file sour
 | Sample, saved answers | INSUFFICIENT DATA, $5,217 | Same |
 | Real ledger, no answers | INSUFFICIENT DATA, $74,570 | INSUFFICIENT DATA; adds REQUEST REQUIRED for TD Convenience Checking ...1272 ($101,390 out, material) and NST Credit Line ...6298, and VERIFY OWNERSHIP for CHK ...1563 |
 | Real ledger, saved answers | INSUFFICIENT DATA, $44,882 | INSUFFICIENT DATA, $39,061 (credit-line transfers now count as debt service); same account requests |
+
+## Batch 4 fixes
+
+A spec review on 2026-11-02 found 10 rows marked Met, B1 or B3 that the code did not meet. Each fix has a test in `V17Batch4` that fails on batch 3.
+
+| Row | Batch 3 behaviour | Batch 4 |
+| :--- | :--- | :--- |
+| K3 | Peak Handled showed the observed week even below current load; drop could be negative | Report Peak = max(observed, modeled current); holdback over a counted month |
+| L6, A5 | Closure quote matched anywhere in the ledger text | Quote must sit on the payee's or funder-named transaction; later cleared debits override it |
+| K7 | MCA and loan returns were T2 only with R01 or R09 | All non-T1 returns on finance and essentials are T2 |
+| M8 | Every wire scored +2 | Only funder-named or finance-worded wires |
+| V10 | Zero headline did not name the room; conservative binding shown only at zero | Both stated |
+| P5, L4 | Live window held 11 business days | 10, counting the end day |
+| K2 | Holiday weeks with 4 business days were eligible | Skipped |
+| K8 | Loan stop-pays could show cured | Never cured |
+
+Not in batch 4: report publication after rejected answer files (V3 handoff), the stage manifest (V3 handoff), and B18 (`coverage_block` also turns NO into INSUFFICIENT DATA), which still needs sign-off.
+
+## Batch 4 effect on saved runs
+
+| Run | Batch 3 | Batch 4 |
+| :--- | :--- | :--- |
+| Sample, no answers | INSUFFICIENT DATA, $11,577 | Same; binding adds "CONSERVATIVE: Room D (worst month Jun-26)" |
+| Sample, saved answers | INSUFFICIENT DATA, $5,217 | Same; CFG funding match falls from HIGH 5 to MED 3 (the JKL customer wire loses +2) |
+| Real ledger, no answers | INSUFFICIENT DATA, $74,570 | Same; binding adds "CONSERVATIVE: Room D (worst month Feb-26)" |
+| Real ledger, saved answers | INSUFFICIENT DATA, $39,061 | Same; binding adds the conservative room |

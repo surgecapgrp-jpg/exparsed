@@ -1,4 +1,4 @@
-# UW JUDGMENT PROMPT V3.0 (policy V2.2)
+# UW JUDGMENT PROMPT V3.0 (policy V1.7)
 
 ## Role
 
@@ -49,7 +49,7 @@ Pick one tag:
 - `MCA` needs `funder`: the funder's name as a short plain string. Fixed daily, weekly or biweekly debits to a funding, capital or advance company are the usual pattern.
 - `DIRECT_COST` is a recurring supplier tied to cost of revenue. Isolated retail purchases stay `OTHER`.
 - `AMBIGUOUS_<LABEL>` (for example `AMBIGUOUS_CARD_PAYMENT`) is a recurring obligation whose nature is unclear. It is shown in Table 5 and kept out of the obligation total.
-- Add `terminated` only when a document or a transaction description proves the position was paid off or closed. Use the same `kind`/`quote`/`doc_id` shape as `evidence`. An estimated payoff is not proof. Without `terminated`, a position whose debits stopped is reported U (unresolved) with a scenario cost, and a material U position blocks a YES verdict.
+- Add `terminated` only when a document or a transaction description proves the position was paid off or closed. Use the same `kind`/`quote`/`doc_id` shape as `evidence`. A `bank_text` quote must appear on one transaction of this payee or one naming its funder; cleared debits after that transaction keep the position open. An estimated payoff is not proof. Without `terminated`, a position whose debits stopped is reported U (unresolved) with a scenario cost, and a material U position blocks a YES verdict.
 
 ### `core_operation`
 
