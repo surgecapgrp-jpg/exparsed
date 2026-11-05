@@ -1,179 +1,263 @@
 # exparsed handoff
 
-State as of 2026-10-26. Repo: https://github.com/surgecapgrp-jpg/exparsed (private, branch `main`).
+State on 2026-11-05 at `main` commit `8db2a61`. Repo: https://github.com/surgecapgrp-jpg/exparsed (private).
+This file replaces the 2026-10-26 handoff. The underwriting design detail is in `underwriting/docs/HANDOFF.md`,
+and the policy compliance detail is in `underwriting/docs/V1_7_MATRIX.md`.
 
-## What exparsed is
+## 1. Summary
 
-`exparsed.html` is one self-contained page (6,688 lines) that turns bank statements into a ledger.
-It reads text PDFs (through pdf.js), CSV, OFX/QFX, Excel (SheetJS) and scanned PDFs (through the local
-Mac OCR server). Each ledger is checked against the statement's own figures: opening balance plus
-credits minus debits must equal the closing balance, and section totals must match the printed
-summary. Files never leave the machine. Open the page in Chrome and drop files on it.
+exparsed is one HTML page that reads bank statements, checks them against their own printed totals, and
+underwrites the merchant for MCA capacity under policy V1.7.
 
-Each file gets one status:
+| Part | State |
+| :--- | :--- |
+| Statement reader | In use. 140 of 244 Desktop-set files verify from text; 29 of 42 scans verify through Mac OCR. |
+| Underwriting engine | Experiment. Policy V1.7 batches 1 to 4 merged. Run on 1 real ledger and 1 synthetic ledger. |
+| Underwrite button and chat | Built and tested with a mocked browser run. Never run in real Chrome with real Pyodide and a real key. |
+| UI | Surge Capital theme (PR #9, merged 2026-11-04). |
+| Tests | 208 JS tests, 65 engine tests, 15 end-to-end page checks: all pass on `main`. |
+
+The next step is a real Chrome run on 3 to 5 real merchant files (section 9, item 1).
+
+## 2. Files in the repo
+
+| Path | What it is |
+| :--- | :--- |
+| `exparsed.html` | The whole app: 10,769 lines, about 700 KB. Statement reader, ledger export, OCR, AI calls, underwriting panel, chat, and an embedded copy of the Python engine. |
+| `mac_ocr_server.py`, `mac_ocr.swift` | Local OCR server on `127.0.0.1:8091` (Apple Vision). The Swift helper compiles on first start. |
+| `underwriting/engine/uw.py` | The underwriting engine, 3,100 lines, Python standard library only. |
+| `underwriting/adapter/exparsed_adapter.py` | Converts the page's `ledger-v1` export to the engine's ledger. `page_run()` is the entry point the page calls. Holds the holiday list. |
+| `underwriting/checker/validate_report.py` | The V1.7 report checker. The engine runs it on every report and fails the run on any error. |
+| `underwriting/prompts/judge.md` | System prompt for the judgment call. |
+| `underwriting/schemas/` | `ledger.schema.json` (engine input) and `judgments.schema.json` (model output, also sent as the structured-output schema). |
+| `underwriting/embed.py` | Copies engine, adapter, checker and prompt into `exparsed.html` between the `UW-EMBED` markers (lines 454 to 4196). |
+| `underwriting/tests/` | `test_engine.py` (65 tests), `make_fixture.py`, `fixtures/sample_ledger.json` (321 rows, Jun to Sep 2026) and `fixtures/sample_judgments.json`. |
+| `underwriting/docs/HANDOFF.md` | Engine design, contracts, trust boundary, interpretations 1 to 19. |
+| `underwriting/docs/V1_7_MATRIX.md` | 150 V1.7 rules mapped to code, interpretations B1 to B21, effect of each batch on saved runs. |
+| `tests/` | JS unit tests for the page (`run-node.js` or `run.sh`), `extract.py`, synthetic samples. |
+| `DESIGN_REVIEW.md` | The 2026-11-02 architecture review. Changes 2 to 5 are done; change 1 is open. |
+| `underwriting/legacy/` | Empty except a cache folder. Safe to delete. |
+| `tests/families.js.removed` | Old payee-grouping tests. Not run. |
+
+The repo holds no customer statements. The one real ledger used for testing sits outside the repo
+(section 8).
+
+## 3. Running it
+
+| Task | Command or step |
+| :--- | :--- |
+| Open the app | Open `exparsed.html` in Chrome. Drop statement files on the page. Nothing is uploaded except model calls. |
+| OCR server | Starts at login through `~/Library/LaunchAgents/local.exparsed.macocr.plist`. Manual: `python3 mac_ocr_server.py`. Check: `launchctl list \| grep exparsed`. |
+| Keys | Settings > AI providers. One Claude key and model, one OpenRouter key and model. Held in memory only, lost on reload. |
+| Underwrite | Underwrite button > Run. First run downloads Pyodide 0.27.2 (about 10 MB) from cdn.jsdelivr.net. |
+| Page tests | `node tests/run-node.js` (208 pass) or `bash tests/run.sh` on macOS. |
+| Engine tests | `cd underwriting && python3 -m unittest discover -s tests` (65 pass). |
+| Engine CLI | `python3 underwriting/engine/uw.py underwriting/tests/fixtures/sample_ledger.json --out run/` |
+| After an engine change | `python3 underwriting/embed.py`. Test `PageEmbed` fails until the page copy matches. |
+
+## 4. Statement reader
+
+The page reads text PDFs (pdf.js), CSV, OFX/QFX, Excel (SheetJS) and scanned PDFs (Mac OCR, or Claude or
+OpenRouter vision). Each file gets one status:
 
 | Status | Meaning |
-|---|---|
-| verified (✓ reconciled) | rows add up to the printed balances and totals |
-| partial | some figures check, at least one total or balance is missing or off |
-| break | the rows do not add up to the statement's figures |
-| needs-ocr | the PDF has no text layer; run it again with the OCR server up |
-| not-statement | application, ID, contract, credit report or similar |
-| untestable | no balances or totals printed, so nothing to check against |
+| :--- | :--- |
+| verified | Rows add up to the printed balances and totals |
+| partial | Some figures check; at least one total or balance is missing or off |
+| break | Rows do not add up to the statement's figures |
+| needs-ocr | No text layer; rerun with OCR |
+| not-statement | Application, ID, contract, credit report or similar |
+| untestable | No balances or totals printed |
 
-## Where things live
+Read path, with current line numbers in `exparsed.html`:
+
+1. `readFileContent` (9646) is the entry. `dispatchFile` (4712) picks a reader by file type.
+2. `fileOcrNeed` (9024) and `lgDocKind` (7536) decide whether a PDF needs OCR or is not a statement.
+3. `doOcrMac` (10422) posts scanned pages to the OCR server. Cloud OCR goes through `cloudOcrRead` (9083).
+4. `lgAccountChildren` (9656) splits a file: `lgSplitAccounts` (7856) per account heading,
+   `lgSplitStatements` (7887) per repeated "Page 1 of N".
+5. `lgFileLedger` (8666) builds and caches the ledger through `lgBuild` (7408) and `lgChooseReading` (7398).
+   Readers: `lgParseColumnar` (6053), `lgParsePrintout` (6734), `lgParseCards` (7949), `lgParseStackedRows` (7988).
+6. Shared helpers: `lgCleanLine` (5903) repairs OCR and text damage; `lgSectionOf` (5695) maps headings.
+7. `recFromContent` (9666) builds the record shown on the page.
+8. `lgOwnRows` (8722) drops overlapping printouts of one account. `lgLedgerExport` (8730) builds `ledger-v1`.
+   `lgComputed` (8829) adds ADB, negative days and gross inflows per month.
+
+Last measured results (2026-10-26, not rerun since):
+
+| Set | Result |
+| :--- | :--- |
+| Desktop set, 244 files, text layer | 140 verified, 23 multi-account files split into 70 verified ledgers, 0 break, 42 needs-ocr, 23 untestable, 8 not-statement, 3 partial |
+| The 42 needs-ocr files through Mac OCR | 29 verified, 3 files split into 9 verified statements, 6 partial, 3 not-statement, 1 break (`Bank_Statement_5`) |
+| FUNDED set, about 7,300 files | Not rerun after the October fixes |
+
+## 5. Underwriting
+
+### 5.1 Design
+
+Code computes every number. The model answers a short list of classification questions and never sees a
+dollar total or writes a table.
+
+```text
+statements -> lgLedgerExport (ledger-v1 JSON)
+  -> page_run(ledger)            engine run 1: questions.json + default-answer report
+  -> model with judge.md         judgments.json (structured output)
+  -> page_run(ledger, answers)   engine run 2: checks every answer, recomputes, renders 10 tables
+  -> validate_report.py          must PASS, or the run fails
+  -> panel shows report; downloads: report.md, audit.json, judgments.json
+```
+
+The engine rejects a whole answer file when: the ledger hash differs, a question ID is unknown or
+repeated, a tag is outside the allowed list, a strip lacks evidence, a quote is not verbatim in the
+transaction text or named document, or a closure quote is not on a transaction of that payee or one
+naming its funder.
+
+### 5.2 Policy V1.7 coverage
+
+`ENGINE_VERSION` 3.4, `POLICY_VERSION` V1.7b4. The matrix tracks 150 rules:
+
+| Status | Rows |
+| :--- | ---: |
+| Met before V1.7 work | 38 |
+| Changed in batch 1 (statuses Y/N/U, STRIP_UNRESOLVED, 52/12 conversion) | 19 |
+| Changed in batch 2 (debit-first sweep D1 to D5, WATCH rows, identity joins, ±30-day windows) | 33 |
+| Changed in batch 3 (account coverage, missing-account requests, commingling, report checker) | 24 |
+| Changed in batch 4 (fixes from the 2026-11-02 spec review) | 10 |
+| Partial | 20 |
+| Gap | 3 |
+| Handled by the page | 3 |
+
+Gaps: D6 (reverse consolidations, processor splits, off-bank deductions), L11 (contractual cost
+separate from observed), L13 (contract or lender payoff tied to the position).
+
+Partial rows, grouped: per-file source records (R1), ownership evidence (R2), trace IDs (R3), exception
+records (R7), pending rows as observations (S3), account identity beyond last four (S5), dedupe crosswalk
+(S7), alternative tags (T1), off-bank exposure (T7, C5), hidden collections behind failed attempts (D5),
+generic descriptors (D7), same-day doubles (D8), variable adverse scenario (D11), non-wire new senders
+(C2), LLM sender identity as proof (M9), same-name renewal (M14), full credit dispositions (A2),
+execution order (H11), FLIGHT inflow scope (P15).
+
+### 5.3 Pull request history
+
+| PR | Merge commit | Content |
+| :--- | :--- | :--- |
+| #4 | `8944394` | Engine runs in the page through Pyodide; one key set for OCR, judgments and chat |
+| #5 | `82df417` | Design review changes 2 to 5: `underwrite()` interface, cross-check of page figures, structured chat rows, test markers |
+| #6 | `c356a90` | V1.7 batch 1 and the compliance matrix |
+| #7 | `e0ccc2f` | V1.7 batch 2 |
+| #8 | `9b9c96c` | V1.7 batch 3 |
+| #9 | `00b35ed` | Surge Capital rebrand (UI only, 1 file) |
+| #10 | `8db2a61` | V1.7 batch 4 |
+
+Rollback point before all underwriting work: `283bc50`.
+
+### 5.4 Model calls
+
+| Item | Detail |
+| :--- | :--- |
+| Code | `aiRequest` (9196), `aiParse` (9214), `aiCall` (9231), `uwJudgeOnce` (9261), `uwUnderwrite` (9274), `uwRun` (10707) |
+| Provider pick | OCR has its own pick. Underwriting and chat share a second pick (Claude or OpenRouter). |
+| Judgment call | Non-streaming, 16,000 max tokens, Claude system prompt cached. Claude gets `output_config.format`; OpenRouter gets `response_format`. A 400 retries once without the schema. |
+| Rejected answers | The engine error goes back to the model once. A second rejection shows the engine-default report with a red status line. |
+| Fallback | Claude requests carry server-side refusal fallback (`fallbacks: "default"`). |
+| Chat | Tools run in the page: `search_rows`, `read_document`, `read_audit` (13 audit sections). Results capped at 60,000 characters; 8 tool rounds per turn. System prompt: `uwChatSystem` (9356). |
+
+### 5.5 Results on saved runs
+
+| Run | Status | HEADLINE monthly |
+| :--- | :--- | ---: |
+| Sample ledger, engine defaults | INSUFFICIENT DATA | $11,577 |
+| Sample ledger, saved answers | INSUFFICIENT DATA | $5,217 |
+| Real ledger, engine defaults | INSUFFICIENT DATA | $74,570 |
+| Real ledger, saved answers | INSUFFICIENT DATA | $39,061 |
+
+The real ledger (1 account, 3,069 rows, Sep 2025 to Oct 2026) was YES at $44,882 under policy V2.2.
+V1.7 makes it INSUFFICIENT DATA for 3 reasons:
+
+- 4 material U positions: Accord $14,054, DIB $8,753, Eminent $7,500 and MS Equities $7,045 per month
+  have no collections in 30 covered business days and no closure proof.
+- TD Convenience Checking ...1272 moves $101,390 out by transfer and was not supplied (REQUEST REQUIRED).
+- CHK ...1563 has two-way transfers (VERIFY OWNERSHIP).
+
+Transfers to NST Credit Line ...6298 ($75,672) now count as debt service, which cut HEADLINE from
+$44,882 to $39,061.
+
+## 6. Decisions on record
+
+Signed off 2026-11-02:
+
+| # | Decision |
+| :--- | :--- |
+| B2 | Changed: unresolved credits never block YES. They block NO only when adding them back would reverse it. |
+| B3 | Kept: unverified cadence is U with STRESS = max cleared debit x20. |
+| B8 | Kept: D4 nominates a new payee after a financing credit only if it repeats or shares a word with the sender. |
+| B10 | Kept: an unanswered fixed daily, weekly or biweekly series becomes a WATCH row. |
+
+Waiting for sign-off: B1, B4 to B7, B9, B11 to B21 in `underwriting/docs/V1_7_MATRIX.md`, and the 19
+readings in `underwriting/docs/HANDOFF.md` section 4.1. B18 matters most: a material missing account
+also turns a NO into INSUFFICIENT DATA, while the policy text only asks to stop a YES.
+
+## 7. Verification
+
+| Check | Result on `main` 8db2a61 |
+| :--- | :--- |
+| `node tests/run-node.js` | 208 passed, 0 failed |
+| `python3 -m unittest discover -s tests` in `underwriting/` | 65 passed |
+| Engine self-checks per run | 17 pass on the sample |
+| Report checker on every rendered report | PASS |
+| End-to-end page run (headless Chromium, real engine behind a local server, mocked Pyodide and model, 3-month CSV) | 15 of 15 |
+| Real ledger gross credits per month against the page's `computed` figures | Equal to the cent, 13 of 13 months |
+| `bash tests/run.sh` (macOS JavaScriptCore) | Not run since PR #4 |
+| Real Chrome, real Pyodide, real Claude or OpenRouter key | Never run |
+
+## 8. Locations outside the repo
 
 | Item | Location |
-|---|---|
-| Working copy of the page | `/Users/springfunding/JuniMyAgentVault/03_Agent_Wiki/pdf-vision-ocr/exparsed.html` |
-| Backup before the Desktop-set fixes | same folder, `exparsed.before-desktop-breaks.html` |
-| Unit tests (working copy) | `/Users/springfunding/JuniMyAgentVault/03_Agent_Wiki/pdf-vision-ocr/test-statements/tests/` |
-| OCR server (working copy) | same folder, `mac_ocr_server.py` and `mac_ocr.swift` |
-| OCR server autostart | `~/Library/LaunchAgents/local.exparsed.macocr.plist`, log at `~/Library/Logs/mac_ocr_server.log` |
-| Desktop test set (244 files) | `/Users/springfunding/Desktop/test files for exparsed` |
-| Large test set (about 7,300 files, 5.3 GB) | `/Users/springfunding/JuniMyAgentVault/02_Library_Reference/pdf-vision-ocr/test-statements/FUNDED` |
-| This repo | GitHub only. The vault folder is not a git checkout; copy changed files into a clone to push. |
+| :--- | :--- |
+| Mac working copy of the page | `/Users/springfunding/JuniMyAgentVault/03_Agent_Wiki/pdf-vision-ocr/exparsed.html`. Not a git checkout; copy files into a clone to push. Check it is not older than `main`. |
+| Desktop test set, 244 files | `/Users/springfunding/Desktop/test files for exparsed` |
+| FUNDED set, about 7,300 files, 5.3 GB | `/Users/springfunding/JuniMyAgentVault/02_Library_Reference/pdf-vision-ocr/test-statements/FUNDED` |
+| OCR server log | `~/Library/Logs/mac_ocr_server.log` |
+| Real test ledger and its saved answers | Uploaded to a Claude Code cloud session (`dce0c170-ledger.json`). Temporary; keep a private copy. |
+| Batch-run harness (`serve.py`, `hook.js`, `supervise.py`, `inx*.py`) | Remote branch `batch-harness` (4 commits, 2026-10-27), never merged. |
+| End-to-end harness (`engine_server.py`, `e2e.js`) | Cloud session scratchpad. Temporary; not in the repo. |
 
-The repo holds no customer statements. `tests/samples/` has synthetic files only.
+## 9. Open items, in order
 
-## Running it
+1. **Live run.** Open `main`'s `exparsed.html` in Chrome, add a key, underwrite 3 to 5 real merchant files.
+   Record Pyodide load time, page freeze, model cost, rejected answers. This is the one check never done.
+2. **Holidays for 2027.** `HOLIDAYS` in `underwriting/adapter/exparsed_adapter.py` stops at 2026. Statements
+   from January 2027 will count holidays as business days. Add the Federal Reserve 2027 dates.
+3. **Rejected-answer fallback.** After two rejected answer files the page shows the engine-default report.
+   The V3 handoff says not to publish defaults after a model failure. Fix: show the error and no report.
+4. **Sign-offs.** B18 first, then the other open interpretations (section 6).
+5. **Standards fixes from the 2026-11-02 review:**
+   - Commingling cutoffs, the 3x median rule, cadence cutoffs and the thin-balance factor are inline numbers in `uw.py`; the repo rule asks for named constants.
+   - The worst-status order is defined in 3 files.
+   - `page_run` claims it never raises, but `import uw` sits outside its `try`.
+   - The checker repeats the weekly and daily conversion and hard-codes 0.60 and 20.
+6. **Design review change 1.** One model-call module for OCR, judgments and chat. Today the Anthropic
+   headers are built twice and `prov==='claude'` branches repeat in 3 functions.
+7. **V1.7 gaps D6, L11, L13** and the 20 partial rows (section 5.2).
+8. **Stage manifest** from the V3 handoff: per-stage NOT_STARTED / NEEDS_REVIEW states with input and
+   policy hashes. Not started and not tracked in the matrix.
+9. **Statement reader:** the 9 partial files, the upside-down check in `Bank_Statement_5`, a FUNDED rerun.
+10. **Performance.** Python runs on the page's main thread. CPython takes 0.4 s on the real ledger; Pyodide
+    is 2 to 5 times slower. Move it to a Web Worker if the page freezes.
+11. **Review queue.** Show open questions and Table 1 notes for an underwriter, who answers in the same
+    judgments format.
+12. **Pricing.** Deferred by request; not started.
+13. **Unmerged branches.** 3 remote branches hold commits that are not in `main`:
+    - `batch-harness`: 4 commits, the batch-run harness and `ocr.js` under node. Merge it so batch runs can be repeated.
+    - `uw-engine`: 6 commits, ending with Python 3.9 support for the engine CLI (macOS built-in `python3`). `main` needs Python 3.10+.
+    - `deepen`: 16 commits, an earlier "underwriting as a tab" design that PR #4 replaced. Probably safe to delete after a look.
 
-- Page: open `exparsed.html` in Chrome.
-- OCR server: the launch agent starts `mac_ocr_server.py` at login on `127.0.0.1:8091` and restarts it
-  after a crash. Check it with `launchctl list | grep exparsed` (a PID in the first column means it is up).
-  Manual start: `python3 mac_ocr_server.py`. First start compiles `mac_ocr.swift` into `mac_ocr`
-  (git-ignored). Stop autostart: `launchctl bootout gui/$(id -u)/local.exparsed.macocr`.
-- Unit tests: `bash tests/run.sh` in this repo, or `bash test-statements/tests/run.sh exparsed.html`
-  in the vault folder. Uses macOS JavaScriptCore, no node needed. `node tests/run-node.js` also works.
-  Current result: 231 passed, 0 failed.
-- Run the unit tests after every change to `exparsed.html`.
+    `design-review-fixes`, `rebrand/surge-capital`, `underwriting-in-page` and `v17-batch1` to `v17-batch4` are merged and can be deleted.
 
-## How the page reads a file
+## 10. Rules for the next engineer
 
-Entry is `readFileContent` (line 5642). Line numbers below are for the committed `exparsed.html`.
-
-1. `dispatchFile` (927) picks a reader by file type. PDFs go through pdf.js page text.
-2. `fileOcrNeed` (5223) and `lgDocKind` (3740) decide whether a PDF needs OCR or is not a statement.
-   Split children (`f.splitFrom`) skip the needs-OCR test.
-3. `doOcrMac` (6418) posts scanned pages to the OCR server and gets lines back.
-4. `lgAccountChildren` (5652) splits one file into several ledgers:
-   - `lgSplitAccounts` (4060): one ledger per account heading (Numerica "ID", "Account Number: …",
-     share headings).
-   - `lgSplitStatements` (4091): one ledger per statement when "Page 1 of N" repeats, for files that
-     hold several months.
-5. `lgFileLedger` (4868) builds and caches the ledger (`_ledgerKey`) by running `lgBuild` (3612),
-   which tries the readers in order:
-   - `lgParseColumnar` (2259): statements with sections (Deposits, Withdrawals, Checks, Fees) and a summary.
-   - `lgParsePrintout` (2940): online printouts with a running balance. `lgJoinWrappedCents` (2925)
-     first rejoins cents that wrapped to the next line.
-   - `lgParseCards` (4153): card-style rows.
-   - `lgParseStackedRows` (4192): phone-app screenshots with amount / date and payee / balance on three lines.
-6. Helpers used by all readers:
-   - `lgCleanLine` (2109): fixes OCR and text-layer damage ("124.20-SC", "L,204.00", marks glued to dates).
-   - `lgSectionOf` (1901): maps a heading to a section key (dep, wd, chk, fee, ret, other).
-   - `lgSummaryKey` (2030): maps a summary label to a total.
-   - `lgFindPeriod` (1814): finds the statement period.
-   - `lgNoActivity` (3830): detects statements with no transactions.
-7. `recFromContent` (5662) turns the ledger into the record shown on the page.
-
-## Test results on the Desktop set (244 files)
-
-Text-layer run, after this round of fixes:
-
-| Result | Files |
-|---|---|
-| verified | 140 |
-| multi-account files split into separate ledgers | 23 files, 70 ledgers, all verified |
-| break | 0 (52 at the start) |
-| needs-ocr | 42 |
-| untestable | 23 |
-| not-statement | 8 |
-| partial | 3 |
-| split children counted under their parent | 5 |
-
-OCR run on the 42 needs-ocr files:
-
-| Result | Files |
-|---|---|
-| verified | 29 (21 at the start) |
-| split into statements | 3 files, 9 statements, all verified |
-| partial | 6 |
-| not-statement | 3 |
-| break | 1 (`Bank_Statement_5`) |
-
-Full reruns after each fix showed no file that got worse.
-
-## Fixes made in this round
-
-- Multi-account files read every account as its own ledger (`lgSplitAccounts`, account-number headings,
-  leading zeros stripped from the id).
-- Multi-statement files split on a repeated "Page 1 of N" (`lgSplitStatements`).
-- New headings: PAPER DEPOSITS, FEES AND SERVICE CHARGES, EXPLANATION OF SERVICE FEES, RETURNED CHECKS
-  (`ret` counts as a credit).
-- Share headings such as "CHECKING-E WENAT ID: 10" and hyphenated names ("NON-INTEREST").
-- Two-line balances ("Beginning balance" / "on April 1, 2026 $x") and two unlabelled period dates.
-- Wells Fargo "Totals $x $y" read as the deposit and withdrawal totals.
-- Header balance prefers "Current Ledger Balance" over other "present"/"current" labels.
-- KeyBank dashed dates ("6-30-26") give the period.
-- OCR rows whose date was not read get the date of the next row in the same section, marked "[date not read]".
-- "Balance Forward" accepted as the opening balance; dated balance lines no longer count as activity.
-- Page number glued to a year ("10/16/20261") in card rows.
-- Phone-app stacked layout (`lgParseStackedRows`); `13/14/15_October2026` verify through it.
-
-Tests for these are E13 to E15 in `tests/edge.js`.
-
-## Known open items
-
-- `Bank_Statement_5`: OCR reads one check upside down ("9207/60/90 00087 $217.50"), so the check total
-  is off. Fix would be in the OCR server (detect a rotated region) or a check-row repair in `lgCleanLine`.
-- 6 OCR files and 3 text files are partial. Each is missing one total or balance; none was looked at
-  file by file after the last run.
-- `tests/README.md` mentions statement batches under `../test-statements/`. They hold customer documents
-  and stay out of this repo.
-- `tests/families.js.removed` holds old tests for payee grouping, which moved to the LLM step downstream.
-  It is not run.
-- The FUNDED set (about 7,300 files) was not rerun after this round. Many of its files are applications,
-  IDs, credit reports and contracts.
-
-## AI providers, underwriting and chat (2026-11-02, branch `underwriting-in-page`)
-
-| Item | Where |
-|---|---|
-| Keys | Settings > AI providers: one Claude key and model, one OpenRouter key and model. Held in memory only, as before. |
-| Provider per job | OCR keeps its own pick (Mac OCR, Claude, OpenRouter). Underwriting and chat share a second pick (Claude or OpenRouter). |
-| Underwrite button | Opens a panel over the output pane. Run: ledger export > engine through Pyodide > judgments from the model > engine again > ten-table report. |
-| Engine | `underwriting/` (Python). `underwriting/embed.py` copies it into the page between the `UW-EMBED` markers. |
-| Model calls | `aiRequest` / `aiCall` in the AI CALLS section of the page (pure functions, tested in `tests/ai.js`). Non-streaming, 16,000 max tokens, Claude system prompt cached. |
-| Chat | Same panel. Tools run in the page: `search_rows`, `read_document`, `read_audit`. |
-
-- Claude Opus 5.5, Sonnet 5.5 and Fable 5.1 reject forced `tool_choice`, so judgments use structured output (`output_config.format`).
-- Claude requests to Opus 5.5, Opus 5, Sonnet 5.5 and Fable 5.1 carry server-side refusal fallback (`fallbacks: "default"`, beta header `server-side-fallback-2026-07-01`).
-- First Run downloads Pyodide 0.27.2 (about 10 MB) from cdn.jsdelivr.net; Chrome caches it. Offline, Run fails with a message and chat still works.
-- Python runs on the page's main thread. The real 3,069-row ledger takes 0.4 s in CPython; Pyodide is typically 2 to 5 times slower. Move it to a Web Worker if the page freezes noticeably.
-- Tests: `node tests/run-node.js` gives 208 passed (21 in `tests/ai.js`). `python3 -m unittest discover -s underwriting/tests` gives 56 passed. `tests/run.sh` (JSC) was not run.
-- `tests/extract.py` takes the regions marked `/* @test-begin NAME */` ... `/* @test-end */` in the page and stops when the markers do not pair up. Keep DOM code out of marked regions.
-- Chat reads row objects from `uwChatData`; the export and chat share `lgOwnRows`, so both drop the same duplicate printout rows.
-- Not verified: Pyodide loading in a real browser, and live Claude or OpenRouter calls. A headless-Chrome run with mocked Pyodide (the real engine behind a local server), mocked Claude endpoints and a 3-month CSV passed 15 of 15 checks.
-
-## Test harness (not in the repo)
-
-The batch runs used a local harness in the Claude session scratchpad:
-`/private/tmp/claude-501/-Users-springfunding-JuniMyAgentVault-03-Agent-Wiki-pdf-vision-ocr/926417a5-725d-41c0-9db0-152f7581fc1c/scratchpad/run`.
-That folder is temporary and may be gone. What it did:
-
-- `serve.py` served the page with `hook.js` injected and the test files under `/funded/<name>`.
-  `ONLY=<list>` limited the run to listed files. Results were appended as JSON lines.
-- `hook.js` called `readFileContent` (the page's real path, including the account split) and reported
-  one result per child ledger. With `&ocr=1` it ran `doOcrMac` on scans first.
-- `supervise.py` ran 4 headless Chrome workers through the Chrome DevTools Protocol.
-- `inx.py` / `inxo.py` ran JavaScript in the page for single-file checks (`inxo.py` with OCR).
-- Inside the Claude Code sandbox, binding a local port fails with EPERM. Those commands ran outside the
-  sandbox, or set `sandbox.network.allowLocalBinding: true`.
-
-## Suggested next steps
-
-1. Look at the 9 partial files, biggest bank groups first.
-2. Fix the upside-down check in `Bank_Statement_5`.
-3. Rerun the FUNDED set and compare against the last FUNDED results.
-4. Commit the harness (`serve.py`, `hook.js`, `supervise.py`, `inx*.py`) to this repo so batch runs
-   can be repeated.
+- Run both test suites after every change. Run `python3 underwriting/embed.py` after any change under `underwriting/`.
+- Keep DOM code out of `/* @test-begin NAME */` ... `/* @test-end */` regions; `tests/extract.py` stops when markers do not pair.
+- A policy value changes only with a named constant, a `POLICY_VERSION` bump and underwriter sign-off.
+- A new V1.7 behaviour gets a matrix row update and a test that fails on the old code.
+- The engine decides numbers. The model only answers `questions.json`, and every quote it gives must be verbatim.
