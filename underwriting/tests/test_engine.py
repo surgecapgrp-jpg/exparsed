@@ -2,9 +2,12 @@
 """Regression tests for engine/uw.py. Run: python -m unittest discover -s tests -v"""
 
 import copy
+import importlib.util
 import json
 import sys
 import unittest
+from unittest import mock
+from datetime import date
 from decimal import Decimal as D
 from pathlib import Path
 
@@ -511,6 +514,14 @@ class V17Batch3(unittest.TestCase):
         ev = [e for e in run(led).audit["returns"] if e["cls"] == "UNKNOWN"]
         self.assertEqual((len(ev), ev[0]["tier"], ev[0]["cured"]), (1, "n/a", "n/a"))
 
+    def test_checker_policy_numbers_match_the_engine(self):
+        # The checker keeps its own copy so it stays a separate check; this catches the two drifting apart.
+        spec = importlib.util.spec_from_file_location("chk", ROOT / "checker" / "validate_report.py")
+        chk = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(chk)
+        names = ("HOLDBACK_SHARE", "BUSINESS_DAYS_PER_MONTH", "WEEKS_PER_MONTH", "WORST_ORDER")
+        self.assertEqual([getattr(chk, n) for n in names], [getattr(uw, n) for n in names])
+
     def test_checker_needs_both_v17_lines_once_and_in_order(self):
         rep = run().report
         line = next(l for l in rep.splitlines() if l.startswith("- **Commingling:**"))
@@ -666,6 +677,52 @@ class RealDataShapes(unittest.TestCase):
         )
         self.assertEqual(out["accounts"][0]["integrity"], "Pass")
         uw.underwrite(raw(out))
+
+    def one_file_src(self, start, end):
+        return {
+            "format": "ledger-v1",
+            "computed": [],
+            "files": [
+                {
+                    "name": "y.pdf",
+                    "accountLast4": "4321",
+                    "status": "verified",
+                    "checks": [],
+                    "provenance": None,
+                    "period": {"start": start, "end": end},
+                    "columns": "date|section|amount|balance|page|description",
+                    "rows": [f"{start}|dep|100.00|100.00|1|ACH CREDIT ACME"],
+                }
+            ],
+        }
+
+    def test_2027_federal_reserve_holidays_are_not_business_days(self):
+        sys.path.insert(0, str(ROOT / "adapter"))
+        import exparsed_adapter
+
+        cal = uw.Cal(exparsed_adapter.convert(self.one_file_src("2027-01-01", "2027-12-31"), [])["holidays"])
+        # Federal Reserve 2027: Sunday July 4 moves to Monday; Saturday June 19 and December 25 are not observed.
+        closed = ["2027-01-01", "2027-01-18", "2027-02-15", "2027-05-31", "2027-07-05",
+                  "2027-09-06", "2027-10-11", "2027-11-11", "2027-11-25"]
+        self.assertEqual([d for d in closed if cal.is_bd(date.fromisoformat(d))], [])
+        self.assertTrue(cal.is_bd(date(2027, 6, 18)) and cal.is_bd(date(2027, 12, 24)))
+
+    def test_statement_in_a_year_without_holidays_is_a_clear_error(self):
+        sys.path.insert(0, str(ROOT / "adapter"))
+        import exparsed_adapter
+
+        r = json.loads(exparsed_adapter.page_run(json.dumps(self.one_file_src("2027-12-01", "2028-01-31"))))
+        self.assertEqual(r["ok"], False)
+        self.assertIn("no Federal Reserve holidays for 2028", r["error"])
+
+    def test_page_run_returns_an_error_when_the_engine_cannot_load(self):
+        sys.path.insert(0, str(ROOT / "adapter"))
+        import exparsed_adapter
+
+        with mock.patch.dict(sys.modules, {"uw": None}):  # None makes `import uw` raise ImportError
+            r = json.loads(exparsed_adapter.page_run(json.dumps(self.statement_src())))
+        self.assertEqual(r["ok"], False)
+        self.assertIn("engine did not load", r["error"])
 
     def statement_src(self, computed=()):
         # A sectioned statement: 6 columns, oldest first, no balances.

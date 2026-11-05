@@ -15,7 +15,7 @@ underwrites the merchant for MCA capacity under policy V1.7.
 | Underwriting engine | Experiment. Policy V1.7 batches 1 to 4 merged. Run on 1 real ledger and 1 synthetic ledger. |
 | Underwrite button and chat | Built and tested with a mocked browser run. Never run in real Chrome with real Pyodide and a real key. |
 | UI | Surge Capital theme (PR #9, merged 2026-11-04). |
-| Tests | 213 JS tests, 66 engine tests, 15 end-to-end page checks: all pass on `main`. |
+| Tests | 214 JS tests, 70 engine tests, 15 end-to-end page checks: all pass on `main`. |
 
 The next step is a real Chrome run on 3 to 5 real merchant files (section 9, item 1).
 
@@ -31,7 +31,7 @@ The next step is a real Chrome run on 3 to 5 real merchant files (section 9, ite
 | `underwriting/prompts/judge.md` | System prompt for the judgment call. |
 | `underwriting/schemas/` | `ledger.schema.json` (engine input) and `judgments.schema.json` (model output, also sent as the structured-output schema). |
 | `underwriting/embed.py` | Copies engine, adapter, checker and prompt into `exparsed.html` between the `UW-EMBED` markers (lines 454 to 4200). |
-| `underwriting/tests/` | `test_engine.py` (66 tests), `make_fixture.py`, `fixtures/sample_ledger.json` (321 rows, Jun to Sep 2026) and `fixtures/sample_judgments.json`. |
+| `underwriting/tests/` | `test_engine.py` (70 tests), `make_fixture.py`, `fixtures/sample_ledger.json` (321 rows, Jun to Sep 2026) and `fixtures/sample_judgments.json`. |
 | `underwriting/docs/HANDOFF.md` | Engine design, contracts, trust boundary, interpretations 1 to 19. |
 | `underwriting/docs/V1_7_MATRIX.md` | 150 V1.7 rules mapped to code, interpretations B1 to B21, effect of each batch on saved runs. |
 | `tests/` | JS unit tests for the page (`run-node.js` or `run.sh`), `extract.py`, synthetic samples. |
@@ -50,8 +50,8 @@ The repo holds no customer statements. The one real ledger used for testing sits
 | OCR server | Starts at login through `~/Library/LaunchAgents/local.exparsed.macocr.plist`. Manual: `python3 mac_ocr_server.py`. Check: `launchctl list \| grep exparsed`. |
 | Keys | Settings > AI providers. One Claude key and model, one OpenRouter key and model. Held in memory only, lost on reload. |
 | Underwrite | Underwrite button > Run. First run downloads Pyodide 0.27.2 (about 10 MB) from cdn.jsdelivr.net. |
-| Page tests | `node tests/run-node.js` (213 pass) or `bash tests/run.sh` on macOS. |
-| Engine tests | `cd underwriting && python3 -m unittest discover -s tests` (66 pass). |
+| Page tests | `node tests/run-node.js` (214 pass) or `bash tests/run.sh` on macOS. |
+| Engine tests | `cd underwriting && python3 -m unittest discover -s tests` (70 pass). |
 | Engine CLI | `python3 underwriting/engine/uw.py underwriting/tests/fixtures/sample_ledger.json --out run/` |
 | After an engine change | `python3 underwriting/embed.py`. Test `PageEmbed` fails until the page copy matches. |
 
@@ -162,7 +162,7 @@ Rollback point before all underwriting work: `283bc50`.
 | Code | `aiRequest` (9209), `aiParse` (9227), `aiCall` (9244), `uwJudgeOnce` (9274), `uwUnderwrite` (9287), `uwRun` (10720) |
 | Provider pick | OCR has its own pick. Underwriting and chat share a second pick (Claude or OpenRouter). |
 | Judgment call | Non-streaming, 16,000 max tokens, Claude system prompt cached. Claude gets `output_config.format`; OpenRouter gets `response_format`. A 400 retries once without the schema. |
-| Rejected answers | The engine error goes back to the model once. A second rejection shows the engine-default report with a red status line. |
+| Rejected answers | The engine error goes back to the model once. A second rejection shows the error and no report. |
 | Export | Underwrite calls `lgLedgerExport(list, {redact:false, compact:false})`, so the engine sees the printed text (ORIG ID included) whatever the Redact and Compact toggles say. The export buttons still follow the toggles. |
 | Bad input | A ledger row with an impossible date stops the run with `bad date` and the transaction id. |
 | Fallback | Claude requests carry server-side refusal fallback (`fallbacks: "default"`). |
@@ -207,8 +207,8 @@ also turns a NO into INSUFFICIENT DATA, while the policy text only asks to stop 
 
 | Check | Result on `main` 6323ae9 |
 | :--- | :--- |
-| `node tests/run-node.js` | 213 passed, 0 failed |
-| `python3 -m unittest discover -s tests` in `underwriting/` | 66 passed |
+| `node tests/run-node.js` | 214 passed, 0 failed |
+| `python3 -m unittest discover -s tests` in `underwriting/` | 70 passed |
 | Engine self-checks per run | 17 pass on the sample |
 | Report checker on every rendered report | PASS |
 | End-to-end page run (headless Chromium, real engine behind a local server, mocked Pyodide and model, 3-month CSV) | 15 of 15 |
@@ -232,16 +232,16 @@ also turns a NO into INSUFFICIENT DATA, while the policy text only asks to stop 
 
 1. **Live run.** Open `main`'s `exparsed.html` in Chrome, add a key, underwrite 3 to 5 real merchant files.
    Record Pyodide load time, page freeze, model cost, rejected answers. This is the one check never done.
-2. **Holidays for 2027.** `HOLIDAYS` in `underwriting/adapter/exparsed_adapter.py` stops at 2026. Statements
-   from January 2027 will count holidays as business days. Add the Federal Reserve 2027 dates.
-3. **Rejected-answer fallback.** After two rejected answer files the page shows the engine-default report.
-   The V3 handoff says not to publish defaults after a model failure. Fix: show the error and no report.
+2. **Holidays.** Done in PR #14: the 9 Federal Reserve 2027 dates are in `HOLIDAYS`. A statement period
+   that reaches a year with no dates now stops with "no Federal Reserve holidays for YYYY". Add 2028 before
+   December 2027 statements arrive.
+3. **Rejected-answer fallback.** Done in PR #14: a second rejection shows "Engine stopped: answers rejected
+   twice (...); no report" and clears any earlier report.
 4. **Sign-offs.** B18 first, then the other open interpretations (section 6).
-5. **Standards fixes from the 2026-11-02 review:**
-   - Commingling cutoffs, the 3x median rule, cadence cutoffs and the thin-balance factor are inline numbers in `uw.py`; the repo rule asks for named constants.
-   - The worst-status order is defined in 3 files.
-   - `page_run` claims it never raises, but `import uw` sits outside its `try`.
-   - The checker repeats the weekly and daily conversion and hard-codes 0.60 and 20.
+5. **Standards fixes from the 2026-11-02 review.** Done in PR #14. The engine's inline numbers are named
+   constants at the top of `uw.py`. The adapter uses `uw.WORST_ORDER`. `import uw` sits inside `page_run`'s
+   `try`. The checker keeps its own named copy of 4 policy numbers, and a test fails when they differ from the
+   engine's. Report and audit output is byte-identical on the 4 saved runs.
 6. **Design review change 1.** One model-call module for OCR, judgments and chat. Today the Anthropic
    headers are built twice and `prov==='claude'` branches repeat in 3 functions.
 7. **V1.7 gaps D6, L11, L13** and the 20 partial rows (section 5.2).

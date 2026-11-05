@@ -72,9 +72,18 @@ RETURN_MATCH_BD = 5  # recredit must follow its debit within this many business 
 CHAIN_GAP_BD = 10  # re-presentments within this gap belong to one attempt chain
 TOP_STREAMS = 6
 FIXED_SHARE = D("0.8")   # share of payments in same-amount runs that makes a series fixed-amount
+LARGE_DEPOSIT_MULTIPLE = 3  # a credit at this multiple of the median deposit is unusual
+SCORE_NEAR_CAL = 3  # funding credit within this many calendar days of its first debit scores +1
+THIN_BALANCE_DAYS = 3  # THIN_BALANCE = this many business days of the live stack's daily cost
+# Business-day gap between debits -> cadence: <=2 daily, <=7 weekly, <=12 biweekly, 18 to 25 monthly.
+GAP_DAILY_BD, GAP_WEEKLY_BD, GAP_BIWEEKLY_BD, GAP_MONTHLY_BD = 2, 7, 12, (18, 25)
+# Credits per month -> revenue-stream cadence in Table 3.
+STREAM_DAILY_PER_MONTH, STREAM_WEEKLY_PER_MONTH = 15, D("3.5")
+# Commingling severity per account-month: High above 10 items or 15% of gross; Moderate at 3 items or MATERIAL_SHARE.
+COMMINGLING_HIGH_ITEMS, COMMINGLING_HIGH_SHARE, COMMINGLING_MODERATE_ITEMS = 10, D("0.15"), 3
 
 INTEGRITY = ("Pass", "Pass with flag", "Unverified", "Break")  # best to worst
-WORST_ORDER = ("Break", "Unverified", "Pass with flag", "Pass")
+WORST_ORDER = INTEGRITY[::-1]
 SUFFIX = {
     "Pass": "",
     "Pass with flag": " (FLAGGED)",
@@ -462,9 +471,9 @@ def mean(xs):
 def gap_class(bd):
     return (
         "daily"
-        if bd <= 2
-        else "weekly" if bd <= 7 else "biweekly" if bd <= 12
-        else "monthly" if 18 <= bd <= 25 else "irregular"
+        if bd <= GAP_DAILY_BD
+        else "weekly" if bd <= GAP_WEEKLY_BD else "biweekly" if bd <= GAP_BIWEEKLY_BD
+        else "monthly" if GAP_MONTHLY_BD[0] <= bd <= GAP_MONTHLY_BD[1] else "irregular"
     )
 
 
@@ -903,7 +912,7 @@ class _Engine:
             # Size alone does not make a recurring customer payer's deposit unusual.
             if (
                 self.median
-                and t.amt >= 3 * self.median
+                and t.amt >= LARGE_DEPOSIT_MULTIPLE * self.median
                 and t.norm not in self.established
             ):
                 why.append(
@@ -1664,7 +1673,7 @@ class _Engine:
                     gate=self.gate.get(cid),
                     evidence=GATE_LEVEL[self.gate[cid]["kind"]] if cid in self.gate else "UNKNOWN",
                     expanded_triggers=wide,
-                    expanded_outcome=f"INVESTIGATE: {len(wide)} trigger(s) within 30 days" if wide else "searched; none",
+                    expanded_outcome=f"INVESTIGATE: {len(wide)} trigger(s) within {EXPANDED_WINDOW_CAL} days" if wide else "searched; none",
                 )
             )
         self.set_evidence()
@@ -1708,12 +1717,12 @@ class _Engine:
             # V1.7 M8: a wire scores only when it names the funder or carries finance wording.
             pts += 2
             basis.append("+2 explicit financing / finance wire")
-        if self.median and c.amt >= 3 * self.median:
+        if self.median and c.amt >= LARGE_DEPOSIT_MULTIPLE * self.median:
             pts += 2
-            basis.append("+2 >=3x median deposit")
-        if 0 <= (tr["date"] - c.date).days <= 3:
+            basis.append(f"+2 >={LARGE_DEPOSIT_MULTIPLE}x median deposit")
+        if 0 <= (tr["date"] - c.date).days <= SCORE_NEAR_CAL:
             pts += 1
-            basis.append("+1 within 3 calendar days")
+            basis.append(f"+1 within {SCORE_NEAR_CAL} calendar days")
         if c.norm in self.established:
             pts -= 3
             basis.append("-3 established customer pattern")
@@ -1814,7 +1823,7 @@ class _Engine:
             )
             per = D(len(ts)) / max(1, len(self.months))
             cadence = (
-                "daily" if per >= 15 else "weekly" if per >= D("3.5") else "irregular"
+                "daily" if per >= STREAM_DAILY_PER_MONTH else "weekly" if per >= STREAM_WEEKLY_PER_MONTH else "irregular"
             )
             present = sum(1 for v in per_month if v > 0)
             self.stream_rows.append(
@@ -1954,9 +1963,9 @@ class _Engine:
                 poss.append(t)
 
         def severity(items, share):
-            if len(items) > 10 or (share is not None and share > D("0.15")):
+            if len(items) > COMMINGLING_HIGH_ITEMS or (share is not None and share > COMMINGLING_HIGH_SHARE):
                 return "High"
-            if len(items) >= 3 or (share is not None and share >= MATERIAL_SHARE):
+            if len(items) >= COMMINGLING_MODERATE_ITEMS or (share is not None and share >= MATERIAL_SHARE):
                 return "Moderate"
             return "Low"
 
@@ -2223,7 +2232,7 @@ class _Engine:
             or OD_XFER.search(t.desc.upper())
         }
         self.fees = [t for t in self.txns if t.tag == "FEE_NSF_OD"]
-        self.thin = 3 * (self.stack / BUSINESS_DAYS_PER_MONTH)
+        self.thin = THIN_BALANCE_DAYS * (self.stack / BUSINESS_DAYS_PER_MONTH)
         self.combined = {}
         if all(eod.get(a) for a in self.accts):
             start = max(min(eod[a]) for a in self.accts)
