@@ -125,14 +125,14 @@ V2.2 leaves these points open. The engine picks one reading and states it here s
 - PDF Path B extraction checks. Exparsed already extracts and reconciles; the adapter passes its status through.
 - Reverse-consolidation disclosure by month.
 - Same-name renewal after a gap is handled as STOPPED then RESTARTED inside one position, with a funding search on the restart. V2.2 4E describes the same outcome.
-- A holiday calendar beyond 2026. `adapter/exparsed_adapter.py` carries Federal Reserve holidays for 2025 and 2026; extend `HOLIDAYS` each year.
+- A holiday calendar beyond 2027. `adapter/exparsed_adapter.py` carries Federal Reserve holidays for 2025 to 2027 and stops with an error on a later year; extend `HOLIDAYS` each year.
 
 ## 5. Integration into Exparsed
 
 1. `adapter/exparsed_adapter.py` reads the Exparsed `ledger-v1` export: `files[].rows` pipe rows, newest first, pending rows dropped, file `status` mapped to the Table 1 verdict. Transaction IDs are SHA-1 of account, date, amount, printed balance and description, since the export has none. Add funding agreements and payoff letters to `documents` when the merchant uploads them.
 2. `exparsed.html` runs the engine in the browser. The Underwrite button builds the `ledger-v1` export from the loaded files, loads Pyodide 0.27.2 from jsdelivr on first use, writes the embedded sources into its file system, and calls `page_run(ledger)`.
 3. The page sends `questions.json` with `prompts/judge.md` as the system prompt to the provider picked under Settings > AI providers > Underwriting and chat. Claude gets `output_config.format` (JSON schema); OpenRouter gets `response_format`. A 400 on the schema retries once without it.
-4. `page_run(ledger, judgments)` validates and applies the answers. If the engine rejects them, the page sends the engine's error back to the model once and applies the corrected file. A second rejection shows the default report with the reason.
+4. `page_run(ledger, judgments)` validates and applies the answers. If the engine rejects them, the page sends the engine's error back to the model once and applies the corrected file. A second rejection shows the reason and no report.
 5. The panel shows `report.md` and offers the report, `audit.json` and the judgments as downloads.
 6. Chat in the same panel uses the same key. The model reads ledger rows, extracted documents and audit sections through three local tools (`search_rows`, `read_document`, `read_audit`), so the 642 KB ledger is never sent whole. Tool results are capped at 60,000 characters; a turn stops after 8 tool rounds.
 7. Open item: show open questions and Table 1 notes as an underwriter review queue. An underwriter answer can use the same judgments format, so the model and the human share one path.
@@ -141,7 +141,7 @@ V2.2 leaves these points open. The engine picks one reading and states it here s
 
 | Check | Result |
 | :--- | :--- |
-| `python -m unittest discover -s tests` | 65 tests pass |
+| `python -m unittest discover -s tests` | 70 tests pass |
 | V1.7 report checker on every report the tests render | PASS (run inside `underwrite()`) |
 | Self-checks per run (unrounded) | 17 pass on the sample |
 | Fixtures against JSON Schemas | Pass with `jsonschema` 4.26 |

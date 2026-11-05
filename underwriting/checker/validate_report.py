@@ -23,6 +23,13 @@ import sys
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
+# Policy numbers, copied from engine/uw.py so this check does not run engine code.
+# test_checker_policy_numbers_match_the_engine fails when the two copies differ.
+HOLDBACK_SHARE = Decimal("0.60")
+BUSINESS_DAYS_PER_MONTH = Decimal(20)
+WEEKS_PER_MONTH = Decimal(52) / Decimal(12)
+WORST_ORDER = ("Break", "Unverified", "Pass with flag", "Pass")
+
 SPEC = [
     ("Table 1 — Coverage & Integrity", ["Account", "Months Covered", "Months Counted", "Missing/Partial", "Balance Reconstruction (Pass/Break)", "Notes"]),
     ("Table 2 — Monthly Revenue", ["Month", "Days Counted", "Gross Credits", "Stripped Inflows", "True Revenue", "Counted?"]),
@@ -132,13 +139,25 @@ def unique(rows, names, col=0, title="table"):
         require(sum(r[col] == name for r in rows) == 1, f"{title}: expected one {name}")
 
 
+def conversions(r, table):
+    """Weekly and daily cells must equal monthly / WEEKS_PER_MONTH and / BUSINESS_DAYS_PER_MONTH. Returns monthly."""
+    m=money(r[1],f"{table} {r[0]} monthly",True)
+    w=money(r[2],f"{table} {r[0]} weekly",True)
+    d=money(r[3],f"{table} {r[0]} daily",True)
+    if m is not None and w is not None:
+        require(abs(w-m/WEEKS_PER_MONTH) <= Decimal("0.62"),f"{table} {r[0]} weekly conversion mismatch")
+    if m is not None and d is not None:
+        require(abs(d-m/BUSINESS_DAYS_PER_MONTH) <= Decimal("0.53"),f"{table} {r[0]} daily conversion mismatch")
+    return m
+
+
 def validate(t):
     t1 = t[SPEC[0][0]]
     for row in t1:
         if row[0] == "None": continue
-        require(row[4] in ("Pass", "Unverified", "Pass with flag", "Break"), "Table 1: invalid status")
+        require(row[4] in WORST_ORDER, "Table 1: invalid status")
     severities = [r[4] for r in t1 if r[0] != "None"]
-    worst = next((x for x in ("Break", "Unverified", "Pass with flag", "Pass") if x in severities), None)
+    worst = next((x for x in WORST_ORDER if x in severities), None)
 
     t2 = t[SPEC[1][0]]
     unique(t2,["TOR","Last-3 Avg","BASIS"],title="Table 2")
@@ -236,13 +255,7 @@ def validate(t):
     if stack is not None and current is not None:
         require(rounded_equal(stack,current,2),"Table 4b current does not equal stack")
     for r in t4b:
-        monthly=money(r[1],f"Table 4b {r[0]} monthly",True)
-        weekly=money(r[2],f"Table 4b {r[0]} weekly",True)
-        daily=money(r[3],f"Table 4b {r[0]} daily",True)
-        if monthly is not None and weekly is not None:
-            require(abs(weekly-monthly*12/52) <= Decimal("0.62"),f"Table 4b {r[0]} weekly conversion mismatch")
-        if monthly is not None and daily is not None:
-            require(abs(daily-monthly/Decimal("20")) <= Decimal("0.53"),f"Table 4b {r[0]} daily conversion mismatch")
+        conversions(r, "Table 4b")
     for j in (1,2,3):
         p=money(t4b[0][j],"peak",True)
         c=money(t4b[1][j],"current",True)
@@ -279,13 +292,13 @@ def validate(t):
 
     rooms={r[0]:money(r[1],r[0],True) for r in t5[-4:]}
     if basis is not None and stack is not None:
-        for room, expected in (("Room A",basis-stack),("Room B",Decimal("0.60")*basis-stack)):
+        for room, expected in (("Room A",basis-stack),("Room B",HOLDBACK_SHARE*basis-stack)):
             if rooms[room] is not None:
                 require(rounded_equal(rooms[room],expected,3),f"Table 5: {room} mismatch")
         if obligations is not None and rooms["Room C"] is not None:
             require(rounded_equal(rooms["Room C"],basis-stack-obligations,max(3,len(t5))),"Table 5: Room C mismatch")
         if counted and all(v is not None for v in counted) and rooms["Room D"] is not None:
-            expected_d=Decimal("0.60")*min(counted)-stack
+            expected_d=HOLDBACK_SHARE*min(counted)-stack
             require(rounded_equal(rooms["Room D"],expected_d,3),"Table 5: Room D mismatch")
 
     t6=t[SPEC[6][0]]
@@ -311,13 +324,7 @@ def validate(t):
             cons="; CONSERVATIVE: Room C" if rooms["Room C"] <= rooms["Room D"] else "; CONSERVATIVE: Room D (worst month "
             require(cons in t6[2][1],"Table 6: conservative binding room missing or wrong")
     for r in t6[:2]:
-        m=money(r[1],f"Table 6 {r[0]} monthly",True)
-        w=money(r[2],f"Table 6 {r[0]} weekly",True)
-        d=money(r[3],f"Table 6 {r[0]} daily",True)
-        if m is not None and w is not None:
-            require(abs(w-m*12/52) <= Decimal("0.62"),f"Table 6 {r[0]} weekly conversion mismatch")
-        if m is not None and d is not None:
-            require(abs(d-m/Decimal("20")) <= Decimal("0.53"),f"Table 6 {r[0]} daily conversion mismatch")
+        m=conversions(r, "Table 6")
         pct=r[4]
         if basis is not None and basis>0 and m is not None and pct!="—":
             percent=money(pct,"Payment % of Basis")

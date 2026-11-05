@@ -83,7 +83,7 @@ function engineFake(rejectFirst){
   var n=0;
   return function(j){ n++;
     if(!j) return { ok:true, questions:Q, report:'defaults' };
-    if(rejectFirst && n===2) return { ok:false, error:'judgment Q-debit-1: quote not in transaction text' };
+    if(rejectFirst==='always' || rejectFirst && n===2) return { ok:false, error:'judgment Q-debit-1: quote not in transaction text' };
     var parsed=JSON.parse(j); return { ok:true, report:'with '+parsed.answers.length+' answers, sha '+parsed.ledger_sha256 };
   };
 }
@@ -98,6 +98,10 @@ uwUnderwrite('claude', cfgC, 'P', engineFake(true), fakeJudge([good, good]), fun
 });
 uwUnderwrite('claude', null, 'P', engineFake(false), fakeJudge([good]), function(){}).then(function(o){
   T('A14 no provider: engine defaults with a note', o.result.report==='defaults' && /defaults/.test(o.note), o);
+});
+
+uwUnderwrite('claude', cfgC, 'P', engineFake('always'), fakeJudge([good, good]), function(){}).then(function(o){
+  T('A14b answers rejected twice: an error and no engine-default report', !o.result.ok && /rejected twice/.test(o.result.error) && /quote not in transaction text/.test(o.result.error) && o.result.report===undefined, o);
 });
 
 // A15 structured output rejected by an older model: same request again without the schema

@@ -526,9 +526,18 @@ RETURN_MATCH_BD = 5  # recredit must follow its debit within this many business 
 CHAIN_GAP_BD = 10  # re-presentments within this gap belong to one attempt chain
 TOP_STREAMS = 6
 FIXED_SHARE = D("0.8")   # share of payments in same-amount runs that makes a series fixed-amount
+LARGE_DEPOSIT_MULTIPLE = 3  # a credit at this multiple of the median deposit is unusual
+SCORE_NEAR_CAL = 3  # funding credit within this many calendar days of its first debit scores +1
+THIN_BALANCE_DAYS = 3  # THIN_BALANCE = this many business days of the live stack's daily cost
+# Business-day gap between debits -> cadence: <=2 daily, <=7 weekly, <=12 biweekly, 18 to 25 monthly.
+GAP_DAILY_BD, GAP_WEEKLY_BD, GAP_BIWEEKLY_BD, GAP_MONTHLY_BD = 2, 7, 12, (18, 25)
+# Credits per month -> revenue-stream cadence in Table 3.
+STREAM_DAILY_PER_MONTH, STREAM_WEEKLY_PER_MONTH = 15, D("3.5")
+# Commingling severity per account-month: High above 10 items or 15% of gross; Moderate at 3 items or MATERIAL_SHARE.
+COMMINGLING_HIGH_ITEMS, COMMINGLING_HIGH_SHARE, COMMINGLING_MODERATE_ITEMS = 10, D("0.15"), 3
 
 INTEGRITY = ("Pass", "Pass with flag", "Unverified", "Break")  # best to worst
-WORST_ORDER = ("Break", "Unverified", "Pass with flag", "Pass")
+WORST_ORDER = INTEGRITY[::-1]
 SUFFIX = {
     "Pass": "",
     "Pass with flag": " (FLAGGED)",
@@ -916,9 +925,9 @@ def mean(xs):
 def gap_class(bd):
     return (
         "daily"
-        if bd <= 2
-        else "weekly" if bd <= 7 else "biweekly" if bd <= 12
-        else "monthly" if 18 <= bd <= 25 else "irregular"
+        if bd <= GAP_DAILY_BD
+        else "weekly" if bd <= GAP_WEEKLY_BD else "biweekly" if bd <= GAP_BIWEEKLY_BD
+        else "monthly" if GAP_MONTHLY_BD[0] <= bd <= GAP_MONTHLY_BD[1] else "irregular"
     )
 
 
@@ -1357,7 +1366,7 @@ class _Engine:
             # Size alone does not make a recurring customer payer's deposit unusual.
             if (
                 self.median
-                and t.amt >= 3 * self.median
+                and t.amt >= LARGE_DEPOSIT_MULTIPLE * self.median
                 and t.norm not in self.established
             ):
                 why.append(
@@ -2118,7 +2127,7 @@ class _Engine:
                     gate=self.gate.get(cid),
                     evidence=GATE_LEVEL[self.gate[cid]["kind"]] if cid in self.gate else "UNKNOWN",
                     expanded_triggers=wide,
-                    expanded_outcome=f"INVESTIGATE: {len(wide)} trigger(s) within 30 days" if wide else "searched; none",
+                    expanded_outcome=f"INVESTIGATE: {len(wide)} trigger(s) within {EXPANDED_WINDOW_CAL} days" if wide else "searched; none",
                 )
             )
         self.set_evidence()
@@ -2162,12 +2171,12 @@ class _Engine:
             # V1.7 M8: a wire scores only when it names the funder or carries finance wording.
             pts += 2
             basis.append("+2 explicit financing / finance wire")
-        if self.median and c.amt >= 3 * self.median:
+        if self.median and c.amt >= LARGE_DEPOSIT_MULTIPLE * self.median:
             pts += 2
-            basis.append("+2 >=3x median deposit")
-        if 0 <= (tr["date"] - c.date).days <= 3:
+            basis.append(f"+2 >={LARGE_DEPOSIT_MULTIPLE}x median deposit")
+        if 0 <= (tr["date"] - c.date).days <= SCORE_NEAR_CAL:
             pts += 1
-            basis.append("+1 within 3 calendar days")
+            basis.append(f"+1 within {SCORE_NEAR_CAL} calendar days")
         if c.norm in self.established:
             pts -= 3
             basis.append("-3 established customer pattern")
@@ -2268,7 +2277,7 @@ class _Engine:
             )
             per = D(len(ts)) / max(1, len(self.months))
             cadence = (
-                "daily" if per >= 15 else "weekly" if per >= D("3.5") else "irregular"
+                "daily" if per >= STREAM_DAILY_PER_MONTH else "weekly" if per >= STREAM_WEEKLY_PER_MONTH else "irregular"
             )
             present = sum(1 for v in per_month if v > 0)
             self.stream_rows.append(
@@ -2408,9 +2417,9 @@ class _Engine:
                 poss.append(t)
 
         def severity(items, share):
-            if len(items) > 10 or (share is not None and share > D("0.15")):
+            if len(items) > COMMINGLING_HIGH_ITEMS or (share is not None and share > COMMINGLING_HIGH_SHARE):
                 return "High"
-            if len(items) >= 3 or (share is not None and share >= MATERIAL_SHARE):
+            if len(items) >= COMMINGLING_MODERATE_ITEMS or (share is not None and share >= MATERIAL_SHARE):
                 return "Moderate"
             return "Low"
 
@@ -2677,7 +2686,7 @@ class _Engine:
             or OD_XFER.search(t.desc.upper())
         }
         self.fees = [t for t in self.txns if t.tag == "FEE_NSF_OD"]
-        self.thin = 3 * (self.stack / BUSINESS_DAYS_PER_MONTH)
+        self.thin = THIN_BALANCE_DAYS * (self.stack / BUSINESS_DAYS_PER_MONTH)
         self.combined = {}
         if all(eod.get(a) for a in self.accts):
             start = max(min(eod[a]) for a in self.accts)
@@ -3558,6 +3567,13 @@ import sys
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
+# Policy numbers, copied from engine/uw.py so this check does not run engine code.
+# test_checker_policy_numbers_match_the_engine fails when the two copies differ.
+HOLDBACK_SHARE = Decimal("0.60")
+BUSINESS_DAYS_PER_MONTH = Decimal(20)
+WEEKS_PER_MONTH = Decimal(52) / Decimal(12)
+WORST_ORDER = ("Break", "Unverified", "Pass with flag", "Pass")
+
 SPEC = [
     ("Table 1 — Coverage & Integrity", ["Account", "Months Covered", "Months Counted", "Missing/Partial", "Balance Reconstruction (Pass/Break)", "Notes"]),
     ("Table 2 — Monthly Revenue", ["Month", "Days Counted", "Gross Credits", "Stripped Inflows", "True Revenue", "Counted?"]),
@@ -3667,13 +3683,25 @@ def unique(rows, names, col=0, title="table"):
         require(sum(r[col] == name for r in rows) == 1, f"{title}: expected one {name}")
 
 
+def conversions(r, table):
+    """Weekly and daily cells must equal monthly / WEEKS_PER_MONTH and / BUSINESS_DAYS_PER_MONTH. Returns monthly."""
+    m=money(r[1],f"{table} {r[0]} monthly",True)
+    w=money(r[2],f"{table} {r[0]} weekly",True)
+    d=money(r[3],f"{table} {r[0]} daily",True)
+    if m is not None and w is not None:
+        require(abs(w-m/WEEKS_PER_MONTH) <= Decimal("0.62"),f"{table} {r[0]} weekly conversion mismatch")
+    if m is not None and d is not None:
+        require(abs(d-m/BUSINESS_DAYS_PER_MONTH) <= Decimal("0.53"),f"{table} {r[0]} daily conversion mismatch")
+    return m
+
+
 def validate(t):
     t1 = t[SPEC[0][0]]
     for row in t1:
         if row[0] == "None": continue
-        require(row[4] in ("Pass", "Unverified", "Pass with flag", "Break"), "Table 1: invalid status")
+        require(row[4] in WORST_ORDER, "Table 1: invalid status")
     severities = [r[4] for r in t1 if r[0] != "None"]
-    worst = next((x for x in ("Break", "Unverified", "Pass with flag", "Pass") if x in severities), None)
+    worst = next((x for x in WORST_ORDER if x in severities), None)
 
     t2 = t[SPEC[1][0]]
     unique(t2,["TOR","Last-3 Avg","BASIS"],title="Table 2")
@@ -3771,13 +3799,7 @@ def validate(t):
     if stack is not None and current is not None:
         require(rounded_equal(stack,current,2),"Table 4b current does not equal stack")
     for r in t4b:
-        monthly=money(r[1],f"Table 4b {r[0]} monthly",True)
-        weekly=money(r[2],f"Table 4b {r[0]} weekly",True)
-        daily=money(r[3],f"Table 4b {r[0]} daily",True)
-        if monthly is not None and weekly is not None:
-            require(abs(weekly-monthly*12/52) <= Decimal("0.62"),f"Table 4b {r[0]} weekly conversion mismatch")
-        if monthly is not None and daily is not None:
-            require(abs(daily-monthly/Decimal("20")) <= Decimal("0.53"),f"Table 4b {r[0]} daily conversion mismatch")
+        conversions(r, "Table 4b")
     for j in (1,2,3):
         p=money(t4b[0][j],"peak",True)
         c=money(t4b[1][j],"current",True)
@@ -3814,13 +3836,13 @@ def validate(t):
 
     rooms={r[0]:money(r[1],r[0],True) for r in t5[-4:]}
     if basis is not None and stack is not None:
-        for room, expected in (("Room A",basis-stack),("Room B",Decimal("0.60")*basis-stack)):
+        for room, expected in (("Room A",basis-stack),("Room B",HOLDBACK_SHARE*basis-stack)):
             if rooms[room] is not None:
                 require(rounded_equal(rooms[room],expected,3),f"Table 5: {room} mismatch")
         if obligations is not None and rooms["Room C"] is not None:
             require(rounded_equal(rooms["Room C"],basis-stack-obligations,max(3,len(t5))),"Table 5: Room C mismatch")
         if counted and all(v is not None for v in counted) and rooms["Room D"] is not None:
-            expected_d=Decimal("0.60")*min(counted)-stack
+            expected_d=HOLDBACK_SHARE*min(counted)-stack
             require(rounded_equal(rooms["Room D"],expected_d,3),"Table 5: Room D mismatch")
 
     t6=t[SPEC[6][0]]
@@ -3846,13 +3868,7 @@ def validate(t):
             cons="; CONSERVATIVE: Room C" if rooms["Room C"] <= rooms["Room D"] else "; CONSERVATIVE: Room D (worst month "
             require(cons in t6[2][1],"Table 6: conservative binding room missing or wrong")
     for r in t6[:2]:
-        m=money(r[1],f"Table 6 {r[0]} monthly",True)
-        w=money(r[2],f"Table 6 {r[0]} weekly",True)
-        d=money(r[3],f"Table 6 {r[0]} daily",True)
-        if m is not None and w is not None:
-            require(abs(w-m*12/52) <= Decimal("0.62"),f"Table 6 {r[0]} weekly conversion mismatch")
-        if m is not None and d is not None:
-            require(abs(d-m/Decimal("20")) <= Decimal("0.53"),f"Table 6 {r[0]} daily conversion mismatch")
+        m=conversions(r, "Table 6")
         pct=r[4]
         if basis is not None and basis>0 and m is not None and pct!="—":
             percent=money(pct,"Payment % of Basis")
@@ -3940,6 +3956,8 @@ from collections import Counter, defaultdict
 from decimal import Decimal
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "engine"))  # for `import uw`
+
 # Exparsed file status -> V2.2 Table 1 verdict (see the export's own `note` for each status).
 STATUS = {
     "verified": "Pass",
@@ -3972,6 +3990,15 @@ HOLIDAYS = [
     "2026-11-11",
     "2026-11-26",
     "2026-12-25",
+    "2027-01-01",
+    "2027-01-18",
+    "2027-02-15",
+    "2027-05-31",
+    "2027-07-05",
+    "2027-09-06",
+    "2027-10-11",
+    "2027-11-11",
+    "2027-11-25",
 ]
 
 
@@ -3997,9 +4024,10 @@ def normalized(ledger_text, owners=()):
 
 def page_run(ledger_text, judgments_text=None, owners=()):
     """Entry point for exparsed.html (Pyodide). Returns JSON text; never raises."""
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "engine"))
-    import uw
-
+    try:
+        import uw
+    except Exception as err:  # a missing or broken engine file must still answer in JSON
+        return json.dumps(dict(ok=False, error=f"{type(err).__name__}: engine did not load: {err}"))
     try:
         r = uw.underwrite(normalized(ledger_text, tuple(owners)), json.loads(judgments_text) if judgments_text else None)
         return json.dumps(
@@ -4015,6 +4043,8 @@ def page_run(ledger_text, judgments_text=None, owners=()):
 def convert(src, owners):
     if src.get("format") != "ledger-v1":
         fail(f"expected format ledger-v1, got {src.get('format')!r}")
+    import uw
+
     by_acct, unread = defaultdict(list), []
     for f in src["files"]:
         # V1.7 section 1: every supplied file stays in the inventory, read or not.
@@ -4029,11 +4059,7 @@ def convert(src, owners):
     accounts, txns = [], []
     for last4, files in by_acct.items():
         verdicts = [STATUS.get(f["status"], "Unverified") for f in files]
-        worst = next(
-            v
-            for v in ("Break", "Unverified", "Pass with flag", "Pass")
-            if v in verdicts
-        )
+        worst = next(v for v in uw.WORST_ORDER if v in verdicts)
         notes, pending, zero, seen = [], 0, 0, Counter()
         for f in files:
             failed = [
@@ -4110,6 +4136,11 @@ def convert(src, owners):
         )
     if not accounts:
         fail("no statement files with rows")
+    # A missing year would count its holidays as business days and shift every window silently.
+    years = {y for a in accounts for p in a["statements"] for y in range(int(p["start"][:4]), int(p["end"][:4]) + 1)}
+    missing = sorted(years - {int(h[:4]) for h in HOLIDAYS})
+    if missing:
+        fail(f"no Federal Reserve holidays for {', '.join(map(str, missing))}; add them to HOLIDAYS")
     return dict(
         schema="uw-ledger/1",
         owner_names=owners,
@@ -9298,7 +9329,8 @@ Add `reason`: one sentence naming the fact you relied on. It is stored in the au
         history.push(aiUser('The engine rejected that file: '+r1.error+'\nReturn the complete corrected JSON. Every quote must be a verbatim substring of the source text.'));
         return uwJudgeOnce(prov, cfg, judgePrompt, history, callFn).then(function(j2){
           var r2=apply(j2);
-          return r2.ok ? { result:r2, judgments:j2 } : { result:r0, note:'answers rejected twice ('+r2.error+'), so the report shows engine defaults' };
+          // No engine-default report after a model failure: defaults would read as the model's answers.
+          return r2.ok ? { result:r2, judgments:j2 } : { result:{ ok:false, error:'answers rejected twice ('+r2.error+'); no report' } };
         });
       });
     }
@@ -10729,7 +10761,7 @@ Add `reason`: one sentence naming the fact you relied on. It is stored in the au
         return uwUnderwrite(prov, cfg, el('uw-src-judge').textContent, uwEngine(ledgerText), aiCall, function(t){ uwSetStatus('', t+'…'); });
       }).then(function(out){
         var r=out.result;
-        if(!r.ok){ uwSetStatus('err', 'Engine stopped: '+r.error); return; }
+        if(!r.ok){ uw.result=uw.judgments=null; $uwReport.textContent=''; uwSetStatus('err', 'Engine stopped: '+r.error); return; }   // no stale report from an earlier run
         uw.result=r; uw.judgments=out.judgments||null;
         $uwReport.textContent=r.report;
         var h=r.audit.capacity.headline;

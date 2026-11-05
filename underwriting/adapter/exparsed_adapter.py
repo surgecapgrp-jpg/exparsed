@@ -22,6 +22,8 @@ from collections import Counter, defaultdict
 from decimal import Decimal
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "engine"))  # for `import uw`
+
 # Exparsed file status -> V2.2 Table 1 verdict (see the export's own `note` for each status).
 STATUS = {
     "verified": "Pass",
@@ -54,6 +56,15 @@ HOLIDAYS = [
     "2026-11-11",
     "2026-11-26",
     "2026-12-25",
+    "2027-01-01",
+    "2027-01-18",
+    "2027-02-15",
+    "2027-05-31",
+    "2027-07-05",
+    "2027-09-06",
+    "2027-10-11",
+    "2027-11-11",
+    "2027-11-25",
 ]
 
 
@@ -79,9 +90,10 @@ def normalized(ledger_text, owners=()):
 
 def page_run(ledger_text, judgments_text=None, owners=()):
     """Entry point for exparsed.html (Pyodide). Returns JSON text; never raises."""
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "engine"))
-    import uw
-
+    try:
+        import uw
+    except Exception as err:  # a missing or broken engine file must still answer in JSON
+        return json.dumps(dict(ok=False, error=f"{type(err).__name__}: engine did not load: {err}"))
     try:
         r = uw.underwrite(normalized(ledger_text, tuple(owners)), json.loads(judgments_text) if judgments_text else None)
         return json.dumps(
@@ -97,6 +109,8 @@ def page_run(ledger_text, judgments_text=None, owners=()):
 def convert(src, owners):
     if src.get("format") != "ledger-v1":
         fail(f"expected format ledger-v1, got {src.get('format')!r}")
+    import uw
+
     by_acct, unread = defaultdict(list), []
     for f in src["files"]:
         # V1.7 section 1: every supplied file stays in the inventory, read or not.
@@ -111,11 +125,7 @@ def convert(src, owners):
     accounts, txns = [], []
     for last4, files in by_acct.items():
         verdicts = [STATUS.get(f["status"], "Unverified") for f in files]
-        worst = next(
-            v
-            for v in ("Break", "Unverified", "Pass with flag", "Pass")
-            if v in verdicts
-        )
+        worst = next(v for v in uw.WORST_ORDER if v in verdicts)
         notes, pending, zero, seen = [], 0, 0, Counter()
         for f in files:
             failed = [
@@ -192,6 +202,11 @@ def convert(src, owners):
         )
     if not accounts:
         fail("no statement files with rows")
+    # A missing year would count its holidays as business days and shift every window silently.
+    years = {y for a in accounts for p in a["statements"] for y in range(int(p["start"][:4]), int(p["end"][:4]) + 1)}
+    missing = sorted(years - {int(h[:4]) for h in HOLIDAYS})
+    if missing:
+        fail(f"no Federal Reserve holidays for {', '.join(map(str, missing))}; add them to HOLIDAYS")
     return dict(
         schema="uw-ledger/1",
         owner_names=owners,
