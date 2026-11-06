@@ -46,7 +46,7 @@ from pathlib import Path
 
 D = Decimal
 ENGINE_VERSION = "3.4"
-POLICY_VERSION = "V1.7b4"
+POLICY_VERSION = "V1.7b5"
 
 # Policy parameters (V2.2 values with the V1.7 changes marked). Changing any value is a policy change: bump POLICY_VERSION.
 BUSINESS_DAYS_PER_MONTH = D(20)
@@ -2026,9 +2026,11 @@ class _Engine:
             self.binding += "; material uncertainty: " + "; ".join(self.uncertain_block)
         if self.coverage_block and self.headline is not None:
             self.binding += "; coverage: " + "; ".join(self.coverage_block)
+        # Sign-off B18: a missing account or unreadable statement can only hide more MCA payments,
+        # which lower HEADLINE, so it blocks YES and leaves a NO standing (V1.7 section 9).
         status = (
             "INSUFFICIENT DATA"
-            if len(self.counted) < 2 or self.uncertain_block or self.coverage_block
+            if len(self.counted) < 2 or self.uncertain_block or (self.coverage_block and self.headline > 0)
             else "YES" if self.headline > 0 else "NO"
         )
         self.status = status + SUFFIX[self.worst]
