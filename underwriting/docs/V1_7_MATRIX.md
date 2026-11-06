@@ -207,9 +207,9 @@ Count: 150 rows. 19 B1, 33 B2, 24 B3, 10 B4, 38 Met, 20 Partial, 3 Gap, 3 Page.
 | :--- | :--- | :--- | :--- | :--- |
 | G1 | Confirmed vs possible personal items per account-month | Confirmed: OWNER_DRAW debits and STRIP_OWNER credits (owner names, transfers to the owner, model answers). Possible: P2P and consumer-merchant debits, reported apart. | B3 | Sign-off B19 |
 | G2 | Severity LOW, MODERATE, HIGH | Per account-month count, $ and share of gross credits; worst month sets the status | B3 | — |
-| G3 | REQUEST REQUIRED for unprovided accounts tied to material flows | REQUEST REQUIRED for recurring, financing or material transfers to an unprovided account, with counts, $ and months | B3 | Sign-off B18 |
+| G3 | REQUEST REQUIRED for unprovided accounts tied to material flows | REQUEST REQUIRED for recurring, financing or material transfers to an unprovided account, with counts, $ and months | B3 | — |
 | G4 | VERIFY OWNERSHIP for owner or affiliate accounts | VERIFY OWNERSHIP when transfers run both ways with the unprovided account | B3 | — |
-| G5 | Missing accounts that may hide MCA payments force INSUFFICIENT DATA | An unprovided account moving >=5% of BASIS per month blocks YES and NO | B3 | Sign-off B18 |
+| G5 | Missing accounts that may hide MCA payments force INSUFFICIENT DATA | An unprovided account moving >=5% of BASIS per month, or an unreadable statement, blocks YES; a NO stands (B18 signed off 2026-11-06, V1.7b5) | B3 | — |
 
 ## 10. MCA completeness audit
 
@@ -290,7 +290,7 @@ Not in batch 2: same-day same-amount doubles stay one position (D8, HANDOFF inte
 | # | V1.7 text | Engine reading |
 | ---: | :--- | :--- |
 | B17 | "Months require >=18 covered days on the material revenue/collection accounts" | A material account holds 5% or more of all credits. Its short months inside its own statement span exclude the month. Months before its first statement or after its last are not held against it, because the engine cannot tell an account that did not exist from one that was not supplied. |
-| B18 | REQUEST REQUIRED, VERIFY OWNERSHIP, and "material missing accounts ... INSUFFICIENT DATA" | Any account named in transfer text and not supplied is listed when its transfers recur (2+), it is a financing account (LOC, credit line, loan), or it moves 5% of BASIS per month. Two-way transfers give VERIFY OWNERSHIP. A listed account moving 5% of BASIS or more per month blocks both YES and NO, because it could hold MCA payments or revenue. |
+| B18 | REQUEST REQUIRED, VERIFY OWNERSHIP, and "material missing accounts ... INSUFFICIENT DATA" | Any account named in transfer text and not supplied is listed when its transfers recur (2+), it is a financing account (LOC, credit line, loan), or it moves 5% of BASIS per month. Two-way transfers give VERIFY OWNERSHIP. A listed account moving 5% of BASIS or more per month blocks YES. **Signed off 2026-11-06, changed:** a NO stands, because hidden MCA payments can only lower HEADLINE (V1.7b5). |
 | B19 | CONFIRMED vs POSSIBLE personal items | CONFIRMED = OWNER_DRAW debits and STRIP_OWNER credits. These come from the supplied owner names, transfers to the owner, or a model answer. POSSIBLE = Zelle, Venmo and Cash App debits, plus consumer merchants (grocery, streaming, gym, salon, mortgage, HOA). Possible items never set the status. |
 | B20 | Transfers paying a credit line | A transfer whose text names a LOC, credit line, line of credit or loan is DEBT_SERVICE, so it counts in obligations. On the real ledger, $75,672 to NST Credit Line 6298 adds about $5,800/mo to obligations, and HEADLINE drops from $44,882 to $39,061. |
 | B21 | Class UNKNOWN | A return credit (return wording or an R-code) with no matching debit. Tier and cure are n/a, and Table 9 counts it next to Class A. |
@@ -321,7 +321,7 @@ A spec review on 2026-11-02 found 10 rows marked Met, B1 or B3 that the code did
 | K2 | Holiday weeks with 4 business days were eligible | Skipped |
 | K8 | Loan stop-pays could show cured | Never cured |
 
-Not in batch 4: report publication after rejected answer files (V3 handoff), the stage manifest (V3 handoff), and B18 (`coverage_block` also turns NO into INSUFFICIENT DATA), which still needs sign-off.
+Not in batch 4: report publication after rejected answer files (V3 handoff, done in PR #14), the stage manifest (V3 handoff), and B18 (signed off 2026-11-06: missing accounts block YES only; PR #16, V1.7b5).
 
 ## Batch 4 effect on saved runs
 

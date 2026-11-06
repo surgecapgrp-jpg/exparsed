@@ -533,6 +533,38 @@ class V17Batch3(unittest.TestCase):
             uw.report_gate(rep.replace("Commingling Status: Present — Low", "Commingling Status: Some"))
 
 
+class SignOffB18(unittest.TestCase):
+    """Sign-off B18 (2026-11-06): a missing or unreadable statement blocks YES only, as V1.7 section 9 says."""
+
+    def no_ledger(self):
+        # Rent tripled: HEADLINE is 0 with the saved answers (see test_no_stands_when_uncertainty_cannot_reverse_it).
+        led = copy.deepcopy(LEDGER)
+        led["transactions"] += [
+            dict(t, txn_id=t["txn_id"] + "x", amount="40000.00") for t in led["transactions"] if "OAKWOOD PROPERTY" in t["description"]
+        ]
+        return led
+
+    def answered(self, led):
+        r0 = run(led)
+        return run(led, with_judgments(r0, known(r0, JUDGMENTS["answers"])))
+
+    def test_material_missing_account_leaves_a_no_standing(self):
+        months = ["2026-06-10", "2026-07-10", "2026-08-10", "2026-09-10"]
+        led = add_rows(self.no_ledger(), [("OP", d, "5000.00", "debit", "ONLINE TRANSFER TO CHK ...4455") for d in months], "TR")
+        r = self.answered(led)
+        self.assertTrue(r.audit["account_requests"][0]["material"])
+        self.assertEqual(r.status, "NO")
+        self.assertIn("coverage: unprovided account ...4455", r.audit["capacity"]["binding"])
+        self.assertIn("- **Additional Accounts to Request:** REQUEST REQUIRED; 1) ...4455", r.report)
+
+    def test_unreadable_statement_leaves_a_no_standing(self):
+        led = self.no_ledger()
+        led["sources_unread"] = [dict(name="OP-202610.pdf", reason="Exparsed status needs-ocr", statement=True)]
+        r = self.answered(led)
+        self.assertEqual(r.status, "NO")
+        self.assertIn("coverage: unreadable statement OP-202610.pdf", r.audit["capacity"]["binding"])
+
+
 class V17Batch4(unittest.TestCase):
     """V1.7 fixes from the 2026-11 spec review: peak floor, closure evidence, return tiers, wires, windows, binding."""
 

@@ -116,7 +116,7 @@ naming its funder.
 
 ### 5.2 Policy V1.7 coverage
 
-`ENGINE_VERSION` 3.4, `POLICY_VERSION` V1.7b4. The matrix tracks 150 rules:
+`ENGINE_VERSION` 3.4, `POLICY_VERSION` V1.7b5. The matrix tracks 150 rules:
 
 | Status | Rows |
 | :--- | ---: |
@@ -201,9 +201,14 @@ Signed off 2026-11-02:
 | B8 | Kept: D4 nominates a new payee after a financing credit only if it repeats or shares a word with the sender. |
 | B10 | Kept: an unanswered fixed daily, weekly or biweekly series becomes a WATCH row. |
 
-Waiting for sign-off: B1, B4 to B7, B9, B11 to B21 in `underwriting/docs/V1_7_MATRIX.md`, and the 19
-readings in `underwriting/docs/HANDOFF.md` section 4.1. B18 matters most: a material missing account
-also turns a NO into INSUFFICIENT DATA, while the policy text only asks to stop a YES.
+Signed off 2026-11-06:
+
+| # | Decision |
+| :--- | :--- |
+| B18 | Changed (PR #16, policy V1.7b5): a material missing account or an unreadable statement blocks YES only. A NO stands, because hidden MCA payments can only lower HEADLINE. The account stays under REQUEST REQUIRED and the binding line names it. |
+
+Waiting for sign-off: B1, B4 to B7, B9, B11 to B17, B19 to B21 in `underwriting/docs/V1_7_MATRIX.md`, and
+the 19 readings in `underwriting/docs/HANDOFF.md` section 4.1.
 
 ## 7. Verification
 
@@ -239,7 +244,7 @@ also turns a NO into INSUFFICIENT DATA, while the policy text only asks to stop 
    statements that run into January 2028 arrive.
 3. **Rejected-answer fallback.** Done in PR #14: a second rejection shows "Engine stopped: answers rejected
    twice (...); no report" and clears any earlier report.
-4. **Sign-offs.** B18 first, then the other open interpretations (section 6).
+4. **Sign-offs.** B18 done in PR #16. The other open interpretations remain (section 6).
 5. **Standards fixes from the 2026-11-02 review.** Done in PR #14. The engine's inline numbers are named
    constants at the top of `uw.py`. The adapter uses `uw.WORST_ORDER`. `import uw` sits inside `page_run`'s
    `try`. The checker keeps its own named copy of 4 policy numbers, and a test fails when they differ from the
