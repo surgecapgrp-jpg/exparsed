@@ -1,6 +1,6 @@
 # exparsed handoff
 
-State on 2026-11-05 at `main` commit `6323ae9`. Repo: https://github.com/surgecapgrp-jpg/exparsed (private).
+State on 2026-11-05 at `main` commit `715f07a`. Repo: https://github.com/surgecapgrp-jpg/exparsed (private).
 This file replaces the 2026-10-26 handoff. The underwriting design detail is in `underwriting/docs/HANDOFF.md`,
 and the policy compliance detail is in `underwriting/docs/V1_7_MATRIX.md`.
 
@@ -23,14 +23,14 @@ The next step is a real Chrome run on 3 to 5 real merchant files (section 9, ite
 
 | Path | What it is |
 | :--- | :--- |
-| `exparsed.html` | The whole app: 10,782 lines, about 700 KB. Statement reader, ledger export, OCR, AI calls, underwriting panel, chat, and an embedded copy of the Python engine. |
+| `exparsed.html` | The whole app: 10,814 lines, about 700 KB. Statement reader, ledger export, OCR, AI calls, underwriting panel, chat, and an embedded copy of the Python engine. |
 | `mac_ocr_server.py`, `mac_ocr.swift` | Local OCR server on `127.0.0.1:8091` (Apple Vision). The Swift helper compiles on first start. |
-| `underwriting/engine/uw.py` | The underwriting engine, 3,100 lines, Python standard library only. |
-| `underwriting/adapter/exparsed_adapter.py` | Converts the page's `ledger-v1` export to the engine's ledger. `page_run()` is the entry point the page calls. Holds the holiday list. |
+| `underwriting/engine/uw.py` | The underwriting engine, 3,089 lines, Python standard library only. |
+| `underwriting/adapter/exparsed_adapter.py` | Converts the page's `ledger-v1` export to the engine's ledger. `page_run()` is the entry point the page calls. Holds the Federal Reserve holiday list for 2025 to 2027; a later year stops the run with an error. |
 | `underwriting/checker/validate_report.py` | The V1.7 report checker. The engine runs it on every report and fails the run on any error. |
 | `underwriting/prompts/judge.md` | System prompt for the judgment call. |
 | `underwriting/schemas/` | `ledger.schema.json` (engine input) and `judgments.schema.json` (model output, also sent as the structured-output schema). |
-| `underwriting/embed.py` | Copies engine, adapter, checker and prompt into `exparsed.html` between the `UW-EMBED` markers (lines 454 to 4200). |
+| `underwriting/embed.py` | Copies engine, adapter, checker and prompt into `exparsed.html` between the `UW-EMBED` markers (lines 454 to 4231). |
 | `underwriting/tests/` | `test_engine.py` (70 tests), `make_fixture.py`, `fixtures/sample_ledger.json` (321 rows, Jun to Sep 2026) and `fixtures/sample_judgments.json`. |
 | `underwriting/docs/HANDOFF.md` | Engine design, contracts, trust boundary, interpretations 1 to 19. |
 | `underwriting/docs/V1_7_MATRIX.md` | 150 V1.7 rules mapped to code, interpretations B1 to B21, effect of each batch on saved runs. |
@@ -71,17 +71,17 @@ OpenRouter vision). Each file gets one status:
 
 Read path, with current line numbers in `exparsed.html`:
 
-1. `readFileContent` (9659) is the entry. `dispatchFile` (4716) picks a reader by file type.
-2. `fileOcrNeed` (9037) and `lgDocKind` (7543) decide whether a PDF needs OCR or is not a statement.
-3. `doOcrMac` (10435) posts scanned pages to the OCR server. Cloud OCR goes through `cloudOcrRead` (9096).
-4. `lgAccountChildren` (9669) splits a file: `lgSplitAccounts` (7863) per account heading,
-   `lgSplitStatements` (7894) per repeated "Page 1 of N".
-5. `lgFileLedger` (8678) builds and caches the ledger through `lgBuild` (7415) and `lgChooseReading` (7405).
-   Readers: `lgParseColumnar` (6060), `lgParsePrintout` (6741), `lgParseCards` (7956), `lgParseStackedRows` (7995).
-6. Shared helpers: `lgCleanLine` (5910) repairs OCR and text damage; `lgSectionOf` (5702) maps headings.
-7. `recFromContent` (9679) builds the record shown on the page.
-8. `lgOwnRows` (8734) drops overlapping printouts of one account. `lgLedgerExport` (8742) builds `ledger-v1`.
-   `lgComputed` (8842) adds ADB, negative days and gross inflows per month.
+1. `readFileContent` (9691) is the entry. `dispatchFile` (4747) picks a reader by file type.
+2. `fileOcrNeed` (9068) and `lgDocKind` (7574) decide whether a PDF needs OCR or is not a statement.
+3. `doOcrMac` (10467) posts scanned pages to the OCR server. Cloud OCR goes through `cloudOcrRead` (9127).
+4. `lgAccountChildren` (9701) splits a file: `lgSplitAccounts` (7894) per account heading,
+   `lgSplitStatements` (7925) per repeated "Page 1 of N".
+5. `lgFileLedger` (8709) builds and caches the ledger through `lgBuild` (7446) and `lgChooseReading` (7436).
+   Readers: `lgParseColumnar` (6091), `lgParsePrintout` (6772), `lgParseCards` (7987), `lgParseStackedRows` (8026).
+6. Shared helpers: `lgCleanLine` (5941) repairs OCR and text damage; `lgSectionOf` (5733) maps headings.
+7. `recFromContent` (9711) builds the record shown on the page.
+8. `lgOwnRows` (8765) drops overlapping printouts of one account. `lgLedgerExport` (8773) builds `ledger-v1`.
+   `lgComputed` (8873) adds ADB, negative days and gross inflows per month.
 9. Dates go through `lgDateTok`, which checks the day against the month length (leap years included).
    `lgUSDate` reads through it, so "13/40/26" and "2/30/2026" give no date (PR #12).
 
@@ -152,6 +152,8 @@ execution order (H11), FLIGHT inflow scope (P15).
 | #10 | `8db2a61` | V1.7 batch 4 |
 | #11 | `b67f148` | This handoff |
 | #12 | `6323ae9` | Impossible dates rejected; Underwrite exports raw text (ported from `deepen`) |
+| #13 | `28e2ce7` | Handoff update after #11 and #12 |
+| #14 | `715f07a` | 2027 holidays, no report after twice-rejected answers, standards fixes (open items 2, 3, 5) |
 
 Rollback point before all underwriting work: `283bc50`.
 
@@ -159,14 +161,14 @@ Rollback point before all underwriting work: `283bc50`.
 
 | Item | Detail |
 | :--- | :--- |
-| Code | `aiRequest` (9209), `aiParse` (9227), `aiCall` (9244), `uwJudgeOnce` (9274), `uwUnderwrite` (9287), `uwRun` (10720) |
+| Code | `aiRequest` (9240), `aiParse` (9258), `aiCall` (9275), `uwJudgeOnce` (9305), `uwUnderwrite` (9318), `uwRun` (10752) |
 | Provider pick | OCR has its own pick. Underwriting and chat share a second pick (Claude or OpenRouter). |
 | Judgment call | Non-streaming, 16,000 max tokens, Claude system prompt cached. Claude gets `output_config.format`; OpenRouter gets `response_format`. A 400 retries once without the schema. |
 | Rejected answers | The engine error goes back to the model once. A second rejection shows the error and no report. |
 | Export | Underwrite calls `lgLedgerExport(list, {redact:false, compact:false})`, so the engine sees the printed text (ORIG ID included) whatever the Redact and Compact toggles say. The export buttons still follow the toggles. |
 | Bad input | A ledger row with an impossible date stops the run with `bad date` and the transaction id. |
 | Fallback | Claude requests carry server-side refusal fallback (`fallbacks: "default"`). |
-| Chat | Tools run in the page: `search_rows`, `read_document`, `read_audit` (13 audit sections). Results capped at 60,000 characters; 8 tool rounds per turn. System prompt: `uwChatSystem` (9369). |
+| Chat | Tools run in the page: `search_rows`, `read_document`, `read_audit` (13 audit sections). Results capped at 60,000 characters; 8 tool rounds per turn. System prompt: `uwChatSystem` (9401). |
 
 ### 5.5 Results on saved runs
 
@@ -205,7 +207,7 @@ also turns a NO into INSUFFICIENT DATA, while the policy text only asks to stop 
 
 ## 7. Verification
 
-| Check | Result on `main` 6323ae9 |
+| Check | Result on `main` 715f07a |
 | :--- | :--- |
 | `node tests/run-node.js` | 214 passed, 0 failed |
 | `python3 -m unittest discover -s tests` in `underwriting/` | 70 passed |
@@ -233,8 +235,8 @@ also turns a NO into INSUFFICIENT DATA, while the policy text only asks to stop 
 1. **Live run.** Open `main`'s `exparsed.html` in Chrome, add a key, underwrite 3 to 5 real merchant files.
    Record Pyodide load time, page freeze, model cost, rejected answers. This is the one check never done.
 2. **Holidays.** Done in PR #14: the 9 Federal Reserve 2027 dates are in `HOLIDAYS`. A statement period
-   that reaches a year with no dates now stops with "no Federal Reserve holidays for YYYY". Add 2028 before
-   December 2027 statements arrive.
+   that reaches a year with no dates now stops with "no Federal Reserve holidays for YYYY". Add the 2028 dates before
+   statements that run into January 2028 arrive.
 3. **Rejected-answer fallback.** Done in PR #14: a second rejection shows "Engine stopped: answers rejected
    twice (...); no report" and clears any earlier report.
 4. **Sign-offs.** B18 first, then the other open interpretations (section 6).
@@ -259,7 +261,7 @@ also turns a NO into INSUFFICIENT DATA, while the policy text only asks to stop 
     - `uw-engine`: 3 real commits, a local Python model server (replaced by Pyodide in PR #4) and Python 3.9 support. `main` needs Python 3.10+.
     - `deepen`: 6 real commits of refactors. Two fixes are ported (PR #12). Its newest-first day-end fix was not needed: `main` already reverses newest-first rows. The rest (parser script split, reader snapshots, one "needs OCR" rule) is optional.
 
-    `design-review-fixes`, `handoff-2026-11-05`, `date-and-export-fixes`, `rebrand/surge-capital`, `underwriting-in-page` and `v17-batch1` to `v17-batch4` are merged and can be deleted.
+    `design-review-fixes`, `handoff-2026-11-05`, `date-and-export-fixes`, `handoff-update`, `tdd-open-items`, `rebrand/surge-capital`, `underwriting-in-page` and `v17-batch1` to `v17-batch4` are merged and can be deleted.
 14. **Desktop set rerun after PR #12.** The stricter date check drops any row whose printed date is impossible. Rerun the 244 files and compare against section 4.
 
 ## 10. Rules for the next engineer
