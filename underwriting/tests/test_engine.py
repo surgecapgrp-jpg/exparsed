@@ -509,10 +509,18 @@ class V17Batch3(unittest.TestCase):
         self.assertEqual([m["key"] for m in r.audit["months"]], [m["key"] for m in base.audit["months"]])
         self.assertEqual([m["true"] for m in r.audit["months"]], [m["true"] for m in base.audit["months"]])
 
-    def test_unpaired_return_credit_is_class_unknown(self):
-        led = add_rows(LEDGER, [("OP", "2026-08-19", "612.00", "credit", "RETURN ITEM R01 ACME SUPPLY")], "RU")
-        ev = [e for e in run(led).audit["returns"] if e["cls"] == "UNKNOWN"]
-        self.assertEqual((len(ev), ev[0]["tier"], ev[0]["cured"]), (1, "n/a", "n/a"))
+    def test_unpaired_return_credit_is_class_a(self):
+        # Sign-off B21 (2026-11-07): a return credit with no matching debit is Class A, T1 by code, else T2, uncured.
+        led = add_rows(
+            LEDGER,
+            [("OP", "2026-08-19", "612.00", "credit", "RETURN ITEM R01 ACME SUPPLY"),
+             ("OP", "2026-08-26", "240.00", "credit", "ACH RETURN R08 ZETA SUPPLY")],
+            "RU",
+        )
+        r = run(led)
+        ev = [(e["amt"], e["cls"], e["tier"], e["cured"]) for e in r.audit["returns"] if e["attempts"][0].startswith("RU")]
+        self.assertEqual(ev, [(D("612.00"), "A", "T2", "N (debit not found)"), (D("240.00"), "A", "T1", "N (debit not found)")])
+        self.assertFalse([e for e in r.audit["returns"] if e["cls"] == "UNKNOWN"])
 
     def test_checker_policy_numbers_match_the_engine(self):
         # The checker keeps its own copy so it stays a separate check; this catches the two drifting apart.

@@ -196,7 +196,7 @@ Count: 150 rows. 19 B1, 33 B2, 24 B3, 10 B4, 38 Met, 20 Partial, 3 Gap, 3 Page.
 | K3 | Peak = max(observed, modeled current); peak holdback | Report Peak floored at stack/(52/12) and labelled modeled current floor; holdback over a counted month only; checker rejects a negative drop | B4 | — |
 | K4 | Returns classified once per attempt chain | Chains within 10 bd | Met | — |
 | K5 | FEE_NSF_OD is a fee, never a return | Yes | Met | — |
-| K6 | Class A, B and UNKNOWN | A return credit with no matching debit is Class UNKNOWN, tier and cure n/a; Table 9 counts it apart | B3 | — |
+| K6 | Class A, B and UNKNOWN | A return credit with no matching debit is Class A: T1 by code, else T2; cure "N (debit not found)" (B21 signed off 2026-11-07, V1.7b11). Class UNKNOWN is no longer produced | B3 | — |
 | K7 | T1, T2, T3 codes | T1 stop-pay and R05/R07/R08/R10/R29; T2 every other return on MCA, loan, payroll, rent, tax, insurance; T3 the rest | B4 | — |
 | K8 | Cure only within 2 bd with balance; MCA stop-pay never cured | MCA and loan (DEBT_SERVICE) stop-pays never cured | B4 | — |
 | K9 | Table 9 metrics; absent balances are "unavailable" | Six fixed rows | Met | — |
@@ -269,10 +269,10 @@ The $1 HEADLINE moves come from 52/12 replacing 4.333. With V1.7, a real ledger 
 | B10 | D2 cadence without a funder name | An unanswered fixed daily, weekly or biweekly series becomes a WATCH row. Fixed monthly series without a finance word (rent-like bills) stay NON-MCA. On the real ledger, this catches KAPITUS and ACCORD BUSINESS when no answers exist. **Decided 2026-11-02: kept.** It catches KAPITUS and ACCORD BUSINESS; a model answer removes a false WATCH row. |
 | B11 | Expanded window "plausible out-of-window relationships" | Credits scoring 3+ points (MED or HIGH) within ±30 calendar days. They are listed as INVESTIGATE and never attached. **Signed off 2026-11-07, kept.** |
 | B12 | "A descriptor change with a corroborated originator ID and continuity is usually the same position" | Two payees given the same funder join when they share an `ORIG ID`, when one starts within 10 business days after the other stops, or when one's debits fall inside the other's span on days without its debits. The real ledger joins KAPITUS SERVICIN into KAPITUS on the third rule. ZLUR FUNDING LLC shares a day with ZLUR FUNDING, so it stays separate (U, $1,980 STRESS). **Signed off 2026-11-07, kept.** |
-| B13 | D1 finance language | Word matches, plus CAPITAL, FUNDING, FINANC, LENDING, ADVANCE or MERCHANT inside a token. This finds HEADWAYCAPITAL and FORWARD FINANCIN. It also nominates EMPIRE MERCHANTS (a liquor distributor) until the model answers. |
-| B14 | Monthly cadence x1 | Gaps of 18 to 25 business days. A fixed monthly series with a finance word is MCA by default (HEADWAYCAPITAL, $7,442/mo, silent since 03/31/26, so U). |
-| B15 | WATCH rows in Table 4b | Peak load counts positions only. WATCH debits stay out because their identity is unproved. |
-| B16 | Evidence levels | CORROBORATED: an attached funding with a bank-text, document or named-funder gate, or closure evidence. OBSERVED: a finance word in the payee. INFERRED: the model or a cadence rule says MCA with no finance word. UNKNOWN: WATCH. Strip gates map `bank_text` to OBSERVED, `document` and `named_funder_series` to CORROBORATED, and `sender_identified` to INFERRED. |
+| B13 | D1 finance language | Word matches, plus CAPITAL, FUNDING, FINANC, LENDING, ADVANCE or MERCHANT inside a token. This finds HEADWAYCAPITAL and FORWARD FINANCIN. It also nominates EMPIRE MERCHANTS (a liquor distributor) until the model answers. **Signed off 2026-11-07, kept.** |
+| B14 | Monthly cadence x1 | Gaps of 18 to 25 business days. A fixed monthly series with a finance word is MCA by default (HEADWAYCAPITAL, $7,442/mo, silent since 03/31/26, so U). **Signed off 2026-11-07, kept.** |
+| B15 | WATCH rows in Table 4b | Peak load counts positions only. WATCH debits stay out because their identity is unproved. **Signed off 2026-11-07, kept.** |
+| B16 | Evidence levels | CORROBORATED: an attached funding with a bank-text, document or named-funder gate, or closure evidence. OBSERVED: a finance word in the payee. INFERRED: the model or a cadence rule says MCA with no finance word. UNKNOWN: WATCH. Strip gates map `bank_text` to OBSERVED, `document` and `named_funder_series` to CORROBORATED, and `sender_identified` to INFERRED. **Signed off 2026-11-07, kept.** |
 
 Not in batch 2: same-day same-amount doubles stay one position (D8, HANDOFF interpretation 14); off-bank collections (D6, T7); contractual cost and payoff ties (L11, L13); variable adverse scenarios (D11); alternative tags (T1); new-sender ACH and mobile credits (C2).
 
@@ -289,11 +289,11 @@ Not in batch 2: same-day same-amount doubles stay one position (D8, HANDOFF inte
 
 | # | V1.7 text | Engine reading |
 | ---: | :--- | :--- |
-| B17 | "Months require >=18 covered days on the material revenue/collection accounts" | A material account holds 5% or more of all credits. Its short months inside its own statement span exclude the month. Months before its first statement or after its last are not held against it, because the engine cannot tell an account that did not exist from one that was not supplied. |
+| B17 | "Months require >=18 covered days on the material revenue/collection accounts" | A material account holds 5% or more of all credits. Its short months inside its own statement span exclude the month. Months before its first statement or after its last are not held against it, because the engine cannot tell an account that did not exist from one that was not supplied. **Signed off 2026-11-07, kept.** |
 | B18 | REQUEST REQUIRED, VERIFY OWNERSHIP, and "material missing accounts ... INSUFFICIENT DATA" | Any account named in transfer text and not supplied is listed when its transfers recur (2+), it is a financing account (LOC, credit line, loan), or it moves 5% of BASIS per month. Two-way transfers give VERIFY OWNERSHIP. A listed account moving 5% of BASIS or more per month blocks YES. **Signed off 2026-11-06, changed:** a NO stands, because hidden MCA payments can only lower HEADLINE (V1.7b5). |
-| B19 | CONFIRMED vs POSSIBLE personal items | CONFIRMED = OWNER_DRAW debits and STRIP_OWNER credits. These come from the supplied owner names, transfers to the owner, or a model answer. POSSIBLE = Zelle, Venmo and Cash App debits, plus consumer merchants (grocery, streaming, gym, salon, mortgage, HOA). Possible items never set the status. |
-| B20 | Transfers paying a credit line | A transfer whose text names a LOC, credit line, line of credit or loan is DEBT_SERVICE, so it counts in obligations. On the real ledger, $75,672 to NST Credit Line 6298 adds about $5,800/mo to obligations, and HEADLINE drops from $44,882 to $39,061. |
-| B21 | Class UNKNOWN | A return credit (return wording or an R-code) with no matching debit. Tier and cure are n/a, and Table 9 counts it next to Class A. |
+| B19 | CONFIRMED vs POSSIBLE personal items | CONFIRMED = OWNER_DRAW debits and STRIP_OWNER credits. These come from the supplied owner names, transfers to the owner, or a model answer. POSSIBLE = Zelle, Venmo and Cash App debits, plus consumer merchants (grocery, streaming, gym, salon, mortgage, HOA). Possible items never set the status. **Signed off 2026-11-07, kept.** |
+| B20 | Transfers paying a credit line | A transfer whose text names a LOC, credit line, line of credit or loan is DEBT_SERVICE, so it counts in obligations. On the real ledger, $75,672 to NST Credit Line 6298 adds about $5,800/mo to obligations, and HEADLINE drops from $44,882 to $39,061. **Signed off 2026-11-07, kept.** |
+| B21 | Class UNKNOWN | A return credit (return wording or an R-code) with no matching debit. **Signed off 2026-11-07, changed:** it is Class A. The debit is unknown and may be essential, so the tier is T1 for a T1 code and T2 otherwise; cure is "N (debit not found)". |
 
 Not in batch 3: account identity beyond the last four digits (S5), per-file source records (R1), ownership evidence (R2), alternative tags (T1), pending rows as observations (S3).
 
@@ -396,3 +396,11 @@ B7 changed: U positions are tested one by one. The "U positions combined" test i
 | Run | Effect |
 | :--- | :--- |
 | Sample and real, both runs | Same reports. No saved run had a combined U test or a D3 link that the half-of-payee rule blocked |
+
+## Sign-offs B13 to B17, B19 to B21 (2026-11-07; policy V1.7b11)
+
+B21 changed: a return credit with no matching debit is a Class A return, T1 for a T1 code and T2 otherwise, never cured. Table 9 still prints an UNKNOWN count; it is now always 0. B13, B14, B15, B16, B17, B19 and B20 are kept as written. All 22 interpretations B1 to B22 are now signed off.
+
+| Run | Effect |
+| :--- | :--- |
+| Sample and real, both runs | Same reports. No saved run has a return credit without its debit |
