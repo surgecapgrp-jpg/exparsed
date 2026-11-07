@@ -182,6 +182,25 @@
         "properties": {"name": {"type": "string"}, "reason": {"type": "string"}, "statement": {"type": "boolean"}}
       }
     },
+    "pending_observations": {
+      "type": "array",
+      "description": "V1.7 S3: pending rows, reported as non-cleared observations and never in totals.",
+      "items": {
+        "type": "object",
+        "required": ["account_id", "amount", "description"],
+        "properties": {"account_id": {"type": "string"}, "amount": {"type": "string"}, "description": {"type": "string"}, "source_ref": {"type": "string"}}
+      }
+    },
+    "sources": {
+      "type": "array",
+      "description": "V1.7 R1: one record per supplied file, read or not, reported as given.",
+      "items": {"type": "object", "required": ["source_id", "extraction_status"]}
+    },
+    "duplicate_crosswalk": {
+      "type": "array",
+      "description": "V1.7 S7: groups of identical rows kept as distinct transactions.",
+      "items": {"type": "object", "required": ["txn_ids"], "properties": {"txn_ids": {"type": "array", "items": {"type": "string"}}, "note": {"type": "string"}}}
+    },
     "exparsed_computed": {
       "type": "array",
       "description": "Exparsed computed.months[] gross inflows per account and calendar month. The engine compares its own sums and notes any mismatch in Table 1.",

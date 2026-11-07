@@ -112,6 +112,17 @@ def convert(src, owners):
     import uw
 
     by_acct, unread = defaultdict(list), []
+    # V1.7 R1: one SOURCE record per supplied file, read or not, in export order.
+    sources = {
+        id(f): dict(
+            source_id=f["name"], account_id=None, period=None, extraction_status=f.get("status") or "no rows",
+            checks_passed=[c["check"] for c in f.get("checks", []) if c.get("result") == "pass"],
+            checks_failed=[c["check"] for c in f.get("checks", []) if c.get("result") != "pass"],
+            rows=0, pending=0, zero=0, flags=list((f.get("provenance") or {}).get("flags", [])),
+            rows_omitted=f.get("rowsOmitted"),  # rows the page dropped as copies of another file's dates
+        )
+        for f in src["files"]
+    }
     for f in src["files"]:
         # V1.7 section 1: every supplied file stays in the inventory, read or not.
         if f.get("docKind"):
@@ -122,7 +133,7 @@ def convert(src, owners):
             continue
         # No printed account number: the file stands alone as its own account.
         by_acct[f.get("accountLast4") or f"file {f['name']}"].append(f)
-    accounts, txns = [], []
+    accounts, txns, pending_rows, same_key = [], [], [], defaultdict(list)
     for last4, files in by_acct.items():
         verdicts = [STATUS.get(f["status"], "Unverified") for f in files]
         worst = next(v for v in uw.WORST_ORDER if v in verdicts)
@@ -140,32 +151,41 @@ def convert(src, owners):
                     else ""
                 )
             )
+            rec = sources[id(f)]
+            rec.update(account_id=last4, period=period(f))
             cols = f["columns"].split("|")
             if cols[:6] != ["date", "section", "amount", "balance", "page", "description"] or cols[6:] not in ([], ["type"]):
                 fail(f"{f['name']}: unexpected columns {f['columns']}")
             # The description may itself hold "|": split the fixed columns from the left, type from the right.
             rows = []
-            for line in f["rows"]:
+            for n, line in enumerate(f["rows"], 1):
                 head = line.split("|", 5)
                 desc = head[5]
                 if len(cols) == 7 and "|" in desc:  # lgRowStr drops an empty type; it maps "|" in descriptions to "/"
                     desc = desc.rsplit("|", 1)[0]
-                rows.append(dict(zip(cols[:5], head[:5]), description=desc))
+                rows.append(dict(zip(cols[:5], head[:5]), description=desc, row=n))
             dated = [r["date"] for r in rows if r["date"] != "PENDING"]
             if dated and dated[0] > dated[-1]:
                 rows.reverse()  # printouts list newest first; the engine wants posting order
             for r in rows:
                 if r["date"] == "PENDING":
+                    # V1.7 S3: a pending row is a non-cleared observation, never a transaction.
                     pending += 1
+                    rec["pending"] += 1
+                    pending_rows.append(dict(account_id=last4, amount=r["amount"], description=r["description"],
+                                             source_ref=f"{f['name']} p{r['page']} r{r['row']}"))
                     continue
                 amt = Decimal(r["amount"])
                 if amt == 0:
                     zero += 1
+                    rec["zero"] += 1
                     continue
+                rec["rows"] += 1
                 key = "|".join(
                     (last4, r["date"], r["amount"], r["balance"], r["description"])
                 )
                 seen[key] += 1
+                same_key[key].append(f"{last4}-" + hashlib.sha1(f"{key}|{seen[key]}".encode()).hexdigest()[:12])
                 txns.append(
                     dict(
                         txn_id=f"{last4}-"
@@ -176,7 +196,7 @@ def convert(src, owners):
                         direction="credit" if amt > 0 else "debit",
                         description=r["description"],
                         balance=r["balance"] or None,
-                        source_ref=f"{f['name']} p{r['page']}",
+                        source_ref=f"{f['name']} p{r['page']} r{r['row']}",
                     )
                 )
         if pending:
@@ -214,6 +234,11 @@ def convert(src, owners):
         sources_unread=unread,
         accounts=accounts,
         transactions=txns,
+        pending_observations=pending_rows,
+        sources=list(sources.values()),
+        # V1.7 S7: identical rows stay distinct transactions; this lists them with their source rows.
+        duplicate_crosswalk=[dict(txn_ids=ids, note="identical rows kept as distinct transactions")
+                             for ids in same_key.values() if len(ids) > 1],
         documents=[],
         # Exparsed's own gross credits per month; the engine cross-checks its sums against them.
         exparsed_computed=[

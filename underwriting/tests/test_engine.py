@@ -652,6 +652,88 @@ class DebitSide(unittest.TestCase):
         self.assertTrue(any("adverse scenario $7,800/mo" in n for n in p["notes"]))
 
 
+class Records(unittest.TestCase):
+    """V1.7 R1, R3, R7, S3, S7 (open item 7, records batch): audit records only, no verdict change."""
+
+    def test_transaction_record_carries_trace_id_sequence_and_source(self):
+        desc = "ORIG CO NAME:ACME ORIG ID **318418 SEC:CCD TRACE# **704849 EED:260715"
+        led = add_rows(LEDGER, [("OP", "2026-07-15", "120.00", "credit", desc)], "TR")
+        led["transactions"][-1]["source_ref"] = "jul.pdf p2"
+        rec = next(t for t in run(led).audit["transactions"] if t["txn_id"] == "TR0")
+        self.assertEqual((rec["trace_id"], rec["orig_id"], rec["source_ref"]), ("**704849", "**318418", "jul.pdf p2"))
+        self.assertIsInstance(rec["sequence"], int)
+
+    def ledger_v1(self):
+        return {
+            "format": "ledger-v1",
+            "computed": [],
+            "files": [
+                {
+                    "name": "a.pdf",
+                    "accountLast4": "9805",
+                    "status": "verified",
+                    "checks": [{"check": "balance", "result": "pass"}, {"check": "totals", "result": "fail"}],
+                    "provenance": {"flags": []},
+                    "period": {"start": "2026-06-01", "end": "2026-07-31"},
+                    "columns": "date|section|amount|balance|page|description",
+                    "rows": ["PENDING|pending|-5.00||1|(PENDING) ACME FEE"]
+                    + [f"2026-0{m}-{d:02d}|dep|1000.00||1|ACH CREDIT ACME" for m in (6, 7) for d in range(1, 29)],
+                }
+            ],
+        }
+
+    def page(self, src):
+        sys.path.insert(0, str(ROOT / "adapter"))
+        import exparsed_adapter
+
+        r = json.loads(exparsed_adapter.page_run(json.dumps(src)))
+        self.assertTrue(r["ok"], r.get("error"))
+        return r["audit"]
+
+    def test_pending_rows_are_kept_as_non_cleared_observations(self):
+        a = self.page(self.ledger_v1())
+        self.assertEqual(a["pending_observations"],
+                         [dict(account_id="9805", amount="-5.00", description="(PENDING) ACME FEE", source_ref="a.pdf p1 r1")])
+        self.assertEqual(len(a["transactions"]), 56)
+
+    def test_crosswalk_keeps_identical_rows_and_names_their_source_rows(self):
+        src = self.ledger_v1()
+        src["files"][0]["rows"].append("2026-07-28|dep|1000.00||2|ACH CREDIT ACME")  # printed twice on 07/28
+        src["files"][0]["rowsOmitted"] = "3 rows on dates covered by b.pdf (same transactions; omitted)"
+        a = self.page(src)
+        g = a["duplicate_crosswalk"]
+        self.assertEqual([len(x["txn_ids"]) for x in g], [2])
+        self.assertEqual(sorted(x["source_ref"] for x in a["transactions"] if x["txn_id"] in g[0]["txn_ids"]),
+                         ["a.pdf p1 r57", "a.pdf p2 r58"])
+        self.assertEqual(a["sources"][0]["rows_omitted"], "3 rows on dates covered by b.pdf (same transactions; omitted)")
+
+    def test_unresolved_items_become_exception_records(self):
+        a = run().audit
+        ex = a["exceptions"]
+        u = next(x for x in ex if x["type"] == "U POSITION")
+        suncap = pos(run(), "SUNCAP")[0]
+        self.assertEqual(u["source_tx_ids"], suncap["debit_ids"])
+        self.assertEqual(u["severity"], "MATERIAL")
+        self.assertIn("HEADLINE $5,577", u["possible_effect_on_capacity"])  # sample: $11,577 falls by SunCap's $6,000 scenario
+        credit = next(x for x in ex if x["type"] == "UNRESOLVED CREDITS")
+        self.assertEqual(credit["severity"], "MATERIAL")
+        self.assertEqual(sum(x["type"] == "OPEN QUESTION" for x in ex), 9)
+        self.assertLessEqual({k for x in ex for k in x},
+                             {"type", "source_tx_ids", "why_unresolved", "possible_effect_on_capacity", "required_evidence", "severity"})
+
+    def test_every_file_has_a_source_record(self):
+        src = self.ledger_v1()
+        src["files"].append({"name": "scan.pdf", "status": "needs-ocr", "rows": []})
+        a = self.page(src)
+        self.assertEqual(a["sources"], [
+            dict(source_id="a.pdf", account_id="9805", period=dict(start="2026-06-01", end="2026-07-31"),
+                 extraction_status="verified", checks_passed=["balance"], checks_failed=["totals"],
+                 rows=56, pending=1, zero=0, flags=[], rows_omitted=None),
+            dict(source_id="scan.pdf", account_id=None, period=None, extraction_status="needs-ocr",
+                 checks_passed=[], checks_failed=[], rows=0, pending=0, zero=0, flags=[], rows_omitted=None),
+        ])
+
+
 class V17Batch4(unittest.TestCase):
     """V1.7 fixes from the 2026-11 spec review: peak floor, closure evidence, return tiers, wires, windows, binding."""
 
