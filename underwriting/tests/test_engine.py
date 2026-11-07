@@ -533,6 +533,33 @@ class V17Batch3(unittest.TestCase):
             uw.report_gate(rep.replace("Commingling Status: Present — Low", "Commingling Status: Some"))
 
 
+class SignOffB1(unittest.TestCase):
+    """Sign-off B1 (2026-11-07): an unresolved candidate credit under $2,500 stays in revenue."""
+
+    def setUp(self):
+        self.led = add_rows(
+            LEDGER,
+            [
+                ("OP", "2026-07-15", "2499.99", "credit", "WIRE IN ORIG ZETA SUPPLY REF 1"),
+                ("OP", "2026-08-14", "2500.00", "credit", "WIRE IN ORIG THETA PARTNERS REF 2"),
+            ],
+            "FL",
+        )
+        self.r = run(self.led)
+
+    def test_unanswered_credit_under_the_floor_keeps_its_rule_tag(self):
+        self.assertEqual(tags(self.r, self.led, "ZETA SUPPLY"), ["REV_WIRE"])
+        self.assertEqual(tags(self.r, self.led, "THETA PARTNERS"), ["STRIP_UNRESOLVED"])
+
+    def test_unsure_answer_under_the_floor_keeps_its_rule_tag(self):
+        qid = next(x["question_id"] for x in self.r.questions["questions"] if x["txn_ids"] == ["FL0"])
+        r = run(self.led, with_judgments(self.r, [dict(question_id=qid, tag="unsure")]))
+        self.assertEqual(tags(r, self.led, "ZETA SUPPLY"), ["REV_WIRE"])
+
+    def test_floor_is_a_named_policy_value(self):
+        self.assertEqual(uw.UNRESOLVED_FLOOR, D("2500"))
+
+
 class SignOffB18(unittest.TestCase):
     """Sign-off B18 (2026-11-06): a missing or unreadable statement blocks YES only, as V1.7 section 9 says."""
 

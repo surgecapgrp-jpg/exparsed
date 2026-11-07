@@ -241,12 +241,12 @@ Count: 150 rows. 19 B1, 33 B2, 24 B3, 10 B4, 38 Met, 20 Partial, 3 Gap, 3 Page.
 
 | # | V1.7 text | Engine reading |
 | ---: | :--- | :--- |
-| B1 | STRIP_UNRESOLVED for a "material receipt lacking sufficient evidence" | Every unanswered or "unsure" candidate credit becomes STRIP_UNRESOLVED. No per-credit dollar threshold applies. |
+| B1 | STRIP_UNRESOLVED for a "material receipt lacking sufficient evidence" | An unanswered or "unsure" candidate credit of $2,500 or more becomes STRIP_UNRESOLVED. **Signed off 2026-11-07, changed:** a smaller one keeps its rule tag and stays in revenue (`UNRESOLVED_FLOOR`, V1.7b9). Rule-verifiable funding evidence still strips it. |
 | B2 | "material U/excluded-revenue ... uncertainty affecting capacity => INSUFFICIENT DATA" | **Decided 2026-11-02, changed:** unresolved credits never block YES. They are already out of BASIS, so adding them back can only raise capacity. They block NO only when adding them back would reverse it. Their BASIS and HEADLINE sensitivity stays in `capacity.uncertainty`. Material U positions still block YES. |
 | B3 | "An incomplete or unverified cadence has a STRESS-only rate" | A position without a standard cadence (fewer than 3 cleared debits, or irregular gaps) is U with STRESS = max cleared debit x20. **Decided 2026-11-02: kept.** A material U row blocks YES, so leaving its STRESS cost out of the stack cannot produce an unsafe YES. |
-| B4 | U scenario cost | The last sustained monthly cost. For VARIABLE, cleared debits in the 20 bd ending at the last debit. |
-| B5 | "30 covered business days without collections" | Business days after the last cleared debit, through coverage end, inside the debit account's statement periods. |
-| B6 | Current window "through the end of the relevant account's available coverage" | The debit account's last statement end date. |
+| B4 | U scenario cost | The last sustained monthly cost. For VARIABLE, cleared debits in the 20 bd ending at the last debit. **Signed off 2026-11-07, kept.** |
+| B5 | "30 covered business days without collections" | Business days after the last cleared debit, through coverage end, inside the debit account's statement periods. **Signed off 2026-11-07, kept.** |
+| B6 | Current window "through the end of the relevant account's available coverage" | The debit account's last statement end date. **Signed off 2026-11-07, kept.** |
 | B7 | Combined U exposure | When no single U position is material, the sum of all U scenarios is tested. A material sum marks every U material. |
 
 ## Batch 1 effect on saved runs
@@ -378,3 +378,13 @@ Not in batch 4: report publication after rejected answer files (V3 handoff, done
 | Sample, both runs | Same report |
 | Real, no answers | Same report and HEADLINE. 2,147 trace IDs and 2,057 originator IDs read (0 originator IDs before); 105 exception records (86 open questions, 11 U positions, 6 account requests, 1 VERIFY OWNERSHIP, 1 unresolved credits) |
 | Real, saved answers | Same HEADLINE $39,061. The KAPITUS to KAPITUS SERVICIN descriptor change now joins on "shared originator ID" (was "debits fill open slots"); 21 exception records |
+
+## Sign-offs B1, B4, B5, B6 (2026-11-07; policy V1.7b9)
+
+B1 changed: `UNRESOLVED_FLOOR = D("2500")`. An unanswered or "unsure" candidate credit under $2,500 keeps its rule tag and stays in revenue. Its disposition stays UNRESOLVED. B4, B5 and B6 are kept as written.
+
+| Run | Effect |
+| :--- | :--- |
+| Sample, both runs | Same report |
+| Real, no answers | STRIP_UNRESOLVED $244,097 in 14 months to $230,179 in 12. BASIS $137,284 to $137,951. HEADLINE $74,570 to $74,970. Still INSUFFICIENT DATA |
+| Real, saved answers | Same HEADLINE $39,061. ADP TAX 03/09/26 $168.50 (the 1 open question) stays in revenue: Mar-26 True Revenue $79,553 to $79,721 |
