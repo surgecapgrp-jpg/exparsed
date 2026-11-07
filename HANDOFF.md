@@ -1,6 +1,6 @@
 # exparsed handoff
 
-Code state on 2026-11-07 at the merge of PR #29 (the last code change). Later commits that only
+Code state on 2026-11-07 at the merge of PR #30 (the last code change). Later commits that only
 edit this file are not listed. Repo: https://github.com/surgecapgrp-jpg/exparsed (private).
 This file replaces the 2026-10-26 handoff. The underwriting design detail is in `underwriting/docs/HANDOFF.md`,
 and the policy compliance detail is in `underwriting/docs/V1_7_MATRIX.md`.
@@ -16,7 +16,7 @@ underwrites the merchant for MCA capacity under policy V1.7.
 | Underwriting engine | Experiment. Policy V1.7 batches 1 to 4 merged. Run on 1 real ledger and 1 synthetic ledger. |
 | Underwrite button and chat | Built and tested with a mocked browser run. Never run in real Chrome with real Pyodide and a real key. |
 | UI | Surge Capital theme (PR #9, merged 2026-11-04). |
-| Tests | 217 JS tests, 88 engine tests, 18 end-to-end page checks: all pass on `main`. |
+| Tests | 261 JS tests, 88 engine tests, 18 end-to-end page checks: all pass on `main`. |
 
 The next step is a real Chrome run on 3 to 5 real merchant files (section 9, item 1).
 
@@ -35,7 +35,7 @@ The next step is a real Chrome run on 3 to 5 real merchant files (section 9, ite
 | `underwriting/tests/` | `test_engine.py` (88 tests), `make_fixture.py`, `fixtures/sample_ledger.json` (321 rows, Jun to Sep 2026) and `fixtures/sample_judgments.json`. |
 | `underwriting/docs/HANDOFF.md` | Engine design, contracts, trust boundary, interpretations 1 to 19. |
 | `underwriting/docs/V1_7_MATRIX.md` | 150 V1.7 rules mapped to code, interpretations B1 to B21, effect of each batch on saved runs. |
-| `tests/` | JS unit tests for the page (`run-node.js` or `run.sh`), `extract.py`, synthetic samples. |
+| `tests/` | JS unit tests for the page (`run-node.js` or `run.sh`), `extract.py`, synthetic samples, batch harness `batch/run.js`. |
 | `DESIGN_REVIEW.md` | The 2026-11-02 architecture review. Changes 2 to 5 are done; change 1 is open. |
 | `underwriting/legacy/` | Empty except a cache folder. Safe to delete. |
 | `tests/families.js.removed` | Old payee-grouping tests. Not run. |
@@ -51,7 +51,8 @@ The repo holds no customer statements. The one real ledger used for testing sits
 | OCR server | Starts at login through `~/Library/LaunchAgents/local.exparsed.macocr.plist`. Manual: `python3 mac_ocr_server.py`. Check: `launchctl list \| grep exparsed`. |
 | Keys | Settings > AI providers. One Claude key and model, one OpenRouter key and model. Held in memory only, lost on reload. |
 | Underwrite | Underwrite button > Run. First run downloads Pyodide 0.27.2 (about 10 MB) from cdn.jsdelivr.net. |
-| Page tests | `node tests/run-node.js` (217 pass) or `bash tests/run.sh` on macOS. |
+| Page tests | `node tests/run-node.js` (261 pass) or `bash tests/run.sh` on macOS. |
+| Batch run | `node tests/batch/run.js <dir> <out.jsonl> [--ocr]`, then `node tests/batch/run.js compare old.jsonl new.jsonl` (exit 1 when a ledger got worse). Needs Playwright and network access to cdnjs. |
 | Engine tests | `cd underwriting && python3 -m unittest discover -s tests` (88 pass). |
 | Engine CLI | `python3 underwriting/engine/uw.py underwriting/tests/fixtures/sample_ledger.json --out run/` |
 | After an engine change | `python3 underwriting/embed.py`. Test `PageEmbed` fails until the page copy matches. |
@@ -167,8 +168,9 @@ execution order (H11), FLIGHT inflow scope (P15).
 | #24 | `10c0fe4` | V1.7 R1, R3, R7, S3, S7: source, transaction and exception records (policy V1.7b8) |
 | #25 | `d5c4885` | Handoff update after #24 (handoff-only PRs after this one are not listed) |
 | #27 | `101ea11` | Sign-off B22 kept (docs) |
-| #28 | this PR | Stage manifest: `audit.stages`, one entry per V1.7 execution-order stage (open item 8) |
-| #29 | this PR | Review queue: open questions answered by an underwriter in the judgments format (open item 11) |
+| #28 | `a62ecf9` | Stage manifest: `audit.stages`, one entry per V1.7 execution-order stage (open item 8) |
+| #29 | `82955fc` | Review queue: open questions answered by an underwriter in the judgments format (open item 11) |
+| #30 | this PR | Batch harness `tests/batch/run.js` from `batch-harness`; `ocr.js` runs under node; 25 merged branches deleted (open item 13) |
 
 Rollback point before all underwriting work: `283bc50`.
 
@@ -242,9 +244,10 @@ the 19 readings in `underwriting/docs/HANDOFF.md` section 4.1.
 
 ## 7. Verification
 
-| Check | Result on `main` after PR #29 |
+| Check | Result on `main` after PR #30 |
 | :--- | :--- |
-| `node tests/run-node.js` | 217 passed, 0 failed |
+| `node tests/run-node.js` | 261 passed, 0 failed (`ocr.js` adds 44) |
+| `tests/batch/run.js` on `tests/samples` (pdf.js stubbed: the cloud session cannot reach cdnjs) | 3 non-PDF files read through the page; `compare` reports a planted downgrade and exits 1 |
 | `python3 -m unittest discover -s tests` in `underwriting/` | 88 passed |
 | Engine self-checks per run | 17 pass on the sample |
 | Report checker on every rendered report | PASS |
@@ -262,7 +265,6 @@ the 19 readings in `underwriting/docs/HANDOFF.md` section 4.1.
 | FUNDED set, about 7,300 files, 5.3 GB | `/Users/springfunding/JuniMyAgentVault/02_Library_Reference/pdf-vision-ocr/test-statements/FUNDED` |
 | OCR server log | `~/Library/Logs/mac_ocr_server.log` |
 | Real test ledger and its saved answers | Uploaded to a Claude Code cloud session (`dce0c170-ledger.json`). Temporary; keep a private copy. |
-| Batch-run harness (`serve.py`, `hook.js`, `supervise.py`, `inx*.py`) | Remote branch `batch-harness` (4 commits, 2026-10-27), never merged. |
 | End-to-end harness (`engine_server.py`, `e2e.js`) | Cloud session scratchpad. Temporary; not in the repo. |
 
 ## 9. Open items, in order
@@ -301,13 +303,12 @@ the 19 readings in `underwriting/docs/HANDOFF.md` section 4.1.
     the model's answers (`uwReviewJudgments`) and reruns the engine; a rejected file leaves the report as it was
     and shows the engine error. Table 1 notes are not in the queue; they stay in the report.
 12. **Pricing.** Deferred by request; not started.
-13. **Unmerged branches.** 3 remote branches hold commits that are not in `main`. They share no history
-    with `main`; each starts with its own copy of the 2026-10-26 import.
-    - `batch-harness`: 1 real commit, `tests/batch/run.js` (236 lines) and `ocr.js` under node. Merge it so batch runs can be repeated.
-    - `uw-engine`: 3 real commits, a local Python model server (replaced by Pyodide in PR #4) and Python 3.9 support. `main` needs Python 3.10+.
-    - `deepen`: 6 real commits of refactors. Two fixes are ported (PR #12). Its newest-first day-end fix was not needed: `main` already reverses newest-first rows. The rest (parser script split, reader snapshots, one "needs OCR" rule) is optional.
-
-    `design-review-fixes`, `handoff-2026-11-05`, `date-and-export-fixes`, `handoff-update`, `tdd-open-items`, `handoff-pr14`, `b18-block-yes-only`, `handoff-pr16`, `model-call-module`, `handoff-pr18`, `v17-credit-coverage`, `handoff-pr20`, `v17-debit-side`, `handoff-pr22`, `v17-records`, `handoff-pr24`, `rebrand/surge-capital`, `underwriting-in-page` and `v17-batch1` to `v17-batch4` are merged and can be deleted.
+13. **Branches.** Done in PR #30. `tests/batch/run.js` and the `ocr.js` line in `run-node.js` are copied from
+    `batch-harness` (the branch shares no history with `main`). The 25 merged branches are deleted.
+    3 remote branches remain, none needed:
+    - `batch-harness`: its 1 real commit is now in `main`. Delete it.
+    - `uw-engine`: 3 commits, a local Python model server (replaced by Pyodide in PR #4) and Python 3.9 support. `main` needs Python 3.10+.
+    - `deepen`: 6 commits of refactors. Two fixes are ported (PR #12). The rest (parser script split, reader snapshots, one "needs OCR" rule) is optional.
 14. **Desktop set rerun after PR #12.** The stricter date check drops any row whose printed date is impossible. Rerun the 244 files and compare against section 4.
 
 ## 10. Rules for the next engineer
