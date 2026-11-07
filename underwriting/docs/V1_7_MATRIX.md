@@ -422,3 +422,20 @@ The checker now requires a Class A cure of Y, N or UNKNOWN and rejects a cured T
 | Sample and real, both runs | Same numbers. Table 9 detail and the WILL-PAY line gain the n/a and cure counts |
 
 Not in this batch: the V1.8 return-word scan log (R1), the character pass (B1 to B5) and the extra Table 4 and Table 9 detail.
+
+## V1.8 batch 2: return-word scan (2026-11-07; policy V1.8b2)
+
+V1.8 R1 asks for a record of every row with return wording, each linked to a return event or dismissed with a reason.
+
+- `RETURN_SCAN` matches STOP PAY, STOP PAYMENT, UNAUTHORIZED, NOT AUTH, AUTH REVOKED, ACH BLOCK, POSITIVE PAY, NSF, INSUFFICIENT FUNDS, UNCOLLECTED, RETURN, RETURNED, RETURN ITEM, REVERSAL, REVERSED, RECREDIT, CHARGEBACK and codes R01, R05, R07, R08, R09, R10, R29. Any other R-code counts only when the row also says ACH or RETURN. Every STRIP_RECREDIT row gets a record whatever its wording.
+- `audit.return_scan` holds one record per hit: transaction, account, date, description, amount, matched word, disposition and reason.
+- Dispositions: EVENT (linked to a Table 7 row), FEE (an NSF/OD fee, counted in Table 9 fees), DISMISSED (reason names the tag and that no returned attempt is linked).
+- 2 new self-checks: every hit has a disposition and reason; every Table 7 Class A return row is a hit.
+- Stage 9 counts hold the hit total by disposition.
+
+| Run | Effect |
+| :--- | :--- |
+| Sample, both runs | Same reports. 2 hits: 1 EVENT, 1 FEE |
+| Real, both runs | Same reports. 5 hits, all DISMISSED: a bank claim reversal (credit $2,965 and debit $515) and 3 fee reversals of $34 |
+
+The scan reads only supplied rows. Missing pages or accounts limit it, and a scan with no hits is not proof of no returns.
