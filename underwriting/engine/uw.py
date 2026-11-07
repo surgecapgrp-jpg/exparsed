@@ -46,7 +46,7 @@ from pathlib import Path
 
 D = Decimal
 ENGINE_VERSION = "3.4"
-POLICY_VERSION = "V1.7b8"
+POLICY_VERSION = "V1.7b9"
 
 # Policy parameters (V2.2 values with the V1.7 changes marked). Changing any value is a policy change: bump POLICY_VERSION.
 BUSINESS_DAYS_PER_MONTH = D(20)
@@ -73,6 +73,8 @@ CHAIN_GAP_BD = 10  # re-presentments within this gap belong to one attempt chain
 TOP_STREAMS = 6
 FIXED_SHARE = D("0.8")   # share of payments in same-amount runs that makes a series fixed-amount
 LARGE_DEPOSIT_MULTIPLE = 3  # a credit at this multiple of the median deposit is unusual
+# Sign-off B1 (2026-11-07): an unresolved candidate credit under this amount is not material and keeps its rule tag.
+UNRESOLVED_FLOOR = D("2500")
 SCORE_NEAR_CAL = 3  # funding credit within this many calendar days of its first debit scores +1
 THIN_BALANCE_DAYS = 3  # THIN_BALANCE = this many business days of the live stack's daily cost
 # Business-day gap between debits -> cadence: <=2 daily, <=7 weekly, <=12 biweekly, 18 to 25 monthly.
@@ -1530,8 +1532,9 @@ class _Engine:
                 continue
             for i in q["txn_ids"]:
                 t = self.by_id[i]
-                if not a:  # V1.7: unanswered candidate credits stay out of revenue
-                    t.tag, t.tag_source = "STRIP_UNRESOLVED", "default"
+                if not a:  # V1.7: unanswered candidate credits stay out of revenue, from UNRESOLVED_FLOOR up (B1)
+                    if t.amt >= UNRESOLVED_FLOOR:
+                        t.tag, t.tag_source = "STRIP_UNRESOLVED", "default"
                     continue
                 t.tag, t.tag_source = a["tag"], "judgment"
                 if a["tag"] == "STRIP_FUNDING":

@@ -1,6 +1,6 @@
 # exparsed handoff
 
-Code state on 2026-11-07 at the merge of PR #30 (the last code change). Later commits that only
+Code state on 2026-11-07 at the merge of PR #31 (the last code change). Later commits that only
 edit this file are not listed. Repo: https://github.com/surgecapgrp-jpg/exparsed (private).
 This file replaces the 2026-10-26 handoff. The underwriting design detail is in `underwriting/docs/HANDOFF.md`,
 and the policy compliance detail is in `underwriting/docs/V1_7_MATRIX.md`.
@@ -16,7 +16,7 @@ underwrites the merchant for MCA capacity under policy V1.7.
 | Underwriting engine | Experiment. Policy V1.7 batches 1 to 4 merged. Run on 1 real ledger and 1 synthetic ledger. |
 | Underwrite button and chat | Built and tested with a mocked browser run. Never run in real Chrome with real Pyodide and a real key. |
 | UI | Surge Capital theme (PR #9, merged 2026-11-04). |
-| Tests | 261 JS tests, 88 engine tests, 18 end-to-end page checks: all pass on `main`. |
+| Tests | 261 JS tests, 91 engine tests, 18 end-to-end page checks: all pass on `main`. |
 
 The next step is a real Chrome run on 3 to 5 real merchant files (section 9, item 1).
 
@@ -32,7 +32,7 @@ The next step is a real Chrome run on 3 to 5 real merchant files (section 9, ite
 | `underwriting/prompts/judge.md` | System prompt for the judgment call. |
 | `underwriting/schemas/` | `ledger.schema.json` (engine input) and `judgments.schema.json` (model output, also sent as the structured-output schema). |
 | `underwriting/embed.py` | Copies engine, adapter, checker and prompt into `exparsed.html` between the `UW-EMBED` markers (lines 454 to 4437). |
-| `underwriting/tests/` | `test_engine.py` (88 tests), `make_fixture.py`, `fixtures/sample_ledger.json` (321 rows, Jun to Sep 2026) and `fixtures/sample_judgments.json`. |
+| `underwriting/tests/` | `test_engine.py` (91 tests), `make_fixture.py`, `fixtures/sample_ledger.json` (321 rows, Jun to Sep 2026) and `fixtures/sample_judgments.json`. |
 | `underwriting/docs/HANDOFF.md` | Engine design, contracts, trust boundary, interpretations 1 to 19. |
 | `underwriting/docs/V1_7_MATRIX.md` | 150 V1.7 rules mapped to code, interpretations B1 to B21, effect of each batch on saved runs. |
 | `tests/` | JS unit tests for the page (`run-node.js` or `run.sh`), `extract.py`, synthetic samples, batch harness `batch/run.js`. |
@@ -53,7 +53,7 @@ The repo holds no customer statements. The one real ledger used for testing sits
 | Underwrite | Underwrite button > Run. First run downloads Pyodide 0.27.2 (about 10 MB) from cdn.jsdelivr.net. |
 | Page tests | `node tests/run-node.js` (261 pass) or `bash tests/run.sh` on macOS. |
 | Batch run | `node tests/batch/run.js <dir> <out.jsonl> [--ocr]`, then `node tests/batch/run.js compare old.jsonl new.jsonl` (exit 1 when a ledger got worse). Needs Playwright and network access to cdnjs. |
-| Engine tests | `cd underwriting && python3 -m unittest discover -s tests` (88 pass). |
+| Engine tests | `cd underwriting && python3 -m unittest discover -s tests` (91 pass). |
 | Engine CLI | `python3 underwriting/engine/uw.py underwriting/tests/fixtures/sample_ledger.json --out run/` |
 | After an engine change | `python3 underwriting/embed.py`. Test `PageEmbed` fails until the page copy matches. |
 
@@ -118,7 +118,7 @@ naming its funder.
 
 ### 5.2 Policy V1.7 coverage
 
-`ENGINE_VERSION` 3.4, `POLICY_VERSION` V1.7b8. The matrix tracks 150 rules:
+`ENGINE_VERSION` 3.4, `POLICY_VERSION` V1.7b9. The matrix tracks 150 rules:
 
 | Status | Rows |
 | :--- | ---: |
@@ -170,7 +170,8 @@ execution order (H11), FLIGHT inflow scope (P15).
 | #27 | `101ea11` | Sign-off B22 kept (docs) |
 | #28 | `a62ecf9` | Stage manifest: `audit.stages`, one entry per V1.7 execution-order stage (open item 8) |
 | #29 | `82955fc` | Review queue: open questions answered by an underwriter in the judgments format (open item 11) |
-| #30 | this PR | Batch harness `tests/batch/run.js` from `batch-harness`; `ocr.js` runs under node; merged branches listed for deletion (open item 13) |
+| #30 | (open) | Batch harness `tests/batch/run.js` from `batch-harness`; `ocr.js` runs under node; merged branches listed for deletion (open item 13) |
+| #31 | this PR | Sign-offs B1 (changed: $2,500 floor for STRIP_UNRESOLVED, policy V1.7b9), B4, B5, B6 (kept) |
 
 Rollback point before all underwriting work: `283bc50`.
 
@@ -194,7 +195,7 @@ Rollback point before all underwriting work: `283bc50`.
 | :--- | :--- | ---: |
 | Sample ledger, engine defaults | INSUFFICIENT DATA | $11,577 |
 | Sample ledger, saved answers | INSUFFICIENT DATA | $5,217 |
-| Real ledger, engine defaults | INSUFFICIENT DATA | $74,570 |
+| Real ledger, engine defaults | INSUFFICIENT DATA | $74,970 |
 | Real ledger, saved answers | INSUFFICIENT DATA | $39,061 |
 
 Since V1.7b6 (PR #20) the saved real-ledger answers leave 1 question open: ADP TAX 03/09/26 $168.50, a new
@@ -237,18 +238,22 @@ Signed off 2026-11-07:
 
 | # | Decision |
 | :--- | :--- |
+| B1 | Changed (PR #31, policy V1.7b9): an unanswered or "unsure" candidate credit under $2,500 keeps its rule tag and stays in revenue (`UNRESOLVED_FLOOR`). From $2,500 up it is STRIP_UNRESOLVED. |
+| B4 | Kept: a U position's scenario cost is its last sustained monthly cost; VARIABLE uses the 20 bd ending at the last debit. |
+| B5 | Kept: 30 covered business days after the last cleared debit, inside the debit account's statement periods. |
+| B6 | Kept: the current window ends at the debit account's last statement end date. |
 | B22 | Kept (PR #22, policy V1.7b7): same-amount same-day doubles count as a second schedule only on 3 consecutive debit days. A single double, such as the day after a holiday, is a catch-up payment. |
 
-Waiting for sign-off: B1, B4 to B7, B9, B11 to B17, B19 to B21 in `underwriting/docs/V1_7_MATRIX.md`, and
+Waiting for sign-off: B7, B9, B11 to B17, B19 to B21 in `underwriting/docs/V1_7_MATRIX.md`, and
 the 19 readings in `underwriting/docs/HANDOFF.md` section 4.1.
 
 ## 7. Verification
 
-| Check | Result on `main` after PR #30 |
+| Check | Result on `main` after PR #31 |
 | :--- | :--- |
 | `node tests/run-node.js` | 261 passed, 0 failed (`ocr.js` adds 44) |
 | `tests/batch/run.js` on `tests/samples` (pdf.js stubbed: the cloud session cannot reach cdnjs) | 3 non-PDF files read through the page; `compare` reports a planted downgrade and exits 1 |
-| `python3 -m unittest discover -s tests` in `underwriting/` | 88 passed |
+| `python3 -m unittest discover -s tests` in `underwriting/` | 91 passed |
 | Engine self-checks per run | 17 pass on the sample |
 | Report checker on every rendered report | PASS |
 | End-to-end page run (headless Chromium, real engine behind a local server, mocked Pyodide and model, 3-month CSV) | 18 of 18 |
@@ -277,7 +282,7 @@ the 19 readings in `underwriting/docs/HANDOFF.md` section 4.1.
    statements that run into January 2028 arrive.
 3. **Rejected-answer fallback.** Done in PR #14: a second rejection shows "Engine stopped: answers rejected
    twice (...); no report" and clears any earlier report.
-4. **Sign-offs.** B18 done in PR #16, B22 in PR #27. The other open interpretations remain (section 6).
+4. **Sign-offs.** B18 done in PR #16, B22 in PR #27, B1 and B4 to B6 in PR #31. Next batch: B7, B9, B11, B12. The other open interpretations remain (section 6).
 5. **Standards fixes from the 2026-11-02 review.** Done in PR #14. The engine's inline numbers are named
    constants at the top of `uw.py`. The adapter uses `uw.WORST_ORDER`. `import uw` sits inside `page_run`'s
    `try`. The checker keeps its own named copy of 4 policy numbers, and a test fails when they differ from the
