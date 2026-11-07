@@ -510,7 +510,8 @@ class V17Batch3(unittest.TestCase):
         self.assertEqual([m["true"] for m in r.audit["months"]], [m["true"] for m in base.audit["months"]])
 
     def test_unpaired_return_credit_is_class_a(self):
-        # Sign-off B21 (2026-11-07): a return credit with no matching debit is Class A, T1 by code, else T2, uncured.
+        # Sign-off B21 (2026-11-07): a return credit with no matching debit is Class A.
+        # V1.8 R3/R4: the debit is unknown, so tier n/a and cure UNKNOWN.
         led = add_rows(
             LEDGER,
             [("OP", "2026-08-19", "612.00", "credit", "RETURN ITEM R01 ACME SUPPLY"),
@@ -519,7 +520,8 @@ class V17Batch3(unittest.TestCase):
         )
         r = run(led)
         ev = [(e["amt"], e["cls"], e["tier"], e["cured"]) for e in r.audit["returns"] if e["attempts"][0].startswith("RU")]
-        self.assertEqual(ev, [(D("612.00"), "A", "T2", "N (debit not found)"), (D("240.00"), "A", "T1", "N (debit not found)")])
+        self.assertEqual(ev, [(D("612.00"), "A", "n/a", "UNKNOWN (debit not found)"),
+                              (D("240.00"), "A", "n/a", "UNKNOWN (debit not found)")])
         self.assertFalse([e for e in r.audit["returns"] if e["cls"] == "UNKNOWN"])
 
     def test_checker_policy_numbers_match_the_engine(self):
@@ -898,6 +900,38 @@ class V17Batch4(unittest.TestCase):
         # K8: stop-pay MCA/loan never cured, even with a cleared re-presentment.
         ev = self.returned("SBA EIDL LOAN PMT", "R08", then=True)
         self.assertEqual((ev["tier"], ev["cured"][:1]), ("T1", "N"))
+
+    def test_vendor_stop_pay_is_t3(self):
+        # V1.8 R3: T1 needs a finance collection. A vendor stop-pay is a T3 vendor return.
+        self.assertEqual(self.returned("ACME PAPER SUPPLY", "R08")["tier"], "T3")
+
+    def test_payroll_stop_pay_has_tier_na(self):
+        # V1.8 R3: a stop code on payroll has an unclear initiator, so the tier is n/a.
+        self.assertEqual(self.returned("GUSTO PAYROLL", "R08")["tier"], "n/a")
+
+    def test_mca_stop_pay_stays_t1(self):
+        led = add_rows(LEDGER, [("OP", "2026-08-04", "450.00", "debit", "RAPIDFUND LLC ACH DEBIT"),
+                                ("OP", "2026-08-05", "450.00", "credit", "RAPIDFUND LLC ACH DEBIT RETURN R08")], "RT")
+        r0 = run(led)
+        r = run(led, with_judgments(r0, [dict(question_id=q(r0, "RAPIDFUND LLC"), tag="MCA", funder="RapidFund")]))
+        ev = next(e for e in r.audit["returns"] if e["attempts"][0] == "RT0")
+        self.assertEqual((ev["tier"], ev["cured"][:1]), ("T1", "N"))
+
+    def test_cure_is_unknown_without_follow_up_or_balance(self):
+        # V1.8 R4: a return on the last covered day has no 2 bd follow-up window.
+        led = add_rows(LEDGER, [("OP", "2026-09-29", "800.00", "debit", "ACME PAPER SUPPLY"),
+                                ("OP", "2026-09-30", "800.00", "credit", "ACME PAPER SUPPLY RETURN R01")], "RT")
+        ev = next(e for e in run(led).audit["returns"] if e["attempts"][0] == "RT0")
+        self.assertEqual(ev["cured"], "UNKNOWN (follow-up not covered)")
+        # A re-presentment that cleared with no printed balance cannot show funds were available.
+        led = add_rows(LEDGER, [("OP", "2026-08-04", "800.00", "debit", "ACME PAPER SUPPLY"),
+                                ("OP", "2026-08-05", "800.00", "credit", "ACME PAPER SUPPLY RETURN R01"),
+                                ("OP", "2026-08-06", "800.00", "debit", "ACME PAPER SUPPLY")], "RT")
+        for t in led["transactions"]:
+            if t["txn_id"].startswith("RT"):
+                t.pop("balance", None)
+        ev = next(e for e in run(led).audit["returns"] if e["attempts"][0] == "RT0")
+        self.assertEqual(ev["cured"], "UNKNOWN (re-presented; balance unknown)")
 
     def test_plain_wire_gets_no_finance_points(self):
         # M8: +2 needs explicit finance terms or a finance-origin wire.

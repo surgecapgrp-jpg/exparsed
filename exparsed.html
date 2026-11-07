@@ -505,7 +505,7 @@ from pathlib import Path
 
 D = Decimal
 ENGINE_VERSION = "3.4"
-POLICY_VERSION = "V1.7b11"
+POLICY_VERSION = "V1.8b1"
 
 # Policy parameters (V2.2 values with the V1.7 changes marked). Changing any value is a policy change: bump POLICY_VERSION.
 BUSINESS_DAYS_PER_MONTH = D(20)
@@ -2646,11 +2646,15 @@ class _Engine:
             first, last = ch[0], ch[-1]
             rc = self.by_id[last.returned_by]
             codes = " ".join(self.by_id[t.returned_by].desc.upper() for t in ch)
-            is_mca = first.tag.startswith("MCA_")
+            finance = first.tag.startswith("MCA_") or first.tag == "DEBT_SERVICE"
+            essential = first.tag in ("PAYROLL", "RENT", "TAX", "INSURANCE")
+            # V1.8 R3: T1 needs a stop/block code on an actual finance collection.
+            # A stop/block code on payroll, rent, tax or insurance has an unclear initiator: tier n/a.
+            # A vendor or discretionary item is T3 whatever the code.
             if T1.search(codes):
-                tier = "T1"
-            elif is_mca or first.tag in ("DEBT_SERVICE", "PAYROLL", "RENT", "TAX", "INSURANCE"):
-                tier = "T2"  # V1.7 K7: involuntary essential return, R01/R09 included
+                tier = "T1" if finance else "n/a" if essential else "T3"
+            elif finance or essential:
+                tier = "T2"  # involuntary essential return, R01/R09 included
             else:
                 tier = "T3"
             hi = self.cal.add(rc.date, CURE_WINDOW_BD)
@@ -2667,12 +2671,18 @@ class _Engine:
                 ),
                 None,
             )
-            if (is_mca or first.tag == "DEBT_SERVICE") and tier == "T1":
+            # V1.8 R4: Y needs a cleared re-presentment within 2 bd with funds available (EOD >= 0).
+            # UNKNOWN when the balance or the 2 bd follow-up window is missing from the statements.
+            if tier == "T1":
                 cured = "N (MCA/loan stop-pay)"
             elif cure and cure.bal is not None and cure.bal >= 0:
                 cured = f"Y (re-presented {cure.date:%m/%d} cleared)"
+            elif cure and cure.bal is not None:
+                cured = f"N (re-presented {cure.date:%m/%d} into overdraft)"
             elif cure:
-                cured = "N (re-presented; balance unknown)"
+                cured = "UNKNOWN (re-presented; balance unknown)"
+            elif self.acct_end[rc.acct] < hi:
+                cured = "UNKNOWN (follow-up not covered)"
             else:
                 cured = (
                     "N (returned "
@@ -2712,16 +2722,16 @@ class _Engine:
                         attempts=[t.id],
                     )
                 )
-        # V1.7 K6, sign-off B21 (2026-11-07): a return credit with no matching debit is a Class A return.
-        # The debit is unknown, so it may be essential: T1 by code, else T2, and never cured.
+        # Sign-off B21 (2026-11-07): a return credit with no matching debit is a Class A return.
+        # V1.8 R3/R4: the debit is unknown, so the item category and its follow-up are unknown: tier n/a, cure UNKNOWN.
         for c in self.txns:
             u = c.desc.upper()
             if c.dir == "credit" and c.tag == "STRIP_RECREDIT" and not c.returns and (RETURN_CODE.search(u) or "RETURN" in u):
                 code = RETURN_CODE.search(u)
                 self.t7.append(
-                    dict(date=c.date, who=c.norm, amt=c.amt, cls="A", tier="T1" if T1.search(u) else "T2",
+                    dict(date=c.date, who=c.norm, amt=c.amt, cls="A", tier="n/a",
                          desc=(f"ACH Rev {code.group(0)}; " if code else "") + "return credit, debit not found",
-                         cured="N (debit not found)", attempts=[c.id])
+                         cured="UNKNOWN (debit not found)", attempts=[c.id])
                 )
         self.t7.sort(key=lambda e: (e["date"], e["cls"]))
 
@@ -2775,7 +2785,8 @@ class _Engine:
     def narrative(self):
         a_events = [e for e in self.t7 if e["cls"] == "A"]
         tiers = Counter(e["tier"] for e in a_events)
-        uncured = sum(1 for e in a_events if not e["cured"].startswith("Y"))
+        uncured = sum(1 for e in a_events if e["cured"].startswith("N"))
+        unknown = sum(1 for e in a_events if e["cured"].startswith("UNKNOWN"))
         mca_ret = sum(
             1 for e in a_events if self.by_id[e["attempts"][0]].tag.startswith("MCA_")
         )
@@ -2783,8 +2794,8 @@ class _Engine:
             1 for t in self.txns if t.dir == "debit" and LEVY.search(t.desc.upper())
         )
         will = (
-            f"{len(a_events)} Class A return chain(s) (T1 {tiers['T1']}, T2 {tiers['T2']}, T3 {tiers['T3']}), "
-            f"{uncured} uncured; {mca_ret} MCA payment return(s); {len(self.od_days)} overdraft day(s)."
+            f"{len(a_events)} Class A return chain(s) (T1 {tiers['T1']}, T2 {tiers['T2']}, T3 {tiers['T3']}, n/a {tiers['n/a']}), "
+            f"{uncured} uncured, {unknown} cure unknown; {mca_ret} MCA payment return(s); {len(self.od_days)} overdraft day(s)."
         )
         if levies:
             will += f" {levies} levy/lien/garnishment debit(s) in bank text."
@@ -3610,7 +3621,9 @@ def tables(a):
     fee_months = sorted({mon((f["date"].year, f["date"].month)) for f in liq["fees"]})
     t9 = [
         ["Overdraft days", str(len(od)), ", ".join(map(mdy, od[:6])) + (" ..." if len(od) > 6 else "") or "None"],
-        ["Returned/NSF debit events", str(len(a_ev)), f"Class A: T1 {tiers['T1']}, T2 {tiers['T2']}, T3 {tiers['T3']}; UNKNOWN {sum(e['cls'] == 'UNKNOWN' for e in a['returns'])}"],
+        ["Returned/NSF debit events", str(len(a_ev)), f"Class A: T1 {tiers['T1']}, T2 {tiers['T2']}, T3 {tiers['T3']}, n/a {tiers['n/a']}; "
+         f"cured {sum(e['cured'].startswith('Y') for e in a_ev)}, uncured {sum(e['cured'].startswith('N') for e in a_ev)}, "
+         f"unknown {sum(e['cured'].startswith('UNKNOWN') for e in a_ev)}; UNKNOWN class {sum(e['cls'] == 'UNKNOWN' for e in a['returns'])}"],
         ["NSF/OD fees", f"{len(liq['fees'])}, {usd(sum((f['amount'] for f in liq['fees']), D(0)))}", ", ".join(fee_months) or "None"],
         [
             "Days below THIN_BALANCE",
@@ -3734,6 +3747,7 @@ Started as the V2.2 validator. V1.7 changes:
 - INSUFFICIENT DATA is allowed with two or more counted months, because material uncertainty and
   missing accounts are not fully visible in the report;
 - Table 7 Class accepts UNKNOWN (tier and cure n/a);
+- V1.8: Class A cure is Y, N or UNKNOWN, and a T1 row is never cured;
 - Commingling and Additional Accounts lines appear exactly once, in order, between What Would
   Flip This and the capacity-test line, with their fixed status words.
 
@@ -4067,6 +4081,9 @@ def validate(t):
         if r[3] == "B":
             require(r[4] == "n/a","Table 7: Class B cannot have return severity tier")
             require(r[6] == "n/a (paid by OD)","Table 7: Class B cure must be n/a (paid by OD)")
+        if r[3] == "A":
+            require(r[6].split(" ")[0] in ("Y","N","UNKNOWN"),"Table 7: Class A cure must be Y, N or UNKNOWN")
+            require(not (r[4] == "T1" and r[6].startswith("Y")),"Table 7: a T1 stop-pay is never cured")
 
     t8=t[SPEC[8][0]]
     require(len(t8)==1,"Table 8: expected one conclusion row")
