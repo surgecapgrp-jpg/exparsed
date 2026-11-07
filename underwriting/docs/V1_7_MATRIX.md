@@ -456,3 +456,18 @@ V1.8 B1 to B3 evidence, computed by code and kept in `audit.character_evidence`.
 | All 4 saved runs | Same reports |
 | Real | 7 of 10 positions computed. Kapitus 56 of 56 weekly, Forward Financing 167 of 167 daily, Accord 49 of 50, MS Equities 57 of 58. 5 thin days, EOD -$171.66 to -$4,192.82; no returns, so 0 sweeps |
 | Sample | BlueOak 6 of 7 weekly, SunCap 19 of 19 daily, CFG 4 of 4 |
+
+## V1.8 batch 4: character labels, part 2 (2026-11-07; policy V1.8b4)
+
+V1.8 B4 and B5: the judge picks the character and failure-mode labels from the batch 3 evidence. Code limits which labels the evidence can support.
+
+- The engine adds a `character` question only when a judgments file is supplied, so its evidence reflects the MCA answers. The page asks it in one extra model call and merges the answer into the same judgments file. A rejected or failed character answer keeps the earlier report, with a note.
+- The question id hashes the evidence. An answer given against older evidence is rejected as stale.
+- Allowed labels: LOW is barred when a coverage limit exists (material missing account or unreadable statement) or a finance T1 return is uncured. HIGH needs a finance T1 return or 2 or more sweep sequences. POSSIBLE VOLITIONAL and MIXED need at least one Class A finance return.
+- The answer carries `tag` (character), `failure_mode` and `text` (at most 400 characters). The WILL-PAY line becomes "Character X; failure-mode evidence Y (model reading of engine evidence; capacity verdict independent). text Counts: ...". Unanswered, it reads "Character INDETERMINATE; failure-mode evidence INDETERMINATE (not assessed)."
+- The character question is not counted as an open question (Table 1, status line, exception records) and is not in the review queue yet.
+- `judge.md` V3.1 adds the `character` section. `judgments.schema.json` adds `failure_mode`, the `character` id prefix and a 400-character `text`.
+
+| Run | Effect |
+| :--- | :--- |
+| All 4 saved runs | Only the WILL-PAY line changes: "Character INDETERMINATE ... (not assessed). Counts: ..." The saved judgments hold no character answer |

@@ -970,6 +970,42 @@ class V17Batch4(unittest.TestCase):
         day = next(d for d in ev["thin_days"] if d["date"] == date(2026, 8, 6))
         self.assertEqual((day["why"], day["returns"]), ("return date", ["SW2"]))
 
+    def char_q(self, r):
+        return next((x for x in r.questions["questions"] if x["type"] == "character"), None)
+
+    def test_character_question_waits_for_other_answers(self):
+        # V1.8 B4, B5: asked only once a judgments file exists, so the evidence reflects the MCA answers.
+        r0 = run()
+        self.assertIsNone(self.char_q(r0))
+        r1 = run(None, with_judgments(r0, []))
+        cq = self.char_q(r1)
+        # The sample has a payroll return only: no finance return, no T1, no sweep.
+        self.assertEqual(cq["allowed"], dict(character=["LOW", "ELEVATED", "INDETERMINATE"],
+                                             failure_mode=["CAPACITY", "INDETERMINATE"]))
+        self.assertTrue(r1.audit["narrative"]["will"].startswith("Character INDETERMINATE; failure-mode evidence INDETERMINATE (not assessed)."))
+
+    def test_character_answer_leads_the_will_pay_line(self):
+        r0 = run()
+        cid = self.char_q(run(None, with_judgments(r0, [])))["question_id"]
+        a = dict(question_id=cid, tag="ELEVATED", failure_mode="CAPACITY",
+                 text="One payroll return cured in 1 day; BlueOak missed 1 of 7 weekly pulls.", reason="evidence")
+        r = run(None, with_judgments(r0, [a]))
+        self.assertTrue(r.audit["narrative"]["will"].startswith("Character ELEVATED; failure-mode evidence CAPACITY"))
+        self.assertIn("Counts: 1 Class A return chain(s)", r.audit["narrative"]["will"])
+        self.assertEqual(self.char_q(r)["question_id"], cid)  # the answer does not change the evidence
+        self.assertEqual(r.audit["capacity"], run(None, with_judgments(r0, [])).audit["capacity"])
+
+    def test_character_answer_outside_the_evidence_is_rejected(self):
+        r0 = run()
+        cid = self.char_q(run(None, with_judgments(r0, [])))["question_id"]
+        bad = [(dict(tag="HIGH", failure_mode="CAPACITY"), "character 'HIGH' not allowed"),
+               (dict(tag="ELEVATED", failure_mode="POSSIBLE VOLITIONAL"), "failure_mode 'POSSIBLE VOLITIONAL' not allowed"),
+               (dict(tag="LOW", failure_mode="CAPACITY", question_id="Q-character-0000000000"), "stale")]
+        for extra, msg in bad:
+            a = dict(dict(question_id=cid, text="x" * 20), **extra)
+            with self.assertRaisesRegex(uw.UWError, msg):
+                run(None, with_judgments(r0, [a]))
+
     def test_plain_wire_gets_no_finance_points(self):
         # M8: +2 needs explicit finance terms or a finance-origin wire.
         led = add_rows(LEDGER, [("OP", "2026-07-30", "9000.00", "credit", "WIRE IN ORIG ACME CUSTOMER REF 9")], "WR")
