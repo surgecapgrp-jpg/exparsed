@@ -109,6 +109,30 @@ uwUnderwrite('claude', cfgC, 'P', engineFake('always'), fakeJudge([good, good]),
   T('A14b answers rejected twice: an error and no engine-default report', !o.result.ok && /rejected twice/.test(o.result.error) && /quote not in transaction text/.test(o.result.error) && o.result.report===undefined, o);
 });
 
+// A14c-A14e V1.8 character round: asked after the first answers, merged into one judgments file
+function engineChar(rejectChar){
+  return function(j){
+    if(!j) return { ok:true, questions:Q, report:'defaults' };
+    var p=JSON.parse(j), c=p.answers.filter(function(a){ return a.question_id==='Q-character-1'; })[0];
+    if(c && rejectChar) return { ok:false, error:"character 'HIGH' not allowed by the evidence" };
+    return { ok:true, report:c ? 'character '+c.tag+', '+p.answers.length+' answers' : 'counts only',
+      questions:{ ledger_sha256:'abc', questions:[{ question_id:'Q-debit-1' }, { question_id:'Q-character-1', type:'character' }] },
+      audit:{ questions_open: c ? [] : ['Q-character-1'] } };
+  };
+}
+var charAns='{"ledger_sha256":"x","answers":[{"question_id":"Q-character-1","tag":"ELEVATED","failure_mode":"CAPACITY","text":"t"}]}';
+var cSteps=[];
+uwUnderwrite('claude', cfgC, 'P', engineChar(false), fakeJudge([good, charAns]), function(t){ cSteps.push(t); }).then(function(o){
+  T('A14c character question gets a second call and both answers go in one file',
+    o.result.report==='character ELEVATED, 2 answers' && o.judgments.answers.length===2 && /character read/.test(cSteps[1]), [o, cSteps]);
+});
+uwUnderwrite('claude', cfgC, 'P', engineChar(true), fakeJudge([good, charAns]), function(){}).then(function(o){
+  T('A14d a rejected character read keeps the first result with a note',
+    o.result.report==='counts only' && o.judgments.answers.length===1 && /character read not applied/.test(o.note) && /HIGH/.test(o.note), o);
+});
+T('A14e review queue leaves out the character question',
+  uwQueue({ ok:true, questions:{ questions:[{ question_id:'Q-character-1', type:'character' }] }, audit:{ questions_open:['Q-character-1'] } }).length===0);
+
 // A15 structured output rejected by an older model: same request again without the schema
 var withSchema=[];
 function fake400(prov, cfg, req){

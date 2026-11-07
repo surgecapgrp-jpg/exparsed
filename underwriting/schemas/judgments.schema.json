@@ -15,12 +15,13 @@
         "additionalProperties": false,
         "required": ["question_id"],
         "properties": {
-          "question_id": {"type": "string", "pattern": "^Q-(credit|debit|core)-[0-9a-f]{10}$"},
-          "tag": {"type": "string", "description": "credit: a credit tag (STRIP_UNRESOLVED is the default) or unsure. debit_group: MCA, a debit tag, AMBIGUOUS_<LABEL> or unsure."},
+          "question_id": {"type": "string", "pattern": "^Q-(credit|debit|core|character)-[0-9a-f]{10}$"},
+          "tag": {"type": "string", "description": "credit: a credit tag (STRIP_UNRESOLVED is the default) or unsure. debit_group: MCA, a debit tag, AMBIGUOUS_<LABEL> or unsure. character: LOW, ELEVATED, HIGH, INDETERMINATE or unsure, from the question's allowed list."},
+          "failure_mode": {"enum": ["CAPACITY", "POSSIBLE VOLITIONAL", "MIXED", "INDETERMINATE"], "description": "character only, from the question's allowed list."},
           "funder": {"type": "string", "maxLength": 40},
           "evidence": {"$ref": "#/$defs/evidence"},
           "terminated": {"$ref": "#/$defs/evidence"},
-          "text": {"type": "string", "maxLength": 240},
+          "text": {"type": "string", "maxLength": 400, "description": "core_operation: at most 240 characters. character: at most 400."},
           "reason": {"type": "string", "maxLength": 300}
         }
       }

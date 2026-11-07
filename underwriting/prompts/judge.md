@@ -1,4 +1,4 @@
-# UW JUDGMENT PROMPT V3.0 (policy V1.7)
+# UW JUDGMENT PROMPT V3.1 (policy V1.8)
 
 ## Role
 
@@ -50,6 +50,18 @@ Pick one tag:
 - `DIRECT_COST` is a recurring supplier tied to cost of revenue. Isolated retail purchases stay `OTHER`.
 - `AMBIGUOUS_<LABEL>` (for example `AMBIGUOUS_CARD_PAYMENT`) is a recurring obligation whose nature is unclear. It is shown in Table 5 and kept out of the obligation total.
 - Add `terminated` only when a document or a transaction description proves the position was paid off or closed. Use the same `kind`/`quote`/`doc_id` shape as `evidence`. A `bank_text` quote must appear on one transaction of this payee or one naming its funder; cleared debits after that transaction keep the position open. An estimated payoff is not proof. Without `terminated`, a position whose debits stopped is reported U (unresolved) with a scenario cost, and a material U position blocks a YES verdict.
+
+### `character`
+
+Asked in a second round, after your other answers are applied. `facts` holds the engine's evidence: Class A returns with tier and cure, expected versus cleared collections per position, the lowest-balance days and return dates with what cleared that day, deposit-then-outflow-then-return sequences, overdraft days and coverage limits. `allowed` lists the labels the evidence can support; the engine rejects any other.
+
+Answer `tag` (character risk) and `failure_mode`, each from `allowed`, plus `text`: 2 or 3 sentences, at most 400 characters.
+
+- `tag`: `LOW` when finance payments cleared in the observed intervals, no T1 return, and thin-day priorities held. `ELEVATED` for strained finance payments, unexplained missing pulls, recurring T2 returns or adverse priorities without proof of intent. `HIGH` for repeated finance-specific stops or blocks, an uncured T1 with no servicing explanation, or recurring deposit-then-return sequences. `INDETERMINATE` when accounts, attempt history or balances are missing.
+- `failure_mode`: `CAPACITY` when shortfalls hit essential payments broadly or cures and injections show recovery. `POSSIBLE VOLITIONAL` only when finance returns coincide with discretionary outflows while funds were available. `MIXED` when both hold. `INDETERMINATE` otherwise.
+- `text` names the strongest fact, the strongest alternative explanation and the main data gap. A missing pull is not a return. A return code or a gap in collections alone does not show intent. Never state intent as fact.
+
+The labels describe observed conduct; they are not default probabilities. They do not change any capacity figure or the verdict. Answer `"tag": "unsure"` to leave both labels INDETERMINATE.
 
 ### `core_operation`
 

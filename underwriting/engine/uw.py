@@ -46,7 +46,7 @@ from pathlib import Path
 
 D = Decimal
 ENGINE_VERSION = "3.4"
-POLICY_VERSION = "V1.8b3"
+POLICY_VERSION = "V1.8b4"
 
 # Policy parameters (V2.2 values with the V1.7 changes marked). Changing any value is a policy change: bump POLICY_VERSION.
 BUSINESS_DAYS_PER_MONTH = D(20)
@@ -70,6 +70,10 @@ FLIGHT_SHARE = D("0.30")
 FLIGHT_DAYS = 2
 SWEEP_RETURN_BD = 5  # V1.8 B3 (interpretation, needs sign-off): outflow up to 5 bd before the returned attempt
 THIN_DAY_COUNT = 5  # V1.8 B2: lowest valid EOD dates per account
+# V1.8 B4, B5: labels the judge picks from the character evidence. They never change capacity.
+CHARACTER_LABELS = ("LOW", "ELEVATED", "HIGH", "INDETERMINATE")
+FAILURE_MODES = ("CAPACITY", "POSSIBLE VOLITIONAL", "MIXED", "INDETERMINATE")
+CHARACTER_TEXT_MAX = 400
 RETURN_MATCH_BD = 5  # recredit must follow its debit within this many business days
 CHAIN_GAP_BD = 10  # re-presentments within this gap belong to one attempt chain
 TOP_STREAMS = 6
@@ -394,6 +398,10 @@ def has_token(text, tokens):
     return any(re.search(rf"\b{re.escape(tok)}\b", text.upper()) for tok in tokens)
 
 
+def is_finance(t):
+    return t.tag.startswith("MCA_") or t.tag == "DEBT_SERVICE"
+
+
 def qid(kind, ids):
     return f"Q-{kind}-" + hashlib.sha1("|".join(sorted(ids)).encode()).hexdigest()[:10]
 
@@ -592,6 +600,7 @@ class _Engine:
         self.return_scan()
         self.liquidity()
         self.character_evidence()
+        self.character_question()
         self.narrative()
         self.completeness_audit()
         self.self_check()
@@ -1111,6 +1120,7 @@ class _Engine:
         )
 
     def read_judgments(self, j):
+        self.judged, self.char_answer = j is not None, None
         if j is None:
             return {}
         require(
@@ -1124,8 +1134,13 @@ class _Engine:
         qs = {q["question_id"]: q for q in self.questions}
         out = {}
         for a in j["answers"]:
-            q = qs.get(a.get("question_id"))
             what = f"judgment {a.get('question_id')}"
+            if str(a.get("question_id", "")).startswith("Q-character-"):
+                # The character question exists only after the evidence is built; character_question() checks it.
+                require(self.char_answer is None, f"{what}: answered twice")
+                self.char_answer = a
+                continue
+            q = qs.get(a.get("question_id"))
             require(q is not None, f"{what}: unknown question id")
             require(a["question_id"] not in out, f"{what}: answered twice")
             if q["type"] == "core_operation":
@@ -2367,7 +2382,7 @@ class _Engine:
         """V1.8 B1 to B3 evidence. Code lists facts; it never labels intent or changes capacity."""
         covered = {a: [(s, e) for s, e in v["statements"]] for a, v in self.accts.items()}
         cov = lambda a, d: any(s <= d <= e for s, e in covered[a])
-        finance = lambda t: t.tag.startswith("MCA_") or t.tag == "DEBT_SERVICE"
+        finance = is_finance
         essential = ("PAYROLL", "RENT", "TAX", "INSURANCE", "DIRECT_COST", "UTILITIES")
         # B1: expected versus observed pulls inside each position's observed servicing interval.
         self.collections = []
@@ -2446,6 +2461,63 @@ class _Engine:
                     returned_attempt=att.id, attempt_date=att.date, tier=e["tier"], flight_screen=c.id in flight_ids,
                     note="timing only; purpose and intent are not established"))
 
+    def character_question(self):
+        """V1.8 B4, B5: one judge question over the character evidence, asked once other answers exist.
+
+        Its id hashes the evidence, so an answer given against older evidence is rejected as stale.
+        Code limits the labels the evidence can support; the judge picks within them.
+        """
+        if not self.judged:
+            if self.char_answer:
+                raise UWError("judgment: character answer without a judgments file")
+            return
+        fin = lambda e: is_finance(self.by_id[e["attempts"][0]])
+        a_ev = [e for e in self.t7 if e["cls"] == "A"]
+        f_ev = [e for e in a_ev if fin(e)]
+        t1_open = [e for e in f_ev if e["tier"] == "T1" and not e["cured"].startswith("Y")]
+        facts = dict(
+            class_a_returns=len(a_ev), finance_returns=len(f_ev), finance_t1=sum(e["tier"] == "T1" for e in f_ev),
+            uncured=sum(e["cured"].startswith("N") for e in a_ev),
+            cure_unknown=sum(e["cured"].startswith("UNKNOWN") for e in a_ev),
+            overdraft_days=len(self.od_days),
+            returns=[dict(date=e["date"].isoformat(), item=e["who"], amount=str(e["amt"]), tier=e["tier"],
+                          cured=e["cured"], finance=fin(e)) for e in a_ev[:20]],
+            collections=[dict(position=r["position"], cadence=r["cadence"], expected=r["expected"],
+                              cleared_days=r["cleared_days"], returned_days=r["returned_days"], missing=r["missing"],
+                              basis=r["basis"]) for r in self.collections],
+            thin_days=[dict(date=r["date"].isoformat(), eod=None if r["eod"] is None else str(r["eod"]), why=r["why"],
+                            finance_cleared=len(r["finance_cleared"]), essential_cleared=len(r["essential_cleared"]),
+                            returns=len(r["returns"]), owner_injections=len(r["owner_injections"]),
+                            owner_or_transfer_out=len(r["owner_or_transfer_out"]),
+                            finance_return_with_outflow=r["finance_return_with_outflow"]) for r in self.thin_days],
+            sweeps=[dict(deposit_date=s["deposit_date"].isoformat(), deposit=str(s["deposit_amount"]),
+                         outflow_date=s["outflow_date"].isoformat(), outflow=str(s["outflow_amount"]),
+                         destination=s["destination"], attempt_date=s["attempt_date"].isoformat(), tier=s["tier"])
+                    for s in self.sweeps],
+            coverage_limits=self.coverage_block,
+        )
+        allowed = dict(
+            character=[x for x in CHARACTER_LABELS
+                       if not (x == "LOW" and (self.coverage_block or t1_open))
+                       and not (x == "HIGH" and not (facts["finance_t1"] or len(self.sweeps) >= 2))],
+            failure_mode=[x for x in FAILURE_MODES if f_ev or x not in ("POSSIBLE VOLITIONAL", "MIXED")],
+        )
+        q = dict(question_id=qid("character", [self.sha, stage_hash(facts)]), type="character", txn_ids=[],
+                 facts=facts, allowed=allowed, default="INDETERMINATE / INDETERMINATE: WILL-PAY shows the counts only")
+        self.questions.append(q)
+        a = self.char_answer
+        if not a or a.get("tag") == "unsure":
+            return
+        what = f"judgment {a.get('question_id')}"
+        require(a.get("question_id") == q["question_id"], f"{what}: character question is stale (evidence changed); ask it again")
+        tag, mode = a.get("tag"), a.get("failure_mode")
+        require(tag in allowed["character"], f"{what}: character {tag!r} not allowed by the evidence ({', '.join(allowed['character'])})")
+        require(mode in allowed["failure_mode"],
+                f"{what}: failure_mode {mode!r} not allowed by the evidence ({', '.join(allowed['failure_mode'])})")
+        text = re.sub(r"\s+", " ", str(a.get("text", ""))).strip()
+        require(0 < len(text) <= CHARACTER_TEXT_MAX, f"{what}: text must be 1 to {CHARACTER_TEXT_MAX} characters")
+        self.answers[q["question_id"]] = dict(tag=tag, failure_mode=mode, text=text, reason=str(a.get("reason", ""))[:300])
+
     # ---- 11. narrative (deterministic except Core Operation) --------------------------------------
     def narrative(self):
         a_events = [e for e in self.t7 if e["cls"] == "A"]
@@ -2464,6 +2536,14 @@ class _Engine:
         )
         if levies:
             will += f" {levies} levy/lien/garnishment debit(s) in bank text."
+        # V1.8 B4, B5: the labels lead the line; the counts stay as code facts. Capacity is unaffected.
+        cq = next((q for q in self.questions if q["type"] == "character"), None)
+        ca = self.answers.get(cq["question_id"]) if cq else None
+        if ca:
+            will = (f"Character {ca['tag']}; failure-mode evidence {ca['failure_mode']} (model reading of engine "
+                    f"evidence; capacity verdict independent). {ca['text']} Counts: {will}")
+        else:
+            will = f"Character INDETERMINATE; failure-mode evidence INDETERMINATE (not assessed). Counts: {will}"
         pw = self.peak_week
         if pw and pw["weekly"] >= self.cur_weekly:
             pk = f"Peak weekly {usd(pw['weekly'])} in week of {mdy(pw['monday'])} vs current weekly {usd(self.cur_weekly)}."
@@ -2728,7 +2808,7 @@ class _Engine:
                                 possible_effect_on_capacity="its transactions are not in any figure",
                                 required_evidence="a readable copy or OCR", severity="MATERIAL"))
         for q in self.questions:
-            if q["question_id"] not in self.answers:
+            if q["question_id"] not in self.answers and q["type"] != "character":
                 out.append(dict(type="OPEN QUESTION", source_tx_ids=q["txn_ids"],
                                 why_unresolved=f"{q['type']} question {q['question_id']} unanswered; engine default applied",
                                 possible_effect_on_capacity="the default is the conservative reading",
@@ -3134,7 +3214,7 @@ def tables(a):
         ]
         notes = list(acct["notes"])
         if i == 0:
-            open_q = [q for q in a["questions"] if q["type"] != "core_operation" and not q["answered"]]
+            open_q = [q for q in a["questions"] if q["type"] not in ("core_operation", "character") and not q["answered"]]
             if open_q:
                 notes.append(f"{len(open_q)} judgment question(s) unanswered; engine defaults applied")
             notes += [
@@ -3381,7 +3461,9 @@ def underwrite(raw, judgments=None):
     last = audit["stages"][-1]["output_hash"]
     audit["stages"].append(dict(stage=11, name=STAGES[10], status="COMPLETE", input_hash=last, policy_hash=POLICY_HASH,
                                 output_hash=stage_hash(report), counts=dict(report_gate=audit["report_gate"]), unresolved=[]))
-    return Result(e.questions_doc(), audit, report, e.status, len(audit["questions_open"]))
+    # The character question stays in questions_open (the page asks it) but not in the count: unanswered, WILL-PAY says "not assessed".
+    return Result(e.questions_doc(), audit, report, e.status,
+                  sum(q["type"] != "character" for q in e.questions if q["question_id"] in audit["questions_open"]))
 
 
 def run(ledger_path, out_dir, judgments_path=None):
