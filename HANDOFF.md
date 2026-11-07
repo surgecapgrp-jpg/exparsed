@@ -1,22 +1,24 @@
 # exparsed handoff
 
-Code state on 2026-11-07 at the merge of PR #33 (the last code change). Later commits that only
+Code state on 2026-11-07 at the merge of PR #35 (the last code change). Later commits that only
 edit this file are not listed. Repo: https://github.com/surgecapgrp-jpg/exparsed (private).
 This file replaces the 2026-10-26 handoff. The underwriting design detail is in `underwriting/docs/HANDOFF.md`,
-and the policy compliance detail is in `underwriting/docs/V1_7_MATRIX.md`.
+and the policy compliance detail is in `underwriting/docs/V1_7_MATRIX.md`. Policy V1.8 (MCA Capacity V1.8
+Character Returns Enhanced) replaced V1.7 on 2026-11-07. Its capacity rules match V1.7; it adds return and
+character rules, tracked in the matrix section "V1.8 batch 1".
 
 ## 1. Summary
 
 exparsed is one HTML page that reads bank statements, checks them against their own printed totals, and
-underwrites the merchant for MCA capacity under policy V1.7.
+underwrites the merchant for MCA capacity under policy V1.8.
 
 | Part | State |
 | :--- | :--- |
 | Statement reader | In use. 140 of 244 Desktop-set files verify from text; 29 of 42 scans verify through Mac OCR. |
-| Underwriting engine | Experiment. Policy V1.7 batches 1 to 4 merged. Run on 1 real ledger and 1 synthetic ledger. |
+| Underwriting engine | Experiment. Policy V1.7 batches 1 to 4 and V1.8 batch 1 merged. Run on 1 real ledger and 1 synthetic ledger. |
 | Underwrite button and chat | Built and tested with a mocked browser run. Never run in real Chrome with real Pyodide and a real key. |
 | UI | Surge Capital theme (PR #9, merged 2026-11-04). |
-| Tests | 261 JS tests, 93 engine tests, 18 end-to-end page checks: all pass on `main`. |
+| Tests | 261 JS tests, 97 engine tests, 18 end-to-end page checks: all pass on `main`. |
 
 The next step is a real Chrome run on 3 to 5 real merchant files (section 9, item 1).
 
@@ -118,7 +120,7 @@ naming its funder.
 
 ### 5.2 Policy V1.7 coverage
 
-`ENGINE_VERSION` 3.4, `POLICY_VERSION` V1.7b11. The matrix tracks 150 rules:
+`ENGINE_VERSION` 3.4, `POLICY_VERSION` V1.8b1. The matrix tracks 150 rules:
 
 | Status | Rows |
 | :--- | ---: |
@@ -140,6 +142,10 @@ separate from observed), L13 (contract or lender payoff tied to the position).
 Partial rows, grouped: ownership evidence (R2), account identity beyond last four (S5), alternative tags (T1), off-bank exposure (T7, C5), hidden collections behind failed attempts (D5),
 generic descriptors (D7), LLM sender identity as proof (M9),
 execution order (H11), FLIGHT inflow scope (P15).
+
+V1.8 batch 1 (PR #35) changed rows K6, K7 and K8 to the V1.8 return rules: T1 only on MCA or loan, tier n/a
+for an unclear item, cure UNKNOWN when the balance or follow-up window is missing. Not built yet from V1.8:
+the return-word scan log (R1), the character pass (B1 to B5) and the extra Table 4 and Table 9 detail.
 
 ### 5.3 Pull request history
 
@@ -174,6 +180,7 @@ execution order (H11), FLIGHT inflow scope (P15).
 | #31 | `7ad2a85` | Sign-offs B1 (changed: $2,500 floor for STRIP_UNRESOLVED, policy V1.7b9), B4, B5, B6 (kept) |
 | #32 | `9cf4be8` | Sign-offs B7 (changed: no summed U test, policy V1.7b10), B9 (changed: D3 needs 2 debits only), B11, B12 (kept) |
 | #33 | `cc76a74` | Sign-offs B21 (changed: unmatched return credits are Class A, policy V1.7b11), B13 to B17, B19, B20 (kept) |
+| #35 | `2c70239` | V1.8 batch 1: T1 only on finance, unclear tier n/a, cure UNKNOWN (policy V1.8b1) |
 
 Rollback point before all underwriting work: `283bc50`.
 
@@ -255,18 +262,18 @@ Signed off 2026-11-07:
 | B17 | Kept: an account with 5%+ of credits drops its short months inside its own statement span only. |
 | B19 | Kept: CONFIRMED personal items are OWNER_DRAW and STRIP_OWNER; POSSIBLE items never set the status. |
 | B20 | Kept: a transfer naming a LOC, credit line or loan is DEBT_SERVICE. |
-| B21 | Changed (PR #33, policy V1.7b11): a return credit with no matching debit is Class A, T1 by code else T2, cure "N (debit not found)". |
+| B21 | Changed (PR #33, policy V1.7b11): a return credit with no matching debit is Class A, T1 by code else T2, cure "N (debit not found)". V1.8 (PR #35, V1.8b1) keeps Class A and sets tier n/a, cure "UNKNOWN (debit not found)". |
 | B22 | Kept (PR #22, policy V1.7b7): same-amount same-day doubles count as a second schedule only on 3 consecutive debit days. A single double, such as the day after a holiday, is a catch-up payment. |
 
 All 22 matrix interpretations B1 to B22 are signed off. Waiting for sign-off: the 19 readings in `underwriting/docs/HANDOFF.md` section 4.1.
 
 ## 7. Verification
 
-| Check | Result on `main` after PR #33 |
+| Check | Result on `main` after PR #35 |
 | :--- | :--- |
 | `node tests/run-node.js` | 261 passed, 0 failed (`ocr.js` adds 44) |
 | `tests/batch/run.js` on `tests/samples` (pdf.js stubbed: the cloud session cannot reach cdnjs) | 3 non-PDF files read through the page; `compare` reports a planted downgrade and exits 1 |
-| `python3 -m unittest discover -s tests` in `underwriting/` | 93 passed |
+| `python3 -m unittest discover -s tests` in `underwriting/` | 97 passed |
 | Engine self-checks per run | 17 pass on the sample |
 | Report checker on every rendered report | PASS |
 | End-to-end page run (headless Chromium, real engine behind a local server, mocked Pyodide and model, 3-month CSV) | 18 of 18 |
@@ -332,15 +339,19 @@ All 22 matrix interpretations B1 to B22 are signed off. Waiting for sign-off: th
     Merged, safe to delete: `b18-block-yes-only`, `b22-signoff`, `date-and-export-fixes`, `design-review-fixes`, `handoff-2026-11-05`,
     `handoff-anchor`, `handoff-pr14` to `handoff-pr24`, `handoff-update`, `model-call-module`, `review-queue`, `stage-manifest`,
     `tdd-open-items`, `underwriting-in-page`, `v17-batch1` to `v17-batch4`, `v17-credit-coverage`, `v17-debit-side`, `v17-records`,
-    `batch-harness-merge`, `signoff-b1-b6`, `signoff-b7-b12`, `signoff-b13-b21` and `handoff-pr33`. GitHub's "Automatically delete head branches" setting stops new ones piling up.
+    `batch-harness-merge`, `signoff-b1-b6`, `signoff-b7-b12`, `signoff-b13-b21`, `handoff-pr33`, `v18-returns` and `handoff-pr35`. GitHub's "Automatically delete head branches" setting stops new ones piling up.
 14. **Desktop set rerun after PR #12.** The stricter date check drops any row whose printed date is impossible. Rerun the 244 files and compare against section 4.
+15. **V1.8 remaining.** Batch 1 done in PR #35. Next: the return-word scan log (V1.8 R1: every STOP PAY, NSF
+    or R-code row linked to a return or dismissed with a reason), then the character pass (B1 to B5: expected
+    versus cleared collections, lowest-balance days, deposit-then-return sequences, character and failure-mode
+    labels from the judge prompt), then the extra Table 4 notes and Table 9 detail.
 
 ## 10. Rules for the next engineer
 
 - Run both test suites after every change. Run `python3 underwriting/embed.py` after any change under `underwriting/`.
 - Keep DOM code out of `/* @test-begin NAME */` ... `/* @test-end */` regions; `tests/extract.py` stops when markers do not pair.
 - A policy value changes only with a named constant, a `POLICY_VERSION` bump and underwriter sign-off.
-- A new V1.7 behaviour gets a matrix row update and a test that fails on the old code.
+- A new V1.8 behaviour gets a matrix row update and a test that fails on the old code.
 - The engine decides numbers. The model only answers `questions.json`, and every quote it gives must be verbatim.
 - Update this file in the same PR as the code change: header commit, PR table row, test counts, line numbers.
   A docs-only PR afterwards is then not needed.
