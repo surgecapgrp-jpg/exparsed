@@ -734,6 +734,38 @@ class Records(unittest.TestCase):
         ])
 
 
+class StageManifest(unittest.TestCase):
+    """V3 handoff: one manifest entry per V1.7 execution-order stage, with hashes, counts and review state."""
+
+    NAMES = [
+        "inventory/routes/coverage", "normalize/dedupe/reconcile", "account links and provisional tags",
+        "debit-first MCA discovery", "credit-first funding discovery", "event/renewal discovery",
+        "candidate-pair reconciliation", "finalized tags and position status",
+        "revenue, costs, returns, liquidity, capacity", "MCA completeness audit", "render and validate ten tables",
+    ]
+
+    def test_eleven_stages_in_policy_order_with_review_state(self):
+        st = run().audit["stages"]
+        self.assertEqual([s["name"] for s in st], self.NAMES)
+        by = {s["stage"]: s for s in st}
+        self.assertEqual(by[8]["status"], "NEEDS_REVIEW")  # SunCap is a material U position on the sample
+        self.assertIn("U POSITION", by[8]["unresolved"])
+        self.assertEqual((by[6]["status"], by[11]["status"]), ("COMPLETE", "COMPLETE"))
+        self.assertTrue(all(s["status"] in ("COMPLETE", "NEEDS_REVIEW") for s in st))
+
+    def test_hashes_chain_from_the_ledger_and_track_policy(self):
+        a = run().audit
+        st = a["stages"]
+        self.assertEqual(st[0]["input_hash"], a["ledger_sha256"])
+        self.assertEqual([s["input_hash"] for s in st[1:]], [s["output_hash"] for s in st[:-1]])
+        self.assertEqual(st, run().audit["stages"])  # same ledger, same manifest
+        with mock.patch.object(uw, "HOLDBACK_SHARE", D("0.50")):
+            self.assertNotEqual(uw.policy_hash(), st[0]["policy_hash"])
+        answered = run(None, JUDGMENTS).audit["stages"]
+        self.assertEqual(answered[0]["output_hash"], st[0]["output_hash"])  # answers do not touch inventory
+        self.assertNotEqual(answered[2]["output_hash"], st[2]["output_hash"])  # they re-tag transactions
+
+
 class V17Batch4(unittest.TestCase):
     """V1.7 fixes from the 2026-11 spec review: peak floor, closure evidence, return tiers, wires, windows, binding."""
 
