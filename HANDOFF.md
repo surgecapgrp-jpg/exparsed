@@ -15,7 +15,7 @@ underwrites the merchant for MCA capacity under policy V1.7.
 | Underwriting engine | Experiment. Policy V1.7 batches 1 to 4 merged. Run on 1 real ledger and 1 synthetic ledger. |
 | Underwrite button and chat | Built and tested with a mocked browser run. Never run in real Chrome with real Pyodide and a real key. |
 | UI | Surge Capital theme (PR #9, merged 2026-11-04). |
-| Tests | 215 JS tests, 75 engine tests, 15 end-to-end page checks: all pass on `main`. |
+| Tests | 215 JS tests, 80 engine tests, 15 end-to-end page checks: all pass on `main`. |
 
 The next step is a real Chrome run on 3 to 5 real merchant files (section 9, item 1).
 
@@ -23,15 +23,15 @@ The next step is a real Chrome run on 3 to 5 real merchant files (section 9, ite
 
 | Path | What it is |
 | :--- | :--- |
-| `exparsed.html` | The whole app: 10,842 lines, about 700 KB. Statement reader, ledger export, OCR, AI calls, underwriting panel, chat, and an embedded copy of the Python engine. |
+| `exparsed.html` | The whole app: 10,857 lines, about 700 KB. Statement reader, ledger export, OCR, AI calls, underwriting panel, chat, and an embedded copy of the Python engine. |
 | `mac_ocr_server.py`, `mac_ocr.swift` | Local OCR server on `127.0.0.1:8091` (Apple Vision). The Swift helper compiles on first start. |
-| `underwriting/engine/uw.py` | The underwriting engine, 3,111 lines, Python standard library only. |
+| `underwriting/engine/uw.py` | The underwriting engine, 3,126 lines, Python standard library only. |
 | `underwriting/adapter/exparsed_adapter.py` | Converts the page's `ledger-v1` export to the engine's ledger. `page_run()` is the entry point the page calls. Holds the Federal Reserve holiday list for 2025 to 2027; a later year stops the run with an error. |
 | `underwriting/checker/validate_report.py` | The V1.7 report checker. The engine runs it on every report and fails the run on any error. |
 | `underwriting/prompts/judge.md` | System prompt for the judgment call. |
 | `underwriting/schemas/` | `ledger.schema.json` (engine input) and `judgments.schema.json` (model output, also sent as the structured-output schema). |
-| `underwriting/embed.py` | Copies engine, adapter, checker and prompt into `exparsed.html` between the `UW-EMBED` markers (lines 454 to 4253). |
-| `underwriting/tests/` | `test_engine.py` (75 tests), `make_fixture.py`, `fixtures/sample_ledger.json` (321 rows, Jun to Sep 2026) and `fixtures/sample_judgments.json`. |
+| `underwriting/embed.py` | Copies engine, adapter, checker and prompt into `exparsed.html` between the `UW-EMBED` markers (lines 454 to 4268). |
+| `underwriting/tests/` | `test_engine.py` (80 tests), `make_fixture.py`, `fixtures/sample_ledger.json` (321 rows, Jun to Sep 2026) and `fixtures/sample_judgments.json`. |
 | `underwriting/docs/HANDOFF.md` | Engine design, contracts, trust boundary, interpretations 1 to 19. |
 | `underwriting/docs/V1_7_MATRIX.md` | 150 V1.7 rules mapped to code, interpretations B1 to B21, effect of each batch on saved runs. |
 | `tests/` | JS unit tests for the page (`run-node.js` or `run.sh`), `extract.py`, synthetic samples. |
@@ -51,7 +51,7 @@ The repo holds no customer statements. The one real ledger used for testing sits
 | Keys | Settings > AI providers. One Claude key and model, one OpenRouter key and model. Held in memory only, lost on reload. |
 | Underwrite | Underwrite button > Run. First run downloads Pyodide 0.27.2 (about 10 MB) from cdn.jsdelivr.net. |
 | Page tests | `node tests/run-node.js` (215 pass) or `bash tests/run.sh` on macOS. |
-| Engine tests | `cd underwriting && python3 -m unittest discover -s tests` (75 pass). |
+| Engine tests | `cd underwriting && python3 -m unittest discover -s tests` (80 pass). |
 | Engine CLI | `python3 underwriting/engine/uw.py underwriting/tests/fixtures/sample_ledger.json --out run/` |
 | After an engine change | `python3 underwriting/embed.py`. Test `PageEmbed` fails until the page copy matches. |
 
@@ -71,17 +71,17 @@ OpenRouter vision). Each file gets one status:
 
 Read path, with current line numbers in `exparsed.html`:
 
-1. `readFileContent` (9719) is the entry. `dispatchFile` (4775) picks a reader by file type.
-2. `fileOcrNeed` (9096) and `lgDocKind` (7602) decide whether a PDF needs OCR or is not a statement.
-3. `doOcrMac` (10495) posts scanned pages to the OCR server. Cloud OCR goes through `cloudOcrRead` (9155).
-4. `lgAccountChildren` (9729) splits a file: `lgSplitAccounts` (7922) per account heading,
-   `lgSplitStatements` (7953) per repeated "Page 1 of N".
-5. `lgFileLedger` (8737) builds and caches the ledger through `lgBuild` (7474) and `lgChooseReading` (7464).
-   Readers: `lgParseColumnar` (6119), `lgParsePrintout` (6800), `lgParseCards` (8015), `lgParseStackedRows` (8054).
-6. Shared helpers: `lgCleanLine` (5969) repairs OCR and text damage; `lgSectionOf` (5761) maps headings.
-7. `recFromContent` (9739) builds the record shown on the page.
-8. `lgOwnRows` (8793) drops overlapping printouts of one account. `lgLedgerExport` (8801) builds `ledger-v1`.
-   `lgComputed` (8901) adds ADB, negative days and gross inflows per month.
+1. `readFileContent` (9734) is the entry. `dispatchFile` (4790) picks a reader by file type.
+2. `fileOcrNeed` (9111) and `lgDocKind` (7617) decide whether a PDF needs OCR or is not a statement.
+3. `doOcrMac` (10510) posts scanned pages to the OCR server. Cloud OCR goes through `cloudOcrRead` (9170).
+4. `lgAccountChildren` (9744) splits a file: `lgSplitAccounts` (7937) per account heading,
+   `lgSplitStatements` (7968) per repeated "Page 1 of N".
+5. `lgFileLedger` (8752) builds and caches the ledger through `lgBuild` (7489) and `lgChooseReading` (7479).
+   Readers: `lgParseColumnar` (6134), `lgParsePrintout` (6815), `lgParseCards` (8030), `lgParseStackedRows` (8069).
+6. Shared helpers: `lgCleanLine` (5984) repairs OCR and text damage; `lgSectionOf` (5776) maps headings.
+7. `recFromContent` (9754) builds the record shown on the page.
+8. `lgOwnRows` (8808) drops overlapping printouts of one account. `lgLedgerExport` (8816) builds `ledger-v1`.
+   `lgComputed` (8916) adds ADB, negative days and gross inflows per month.
 9. Dates go through `lgDateTok`, which checks the day against the month length (leap years included).
    `lgUSDate` reads through it, so "13/40/26" and "2/30/2026" give no date (PR #12).
 
@@ -116,7 +116,7 @@ naming its funder.
 
 ### 5.2 Policy V1.7 coverage
 
-`ENGINE_VERSION` 3.4, `POLICY_VERSION` V1.7b6. The matrix tracks 150 rules:
+`ENGINE_VERSION` 3.4, `POLICY_VERSION` V1.7b7. The matrix tracks 150 rules:
 
 | Status | Rows |
 | :--- | ---: |
@@ -126,7 +126,8 @@ naming its funder.
 | Changed in batch 3 (account coverage, missing-account requests, commingling, report checker) | 24 |
 | Changed in batch 4 (fixes from the 2026-11-02 spec review) | 10 |
 | Changed in B5 (credit coverage C2, A2; PR #20) | 2 |
-| Partial | 18 |
+| Changed in B6 (debit side D8, M14, D11; PR #22) | 3 |
+| Partial | 15 |
 | Gap | 3 |
 | Handled by the page | 3 |
 
@@ -136,7 +137,7 @@ separate from observed), L13 (contract or lender payoff tied to the position).
 Partial rows, grouped: per-file source records (R1), ownership evidence (R2), trace IDs (R3), exception
 records (R7), pending rows as observations (S3), account identity beyond last four (S5), dedupe crosswalk
 (S7), alternative tags (T1), off-bank exposure (T7, C5), hidden collections behind failed attempts (D5),
-generic descriptors (D7), same-day doubles (D8), variable adverse scenario (D11), LLM sender identity as proof (M9), same-name renewal (M14),
+generic descriptors (D7), LLM sender identity as proof (M9),
 execution order (H11), FLIGHT inflow scope (P15).
 
 ### 5.3 Pull request history
@@ -167,14 +168,14 @@ Rollback point before all underwriting work: `283bc50`.
 
 | Item | Detail |
 | :--- | :--- |
-| Code | `aiRequest` (9268), `aiParse` (9286), `aiCall` (9303), `uwJudgeOnce` (9333), `uwUnderwrite` (9346), `uwRun` (10780) |
+| Code | `aiRequest` (9283), `aiParse` (9301), `aiCall` (9318), `uwJudgeOnce` (9348), `uwUnderwrite` (9361), `uwRun` (10795) |
 | Provider pick | OCR has its own pick. Underwriting and chat share a second pick (Claude or OpenRouter). |
 | Judgment call | Non-streaming, 16,000 max tokens, Claude system prompt cached. Claude gets `output_config.format`; OpenRouter gets `response_format`. A 400 retries once without the schema. |
 | Rejected answers | The engine error goes back to the model once. A second rejection shows the error and no report. |
 | Export | Underwrite calls `lgLedgerExport(list, {redact:false, compact:false})`, so the engine sees the printed text (ORIG ID included) whatever the Redact and Compact toggles say. The export buttons still follow the toggles. |
 | Bad input | A ledger row with an impossible date stops the run with `bad date` and the transaction id. |
 | Fallback | Claude requests carry server-side refusal fallback (`fallbacks: "default"`). |
-| Chat | Tools run in the page: `search_rows`, `read_document`, `read_audit` (13 audit sections). Results capped at 60,000 characters; 8 tool rounds per turn. System prompt: `uwChatSystem` (9429). |
+| Chat | Tools run in the page: `search_rows`, `read_document`, `read_audit` (13 audit sections). Results capped at 60,000 characters; 8 tool rounds per turn. System prompt: `uwChatSystem` (9444). |
 
 ### 5.5 Results on saved runs
 
@@ -216,7 +217,7 @@ Signed off 2026-11-06:
 | :--- | :--- |
 | B18 | Changed (PR #16, policy V1.7b5): a material missing account or an unreadable statement blocks YES only. A NO stands, because hidden MCA payments can only lower HEADLINE. The account stays under REQUEST REQUIRED and the binding line names it. |
 
-Waiting for sign-off: B1, B4 to B7, B9, B11 to B17, B19 to B21 in `underwriting/docs/V1_7_MATRIX.md`, and
+Waiting for sign-off: B1, B4 to B7, B9, B11 to B17, B19 to B22 in `underwriting/docs/V1_7_MATRIX.md`, and
 the 19 readings in `underwriting/docs/HANDOFF.md` section 4.1.
 
 ## 7. Verification
@@ -224,7 +225,7 @@ the 19 readings in `underwriting/docs/HANDOFF.md` section 4.1.
 | Check | Result on `main` 1995141 |
 | :--- | :--- |
 | `node tests/run-node.js` | 215 passed, 0 failed |
-| `python3 -m unittest discover -s tests` in `underwriting/` | 75 passed |
+| `python3 -m unittest discover -s tests` in `underwriting/` | 80 passed |
 | Engine self-checks per run | 17 pass on the sample |
 | Report checker on every rendered report | PASS |
 | End-to-end page run (headless Chromium, real engine behind a local server, mocked Pyodide and model, 3-month CSV) | 15 of 15 |
@@ -263,8 +264,8 @@ the 19 readings in `underwriting/docs/HANDOFF.md` section 4.1.
    and one header builder per provider (`anthropicHeaders`, `openrouterHeaders`), used by OCR, model lists,
    judgments and chat. The 3 `prov==='claude'` branches in `aiRequest`, `aiParse` and `aiToolResults` stay: each
    builds a different provider's message shape. Streaming OCR and non-streaming judgments keep separate request code.
-7. **V1.7 gaps D6, L11, L13** and the partial rows (section 5.2). B5 (PR #20) closed C2 and A2; 18 partial
-   rows remain. Next batches: debit side (D8, M14, D11), records (R1, R3, R7, S3, S7), then the document-based
+7. **V1.7 gaps D6, L11, L13** and the partial rows (section 5.2). B5 (PR #20) closed C2 and A2; B6 (PR #22)
+   closed D8, M14 and D11; 15 partial rows remain. Next batches: records (R1, R3, R7, S3, S7), then the document-based
    gaps (L11, L13, D6), which need the page to pass documents to the engine. P15 and M9 need sign-off first.
 8. **Stage manifest** from the V3 handoff: per-stage NOT_STARTED / NEEDS_REVIEW states with input and
    policy hashes. Not started and not tracked in the matrix.

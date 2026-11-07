@@ -595,6 +595,63 @@ class CreditCoverage(unittest.TestCase):
         self.assertLessEqual(set(got.values()), {"ATTACHED", "FINANCING_UNATTACHED", "COMPETING", "CUSTOMER_SUPPORTED", "OTHER_SUPPORTED", "UNRESOLVED"})
 
 
+def business_days(start, end):
+    cal = uw.Cal(LEDGER["holidays"])
+    d, out = date.fromisoformat(start), []
+    while d <= date.fromisoformat(end):
+        if cal.is_bd(d):
+            out.append(d.isoformat())
+        d = date.fromordinal(d.toordinal() + 1)
+    return out
+
+
+class DebitSide(unittest.TestCase):
+    """V1.7 D8, M14, D11 (open item 7, debit-side batch)."""
+
+    def daily(self, name, start, end, amount, doubles=()):
+        rows = [("OP", d, amount, "debit", f"{name} ACH DEBIT") for d in business_days(start, end)]
+        rows += [("OP", d, amount, "debit", f"{name} ACH DEBIT") for d in doubles]
+        return rows
+
+    def test_sustained_same_amount_doubles_are_two_positions(self):
+        days = business_days("2026-07-01", "2026-09-30")
+        led = add_rows(LEDGER, self.daily("NOVA CAPITAL", "2026-07-01", "2026-09-30", "250.00", doubles=days[-20:]), "NV")
+        self.assertEqual(len(pos(run(led), "NOVA CAPITAL")), 2)
+
+    def test_isolated_same_amount_doubles_are_catch_up(self):
+        # Doubles the day after each holiday: one position, as on the real ledger.
+        led = add_rows(LEDGER, self.daily("NOVA CAPITAL", "2026-06-01", "2026-09-30", "250.00",
+                                          doubles=["2026-06-22", "2026-07-06", "2026-09-08"]), "NV")
+        self.assertEqual(len(pos(run(led), "NOVA CAPITAL")), 1)
+
+    def test_restart_within_ten_business_days_is_a_probable_renewal(self):
+        rows = self.daily("NOVA CAPITAL", "2026-06-01", "2026-07-31", "250.00")
+        rows += self.daily("NOVA CAPITAL", "2026-08-10", "2026-09-30", "300.00")  # 5 bd gap
+        p = pos(run(add_rows(LEDGER, rows, "NV")), "NOVA CAPITAL")
+        self.assertEqual(len(p), 1)
+        self.assertIn("PROBABLE RENEWAL", [e["kind"] for e in p[0]["events"]])
+
+    def test_restart_after_a_long_gap_is_not_called_a_renewal(self):
+        rows = self.daily("NOVA CAPITAL", "2026-06-01", "2026-07-15", "250.00")
+        rows += self.daily("NOVA CAPITAL", "2026-08-17", "2026-09-30", "250.00")  # 22 bd gap
+        p = pos(run(add_rows(LEDGER, rows, "NV")), "NOVA CAPITAL")
+        kinds = [e["kind"] for x in p for e in x["events"]]
+        self.assertNotIn("PROBABLE RENEWAL", kinds)
+
+    def test_variable_remittance_reports_an_adverse_scenario(self):
+        june, later = business_days("2026-06-01", "2026-06-30"), business_days("2026-07-01", "2026-09-30")
+        rows = [("OP", d, "400.00" if i % 2 == 0 else "380.00", "debit", "NOVA CAPITAL ACH DEBIT") for i, d in enumerate(june)]
+        rows += [("OP", d, "150.00" if i % 2 == 0 else "170.00", "debit", "NOVA CAPITAL ACH DEBIT") for i, d in enumerate(later)]
+        led = add_rows(LEDGER, rows, "NV")
+        r0 = run(led)
+        qid = next(x["question_id"] for x in r0.questions["questions"] if x.get("descriptor", "").startswith("NOVA CAPITAL"))
+        p = pos(run(led, with_judgments(r0, [dict(question_id=qid, tag="MCA", funder="Nova Capital")])), "NOVA CAPITAL")[0]
+        self.assertEqual((p["cadence"], p["live_status"]), ("VARIABLE", "Y"))
+        self.assertEqual(p["monthly_cost"], D("3200.00"))  # last 20 bd of September
+        self.assertEqual(p["adverse_cost"], D("7800.00"))  # 20 bd of June: 10 x $400 + 10 x $380
+        self.assertTrue(any("adverse scenario $7,800/mo" in n for n in p["notes"]))
+
+
 class V17Batch4(unittest.TestCase):
     """V1.7 fixes from the 2026-11 spec review: peak floor, closure evidence, return tiers, wires, windows, binding."""
 

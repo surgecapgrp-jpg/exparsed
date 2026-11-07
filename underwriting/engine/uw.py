@@ -46,7 +46,7 @@ from pathlib import Path
 
 D = Decimal
 ENGINE_VERSION = "3.4"
-POLICY_VERSION = "V1.7b6"
+POLICY_VERSION = "V1.7b7"
 
 # Policy parameters (V2.2 values with the V1.7 changes marked). Changing any value is a policy change: bump POLICY_VERSION.
 BUSINESS_DAYS_PER_MONTH = D(20)
@@ -432,6 +432,7 @@ class Position:
     live_status: str = ""  # V1.7 Table 4: Y active, N closed on evidence, U unresolved
     status_basis: str = ""
     scenario: Decimal | None = None  # U only: plausible monthly cost, never in the stack
+    adverse: Decimal | None = None  # VARIABLE only: highest 20 bd of cleared debits, reported, never in the stack
     material: bool = False
     watch: bool = False  # V1.7 UNRESOLVED WATCH: finance-looking payee, MCA identity unproved
     groups: list = field(default_factory=list)
@@ -506,12 +507,14 @@ def split_concurrent(ts):
     Tracks open only when a day has more debits than open tracks. Each debit joins the
     nearest-amount track not yet used that day, so a level change stays inside its track.
     """
-    # Same-amount doubles are catch-up payments. Concurrency needs SUSTAIN_PAYMENTS days whose
-    # debits differ by more than CHANGE_THRESHOLD.
+    # Concurrency needs SUSTAIN_PAYMENTS days whose debits differ by more than CHANGE_THRESHOLD,
+    # or (V1.7 D8) same-amount doubles on SUSTAIN_PAYMENTS consecutive debit days. An isolated
+    # same-amount double, such as the day after a holiday, is a catch-up payment.
     amounts = defaultdict(list)
     for t in ts:
         amounts[t.date].append(t.amt)
-    if sum(changed(min(a), max(a)) for a in amounts.values()) < SUSTAIN_PAYMENTS:
+    doubled_run = max((len(r) for r in runs(sorted(amounts), lambda f, d: (len(amounts[f]) > 1) == (len(amounts[d]) > 1)) if len(amounts[r[0]]) > 1), default=0)
+    if sum(changed(min(a), max(a)) for a in amounts.values()) < SUSTAIN_PAYMENTS and doubled_run < SUSTAIN_PAYMENTS:
         return [ts]
     tracks = []
     for _, day in groupby(ts, key=lambda t: t.date):
@@ -1339,6 +1342,13 @@ class _Engine:
             p.level = sum(recent, D(0)) / len(recent) if recent else D(0)
             p.cost = sum(recent, D(0))
             p.notes.append(f"Variable remittance: cost = cleared debits in the 20 bd to {mdy(w_end)}")
+            # V1.7 D11: a separate adverse scenario, the highest 20 bd of cleared debits in the series.
+            p.adverse = max(
+                sum((x.amt for x in c if self.cal.add(t.date, -int(BUSINESS_DAYS_PER_MONTH)) < x.date <= t.date), D(0))
+                for t in c
+            )
+            if p.adverse > p.cost:
+                p.notes.append(f"Variable remittance: adverse scenario {usd(p.adverse)}/mo (highest 20 bd), not in stack")
             if self.cal.diff(c[-1].date, end) > 2 * normal:
                 self.event(p, "STOPPED", c[-1], f"No debit for {self.cal.diff(c[-1].date, end)} bd",
                            "no payoff debit seen")
@@ -1407,6 +1417,10 @@ class _Engine:
                         "debits resume",
                     )
                     trig("RESTARTED", b)
+                    if g <= REFI_GAP_BD:
+                        # V1.7 M14: the same funder resuming within REFI_GAP_BD of the stop.
+                        self.event(p, "PROBABLE RENEWAL", b, f"resumed {g} bd after the stop",
+                                   "same funder within 10 bd; check for a new funding credit")
             if self.cal.diff(c[-1].date, end) > 2 * normal:
                 self.event(
                     p,
@@ -2542,6 +2556,7 @@ class _Engine:
                 live_status=p.live_status,
                 status_basis=p.status_basis,
                 scenario_cost=p.scenario,
+                adverse_cost=p.adverse,
                 material=p.material,
                 watch=p.watch,
                 groups=p.groups,
