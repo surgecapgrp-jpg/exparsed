@@ -170,10 +170,10 @@ execution order (H11), FLIGHT inflow scope (P15).
 | #27 | `101ea11` | Sign-off B22 kept (docs) |
 | #28 | `a62ecf9` | Stage manifest: `audit.stages`, one entry per V1.7 execution-order stage (open item 8) |
 | #29 | `82955fc` | Review queue: open questions answered by an underwriter in the judgments format (open item 11) |
-| #30 | (open) | Batch harness `tests/batch/run.js` from `batch-harness`; `ocr.js` runs under node; merged branches listed for deletion (open item 13) |
-| #31 | (open) | Sign-offs B1 (changed: $2,500 floor for STRIP_UNRESOLVED, policy V1.7b9), B4, B5, B6 (kept) |
-| #32 | (open) | Sign-offs B7 (changed: no summed U test, policy V1.7b10), B9 (changed: D3 needs 2 debits only), B11, B12 (kept) |
-| #33 | this PR | Sign-offs B21 (changed: unmatched return credits are Class A, policy V1.7b11), B13 to B17, B19, B20 (kept) |
+| #30 | `f65bbcc` | Batch harness `tests/batch/run.js` from `batch-harness`; `ocr.js` runs under node; merged branches listed for deletion (open item 13) |
+| #31 | `7ad2a85` | Sign-offs B1 (changed: $2,500 floor for STRIP_UNRESOLVED, policy V1.7b9), B4, B5, B6 (kept) |
+| #32 | `9cf4be8` | Sign-offs B7 (changed: no summed U test, policy V1.7b10), B9 (changed: D3 needs 2 debits only), B11, B12 (kept) |
+| #33 | `cc76a74` | Sign-offs B21 (changed: unmatched return credits are Class A, policy V1.7b11), B13 to B17, B19, B20 (kept) |
 
 Rollback point before all underwriting work: `283bc50`.
 
@@ -332,7 +332,7 @@ All 22 matrix interpretations B1 to B22 are signed off. Waiting for sign-off: th
     Merged, safe to delete: `b18-block-yes-only`, `b22-signoff`, `date-and-export-fixes`, `design-review-fixes`, `handoff-2026-11-05`,
     `handoff-anchor`, `handoff-pr14` to `handoff-pr24`, `handoff-update`, `model-call-module`, `review-queue`, `stage-manifest`,
     `tdd-open-items`, `underwriting-in-page`, `v17-batch1` to `v17-batch4`, `v17-credit-coverage`, `v17-debit-side`, `v17-records`,
-    and `batch-harness-merge` after PR #30. GitHub's "Automatically delete head branches" setting stops new ones piling up.
+    `batch-harness-merge`, `signoff-b1-b6`, `signoff-b7-b12`, `signoff-b13-b21` and `handoff-pr33`. GitHub's "Automatically delete head branches" setting stops new ones piling up.
 14. **Desktop set rerun after PR #12.** The stricter date check drops any row whose printed date is impossible. Rerun the 244 files and compare against section 4.
 
 ## 10. Rules for the next engineer
