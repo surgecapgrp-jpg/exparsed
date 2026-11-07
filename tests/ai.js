@@ -126,3 +126,29 @@ aiCall('claude', cfgC, { system:'S', history:[] }, function(){
 }).then(function(){ T('A16 HTTP error raised', false); }, function(e){
   T('A16 HTTP error raised with status and message', e.status===401 && e.message==='HTTP 401: invalid x-api-key', e.message);
 });
+
+// A17-A18 review queue: open questions for an underwriter, answers in the judgments format
+var RQ={ ok:true, questions:{ ledger_sha256:'abc', questions:[
+  { question_id:'Q-credit-1', type:'credit', txn_ids:['T1'], transactions:[{ date:'2026-09-01', amount:'30000.00', description:'WIRE IN JKL' }], why:['wire'], default:'STRIP_UNRESOLVED' },
+  { question_id:'Q-debit-1', type:'debit_group', descriptor:'BLUEOAK ADV', txn_ids:['T2','T3'], sample_descriptions:['BLUEOAK ADV ACH DEBIT'], why:['D1'], default:'MCA' },
+  { question_id:'Q-core-1', type:'core_operation', txn_ids:[], default:'text written by engine' },
+  { question_id:'Q-debit-2', type:'debit_group', descriptor:'AMEX', txn_ids:['T4'], sample_descriptions:['AMEX'], why:['D2'], default:'OTHER' } ] },
+  audit:{ questions_open:['Q-core-1','Q-credit-1','Q-debit-1'] } };
+var queue=uwQueue(RQ);
+T('A17 queue lists only open questions, with the tags the engine accepts',
+  queue.map(function(x){ return x.question_id; }).join(',')==='Q-credit-1,Q-debit-1,Q-core-1'
+  && queue[0].tags.indexOf('STRIP_FUNDING')>=0 && queue[0].tags.indexOf('MCA')<0
+  && queue[1].tags.indexOf('MCA')>=0 && queue[1].tags.indexOf('STRIP_FUNDING')<0 && queue[2].tags.length===0
+  && queue[0].lines[0]==='09/01/26 $30,000.00 WIRE IN JKL', queue);
+var prev={ ledger_sha256:'abc', answers:[{ question_id:'Q-debit-1', tag:'OTHER' }, { question_id:'Q-debit-2', tag:'OTHER' }] };
+var merged=uwReviewJudgments(prev, 'abc', [
+  { question_id:'Q-debit-1', tag:'MCA', funder:'BlueOak' },
+  { question_id:'Q-credit-1', tag:'STRIP_FUNDING', quote:'WIRE IN JKL' },
+  { question_id:'Q-core-1', text:'Restaurant' },
+  { question_id:'Q-credit-9', tag:'' } ]);
+T('A18 underwriter picks replace model answers; blank picks are dropped',
+  merged.ledger_sha256==='abc' && merged.answers.length===4
+  && JSON.stringify(merged.answers.filter(function(a){ return a.question_id==='Q-debit-1'; })[0])==='{"question_id":"Q-debit-1","tag":"MCA","funder":"BlueOak","reason":"underwriter"}'
+  && merged.answers.filter(function(a){ return a.question_id==='Q-credit-1'; })[0].evidence.kind==='bank_text'
+  && merged.answers.filter(function(a){ return a.question_id==='Q-core-1'; })[0].text==='Restaurant'
+  && prev.answers[0].tag==='OTHER', merged);

@@ -188,6 +188,10 @@
   .uwchat{flex:1 1 45%; min-height:160px; display:flex; flex-direction:column; background:var(--elev); border:1px solid var(--border); border-radius:var(--radius-md); box-shadow:var(--shadow)}
   .uwlog{flex:1 1 auto; overflow:auto; padding:12px 14px; display:flex; flex-direction:column; gap:10px; font-size:var(--text-sm)}
   .uwmsg{white-space:pre-wrap; line-height:1.5}
+  .uwqueue{max-height:40%; overflow:auto; padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius-md); background:var(--paper); font-size:var(--text-sm)}
+  .uwq{padding:8px 0; border-top:1px solid var(--border)} .uwq:first-of-type{border-top:0}
+  .uwq .uwqt{font-weight:600} .uwq .uwql{font-family:var(--font-mono); font-size:11px; color:var(--muted); white-space:pre-wrap}
+  .uwq .uwqf{display:flex; flex-wrap:wrap; gap:6px; margin-top:6px} .uwq input{min-width:0; flex:1 1 160px}
   .uwmsg.user{align-self:flex-end; max-width:85%; padding:8px 10px; background:var(--subtle); border-radius:var(--radius-sm)}
   .uwmsg.tool{color:var(--muted); font-family:var(--font-mono); font-size:11px}
   .uwmsg.error{color:var(--neg)}
@@ -439,6 +443,7 @@
           <button class="act ghost small" id="uwClose" type="button">Close</button>
         </div>
         <pre class="uwreport" id="uwReport">No report yet. Press Run, or ask about the loaded statements below.</pre>
+        <div class="uwqueue" id="uwQueue" hidden aria-label="Review queue"></div>
         <div class="uwchat">
           <div class="uwlog" id="uwLog" aria-live="polite"></div>
           <div class="uwask">
@@ -9497,6 +9502,44 @@ Add `reason`: one sentence naming the fact you relied on. It is stored in the au
         });
       });
     }
+    // Review queue: the engine's open questions for an underwriter, answered in the judgments format.
+    // Tag lists copy engine/uw.py CREDIT_TAGS and DEBIT_TAGS; test_review_queue_tags_match_the_engine checks them.
+    var UW_CREDIT_TAGS=['REV_PROCESSOR','REV_ACH','REV_WIRE','REV_DEPOSIT','REV_PAYER','STRIP_FUNDING','STRIP_TRANSFER','STRIP_REFUND','STRIP_OWNER','STRIP_RECREDIT','STRIP_UNRESOLVED'];
+    var UW_DEBIT_TAGS=['MCA','PAYROLL','OWNER_DRAW','RENT','UTILITIES','INSURANCE','TAX','DEBT_SERVICE','DIRECT_COST','TRANSFER_OUT','OTHER'];
+    var UW_NEEDS_QUOTE=/^STRIP_(FUNDING|TRANSFER|OWNER)$/;   // the engine rejects these without a verbatim quote
+    function uwMoney(a){ var n=Math.abs(+a); return '$'+n.toLocaleString('en-US',{ minimumFractionDigits:2, maximumFractionDigits:2 }); }
+    function uwShortDate(iso){ var p=String(iso).split('-'); return p.length===3 ? p[1]+'/'+p[2]+'/'+p[0].slice(2) : String(iso); }
+    // engine result -> [{ question_id, type, title, why, default, tags, lines }] for the open questions, in engine order
+    function uwQueue(r){
+      if(!r || !r.ok || !r.questions) return [];
+      var open={}; (r.audit && r.audit.questions_open || []).forEach(function(id){ open[id]=true; });
+      return r.questions.questions.filter(function(q){ return open[q.question_id]; }).map(function(q){
+        var credit=q.type==='credit', core=q.type==='core_operation';
+        return { question_id:q.question_id, type:q.type, default:q.default, why:q.why||[],
+          title: core ? 'What does the business do?' : credit ? 'Credit '+(q.txn_ids||[]).length+' transaction(s)' : 'Debits to '+q.descriptor+' ('+(q.txn_ids||[]).length+')',
+          tags: core ? [] : credit ? UW_CREDIT_TAGS.slice() : UW_DEBIT_TAGS.slice(),
+          lines: credit ? (q.transactions||[]).map(function(t){ return uwShortDate(t.date)+' '+uwMoney(t.amount)+' '+t.description; })
+               : core ? (q.streams||[]).map(function(s){ return s.stream+' '+s.share; }) : (q.sample_descriptions||[]) };
+      });
+    }
+    // picks [{ question_id, tag, funder, quote, text }] replace earlier answers for the same question; blank picks are dropped
+    function uwReviewJudgments(prev, sha, picks){
+      var mine={}, out=[];
+      picks.forEach(function(p){
+        var a={ question_id:p.question_id };
+        if(p.text){ a.text=String(p.text).trim(); }
+        else if(p.tag){
+          a.tag=p.tag;
+          if(p.tag==='MCA') a.funder=String(p.funder||'').trim();
+          if(UW_NEEDS_QUOTE.test(p.tag)) a.evidence={ kind:'bank_text', quote:String(p.quote||'') };
+          a.reason='underwriter';
+        } else return;
+        mine[p.question_id]=a;
+      });
+      ((prev && prev.answers) || []).forEach(function(a){ if(!mine[a.question_id]) out.push(a); });
+      Object.keys(mine).forEach(function(id){ out.push(mine[id]); });
+      return { ledger_sha256:sha, answers:out };
+    }
     function aiJsonFromText(text){
       var s=String(text||'').trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'');
       try{ return JSON.parse(s); }catch(e){}
@@ -10921,7 +10964,7 @@ Add `reason`: one sentence naming the fact you relied on. It is stored in the au
     var PYODIDE_URL='https://cdn.jsdelivr.net/pyodide/v0.27.2/full/';
     var $uwBtn=el('uwBtn'), $uwPanel=el('uwPanel'), $uwStatus=el('uwStatus'), $uwRun=el('uwRun'), $uwReport=el('uwReport'),
         $uwLog=el('uwLog'), $uwInput=el('uwInput'), $uwSend=el('uwSend'), $uwClose=el('uwClose'),
-        $uwDlReport=el('uwDlReport'), $uwDlAudit=el('uwDlAudit'), $uwDlJudg=el('uwDlJudg'), $right=document.querySelector('section.right');
+        $uwDlReport=el('uwDlReport'), $uwDlAudit=el('uwDlAudit'), $uwDlJudg=el('uwDlJudg'), $right=document.querySelector('section.right'), $uwQueue=el('uwQueue');
     var uw={ pyLoading:null, py:null, result:null, judgments:null, busy:false, chatBusy:false, chatKey:'', history:[] };
     var aiProviderChoice=lsGet('mdx.aiProvider','claude');
     if(aiProviderChoice!=='claude' && aiProviderChoice!=='openrouter') aiProviderChoice='claude';
@@ -10973,15 +11016,55 @@ Add `reason`: one sentence naming the fact you relied on. It is stored in the au
         return uwUnderwrite(prov, cfg, el('uw-src-judge').textContent, uwEngine(ledgerText), aiCall, function(t){ uwSetStatus('', t+'…'); });
       }).then(function(out){
         var r=out.result;
-        if(!r.ok){ uw.result=uw.judgments=null; $uwReport.textContent=''; uwSetStatus('err', 'Engine stopped: '+r.error); return; }   // no stale report from an earlier run
-        uw.result=r; uw.judgments=out.judgments||null;
+        if(!r.ok){ uw.result=uw.judgments=null; $uwReport.textContent=''; uwRenderQueue(); uwSetStatus('err', 'Engine stopped: '+r.error); return; }   // no stale report from an earlier run
+        uw.result=r; uw.judgments=out.judgments||null; uw.ledgerText=ledgerText;
         $uwReport.textContent=r.report;
+        uwRenderQueue();
         var h=r.audit.capacity.headline;
         uwSetStatus(out.note?'err':'ok', r.status+' · HEADLINE '+(h==null?'—':'$'+Math.round(+h).toLocaleString())+'/mo · '+r.open_questions+' open question(s)'
           +(out.judgments?' · answers by '+cfg.model:'')+(out.note?' · '+out.note:''));
       }).catch(function(e){ uwSetStatus('err', String(e && e.message || e)); }).then(function(){
         uw.busy=false; $uwRun.disabled=false;
         $uwDlReport.disabled=$uwDlAudit.disabled=!uw.result; $uwDlJudg.disabled=!uw.judgments;
+      });
+    }
+    // Review queue: one row per open question. The underwriter's answers go through the engine like the model's.
+    function uwRenderQueue(){
+      var items=uwQueue(uw.result);
+      $uwQueue.textContent=''; $uwQueue.hidden=!items.length;
+      if(!items.length) return;
+      var head=document.createElement('div'); head.className='uwbar';
+      var cap=document.createElement('span'); cap.className='uwstatus'; cap.textContent='Review queue: '+items.length+' open question(s). Leave a row blank to keep the current answer.';
+      var apply=document.createElement('button'); apply.type='button'; apply.className='act primary small'; apply.textContent='Apply answers';
+      head.appendChild(cap); head.appendChild(apply); $uwQueue.appendChild(head);
+      var rows=items.map(function(it){
+        var d=document.createElement('div'); d.className='uwq';
+        var t=document.createElement('div'); t.className='uwqt'; t.textContent=it.title+' · engine default '+it.default; d.appendChild(t);
+        var l=document.createElement('div'); l.className='uwql'; l.textContent=it.lines.slice(0,5).join('\n')+(it.why.length?'\nwhy: '+it.why.join('; '):''); d.appendChild(l);
+        var f=document.createElement('div'); f.className='uwqf'; d.appendChild(f);
+        var row={ question_id:it.question_id };
+        function input(ph){ var x=document.createElement('input'); x.type='text'; x.placeholder=ph; x.setAttribute('aria-label', ph); f.appendChild(x); return x; }
+        if(!it.tags.length){ row.text=input('one line on what the business does'); }
+        else {
+          var sel=document.createElement('select'); sel.setAttribute('aria-label', 'tag for '+it.question_id);
+          ['','unsure'].concat(it.tags).forEach(function(v){ var o=document.createElement('option'); o.value=v; o.textContent=v||'(keep)'; sel.appendChild(o); });
+          f.appendChild(sel); row.tag=sel;
+          row.funder=input('funder name (MCA)'); row.quote=input('verbatim quote from the transaction text');
+          function shown(){ row.funder.hidden=sel.value!=='MCA'; row.quote.hidden=!UW_NEEDS_QUOTE.test(sel.value); }
+          sel.addEventListener('change', shown); shown();
+        }
+        $uwQueue.appendChild(d); return row;
+      });
+      apply.addEventListener('click', function(){
+        if(uw.busy || !uw.result) return;
+        var picks=rows.map(function(r){ return { question_id:r.question_id, tag:r.tag&&r.tag.value, funder:r.funder&&r.funder.value, quote:r.quote&&r.quote.value, text:r.text&&r.text.value }; });
+        var j=uwReviewJudgments(uw.judgments, uw.result.questions.ledger_sha256, picks);
+        var r=uwEngine(uw.ledgerText)(JSON.stringify(j));
+        if(!r.ok){ uwSetStatus('err', 'Answers rejected: '+r.error+' (report unchanged)'); return; }
+        uw.result=r; uw.judgments=j; $uwReport.textContent=r.report; $uwDlJudg.disabled=false;
+        var h=r.audit.capacity.headline;
+        uwSetStatus('ok', r.status+' · HEADLINE '+(h==null?'—':'$'+Math.round(+h).toLocaleString())+'/mo · '+r.open_questions+' open question(s) · underwriter answers applied');
+        uwRenderQueue();
       });
     }
     function uwAppend(kind, text){

@@ -1017,6 +1017,16 @@ class PageEmbed(unittest.TestCase):
         page = embed.PAGE.read_text(encoding="utf-8")
         self.assertEqual(embed.embedded(page), embed.block(), "page copy is stale: run python underwriting/embed.py")
 
+    def test_review_queue_tags_match_the_engine(self):
+        sys.path.insert(0, str(ROOT))
+        import embed
+        import re
+
+        page = embed.PAGE.read_text(encoding="utf-8")
+        lists = {m.group(1): tuple(re.findall(r"'([A-Z_]+)'", m.group(2)))
+                 for m in re.finditer(r"var UW_(CREDIT|DEBIT)_TAGS=\[([^\]]*)\]", page)}
+        self.assertEqual((lists["CREDIT"], lists["DEBIT"]), (uw.CREDIT_TAGS, uw.DEBIT_TAGS))
+
 
 class Schemas(unittest.TestCase):
     def test_fixtures_match_schemas(self):
