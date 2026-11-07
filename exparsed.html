@@ -505,7 +505,7 @@ from pathlib import Path
 
 D = Decimal
 ENGINE_VERSION = "3.4"
-POLICY_VERSION = "V1.8b1"
+POLICY_VERSION = "V1.8b2"
 
 # Policy parameters (V2.2 values with the V1.7 changes marked). Changing any value is a policy change: bump POLICY_VERSION.
 BUSINESS_DAYS_PER_MONTH = D(20)
@@ -787,6 +787,12 @@ T1 = rx(
     "R29",
 )
 RETURN_CODE = re.compile(r"\bR\d\d\b")
+# V1.8 R1: return-word scan. Other R-codes count only next to ACH or RETURN wording.
+RETURN_SCAN = rx(
+    r"STOP PAY(?:MENT)?", "UNAUTHORIZED", r"NOT AUTH\w*", "AUTH REVOKED", "ACH BLOCK", "POSITIVE PAY",
+    "NSF", r"INSUFFICIENT FUNDS?", "UNCOLLECTED", r"RETURN(?:ED)?", "RETURN ITEM", "REVERSAL", "REVERSED",
+    "RECREDIT", r"CHARGEBACK\w*", "R01", "R05", "R07", "R08", "R09", "R10", "R29",
+)
 NOISE = set(
     "ACH DEBIT CREDIT PPD CCD WEB TEL POS PURCHASE PMT PAYMENT ID REF TRN CO ENTRY DESCR IND ORIG DES "
     "CHECKCARD ONLINE ELECTRONIC WITHDRAWAL EPAY EPAYMENT RECURRING XXXXXX".split()
@@ -1040,6 +1046,7 @@ class _Engine:
         self.capacity()
         self.peak()
         self.returns_log()
+        self.return_scan()
         self.liquidity()
         self.narrative()
         self.completeness_audit()
@@ -2735,6 +2742,36 @@ class _Engine:
                 )
         self.t7.sort(key=lambda e: (e["date"], e["cls"]))
 
+    def return_scan(self):
+        """V1.8 R1: one record per row with return wording; each links to a Table 7 event or gets a reason."""
+        event = {}
+        for i, e in enumerate(self.t7):
+            for a in e["attempts"]:
+                event[a] = i
+                if self.by_id[a].returned_by:
+                    event[self.by_id[a].returned_by] = i
+        self.scan = []
+        for t in self.txns:
+            u = t.desc.upper()
+            m = RETURN_SCAN.search(u) or (RETURN_CODE.search(u) if ("ACH" in u or "RETURN" in u) else None)
+            if not m and t.tag != "STRIP_RECREDIT":  # every recredit gets a record, whatever its wording
+                continue
+            if t.id in event:
+                e = self.t7[event[t.id]]
+                disp, why = "EVENT", f"Table 7 {mdy(e['date'])} {e['who']}: Class {e['cls']}, tier {e['tier']}"
+            elif t.tag == "FEE_NSF_OD":
+                disp, why = "FEE", "NSF/OD fee: counted in Table 9 fees; a fee is not a returned-debit event"
+            elif t.dir == "credit":
+                why = ("refund or chargeback credit" if t.tag == "STRIP_REFUND"
+                       else "reversal credit without return wording or code" if t.tag == "STRIP_RECREDIT"
+                       else f"credit tagged {t.tag}")
+                disp, why = "DISMISSED", why + "; no returned debit attempt is linked"
+            else:
+                disp, why = "DISMISSED", f"cleared debit tagged {t.tag}; no returned debit attempt is linked"
+            self.scan.append(dict(txn_id=t.id, account=t.acct, date=t.date, description=t.desc, amount=t.amt,
+                                  direction=t.dir, word=m.group(0) if m else "recredit tag",
+                                  disposition=disp, reason=why))
+
     def liquidity(self):
         eod = defaultdict(dict)  # account -> date -> end-of-day balance
         for t in self.txns:
@@ -3005,6 +3042,15 @@ class _Engine:
                 "HEADLINE = max(0, min(B, C))",
                 self.headline == max(D(0), min(self.room["B"], self.room["C"])),
             )
+        scanned = {s["txn_id"] for s in self.scan}
+        ok(
+            "every return-word hit has an event or a dismissal reason (V1.8 R1)",
+            all(s["disposition"] in ("EVENT", "FEE", "DISMISSED") and s["reason"] for s in self.scan),
+        )
+        ok(
+            "every Table 7 Class A return row is a return-word hit",
+            all((self.by_id[a].returned_by or a) in scanned for e in self.t7 if e["cls"] == "A" for a in e["attempts"]),
+        )
         ok(
             "Class B events have tier n/a",
             all(e["tier"] == "n/a" for e in self.t7 if e["cls"] == "B"),
@@ -3087,7 +3133,8 @@ class _Engine:
             7: dict(backward_searches=len(self.searches), forward_searches=len(self.forward),
                     attached=len(self.attached), competing=competing),
             8: dict(Y=status["Y"], U=status["U"], N=status["N"]),
-            9: dict(headline=self.headline, basis=self.basis, stack=self.stack, status=self.status),
+            9: dict(headline=self.headline, basis=self.basis, stack=self.stack, status=self.status,
+                    return_scan=dict(Counter(s["disposition"] for s in self.scan))),
             10: dict(self.completeness, self_checks=len(self.checks)),
         }
         # What each output hash covers: the counts plus the stage's own results, so a changed tag,
@@ -3237,6 +3284,7 @@ class _Engine:
             peak_week=self.peak_week,
             obligations=self.ob_rows,
             returns=self.t7,
+            return_scan=self.scan,
             flights=self.flights,
             liquidity=dict(
                 od_days=sorted(self.od_days),

@@ -341,8 +341,7 @@ All 22 matrix interpretations B1 to B22 are signed off. Waiting for sign-off: th
     `tdd-open-items`, `underwriting-in-page`, `v17-batch1` to `v17-batch4`, `v17-credit-coverage`, `v17-debit-side`, `v17-records`,
     `batch-harness-merge`, `signoff-b1-b6`, `signoff-b7-b12`, `signoff-b13-b21`, `handoff-pr33`, `v18-returns` and `handoff-pr35`. GitHub's "Automatically delete head branches" setting stops new ones piling up.
 14. **Desktop set rerun after PR #12.** The stricter date check drops any row whose printed date is impossible. Rerun the 244 files and compare against section 4.
-15. **V1.8 remaining.** Batch 1 done in PR #35. Next: the return-word scan log (V1.8 R1: every STOP PAY, NSF
-    or R-code row linked to a return or dismissed with a reason), then the character pass (B1 to B5: expected
+15. **V1.8 remaining.** Batch 1 done in PR #35; the return-word scan log (V1.8 R1) in batch 2. Next: the character pass (B1 to B5: expected
     versus cleared collections, lowest-balance days, deposit-then-return sequences, character and failure-mode
     labels from the judge prompt), then the extra Table 4 notes and Table 9 detail.
 

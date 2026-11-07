@@ -933,6 +933,22 @@ class V17Batch4(unittest.TestCase):
         ev = next(e for e in run(led).audit["returns"] if e["attempts"][0] == "RT0")
         self.assertEqual(ev["cured"], "UNKNOWN (re-presented; balance unknown)")
 
+    def test_return_word_scan_links_or_dismisses_every_hit(self):
+        # V1.8 R1: each row with return wording links to a Table 7 event or gets a dismissal reason.
+        led = add_rows(LEDGER, [("OP", "2026-08-04", "800.00", "debit", "ACME PAPER SUPPLY"),
+                                ("OP", "2026-08-05", "800.00", "credit", "ACME PAPER SUPPLY RETURN R01"),
+                                ("OP", "2026-08-05", "35.00", "debit", "NSF FEE"),
+                                ("OP", "2026-08-11", "1200.00", "debit", "RETURNED DEPOSIT ITEM"),
+                                ("OP", "2026-08-12", "90.00", "credit", "VISA CHARGEBACK REV"),
+                                ("OP", "2026-08-13", "45.00", "debit", "STORE R12 PURCHASE")], "RS")
+        r = run(led)
+        got = {s["txn_id"]: s["disposition"] for s in r.audit["return_scan"] if s["txn_id"].startswith("RS")}
+        # RS0 (the debit) has no return wording; its return credit RS1 carries the link. RS5 has an R-code
+        # without ACH or RETURN wording, so it is not a hit.
+        self.assertEqual(got, {"RS1": "EVENT", "RS2": "FEE", "RS3": "DISMISSED", "RS4": "DISMISSED"})
+        self.assertTrue(all(s["reason"] for s in r.audit["return_scan"]))
+        self.assertIn("every return-word hit has an event or a dismissal reason (V1.8 R1)", r.audit["self_checks"])
+
     def test_plain_wire_gets_no_finance_points(self):
         # M8: +2 needs explicit finance terms or a finance-origin wire.
         led = add_rows(LEDGER, [("OP", "2026-07-30", "9000.00", "credit", "WIRE IN ORIG ACME CUSTOMER REF 9")], "WR")
