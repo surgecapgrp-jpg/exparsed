@@ -1,6 +1,6 @@
 # exparsed handoff
 
-State on 2026-11-06 at `main` commit `f4ec5f5`. Repo: https://github.com/surgecapgrp-jpg/exparsed (private).
+State on 2026-11-07 at `main` commit `d32d1cd`. Repo: https://github.com/surgecapgrp-jpg/exparsed (private).
 This file replaces the 2026-10-26 handoff. The underwriting design detail is in `underwriting/docs/HANDOFF.md`,
 and the policy compliance detail is in `underwriting/docs/V1_7_MATRIX.md`.
 
@@ -156,6 +156,8 @@ execution order (H11), FLIGHT inflow scope (P15).
 | #14 | `715f07a` | 2027 holidays, no report after twice-rejected answers, standards fixes (open items 2, 3, 5) |
 | #15 | `ff1d4e9` | Handoff update after #14 |
 | #16 | `f4ec5f5` | Sign-off B18: missing accounts block YES only (policy V1.7b5) |
+| #17 | `f2eee77` | Handoff update after #16 |
+| #18 | `d32d1cd` | One address and header builder per AI provider (open item 6) |
 
 Rollback point before all underwriting work: `283bc50`.
 
@@ -214,7 +216,7 @@ the 19 readings in `underwriting/docs/HANDOFF.md` section 4.1.
 
 ## 7. Verification
 
-| Check | Result on `main` f4ec5f5 |
+| Check | Result on `main` d32d1cd |
 | :--- | :--- |
 | `node tests/run-node.js` | 215 passed, 0 failed |
 | `python3 -m unittest discover -s tests` in `underwriting/` | 72 passed |
@@ -271,7 +273,7 @@ the 19 readings in `underwriting/docs/HANDOFF.md` section 4.1.
     - `uw-engine`: 3 real commits, a local Python model server (replaced by Pyodide in PR #4) and Python 3.9 support. `main` needs Python 3.10+.
     - `deepen`: 6 real commits of refactors. Two fixes are ported (PR #12). Its newest-first day-end fix was not needed: `main` already reverses newest-first rows. The rest (parser script split, reader snapshots, one "needs OCR" rule) is optional.
 
-    `design-review-fixes`, `handoff-2026-11-05`, `date-and-export-fixes`, `handoff-update`, `tdd-open-items`, `handoff-pr14`, `b18-block-yes-only`, `rebrand/surge-capital`, `underwriting-in-page` and `v17-batch1` to `v17-batch4` are merged and can be deleted.
+    `design-review-fixes`, `handoff-2026-11-05`, `date-and-export-fixes`, `handoff-update`, `tdd-open-items`, `handoff-pr14`, `b18-block-yes-only`, `handoff-pr16`, `model-call-module`, `rebrand/surge-capital`, `underwriting-in-page` and `v17-batch1` to `v17-batch4` are merged and can be deleted.
 14. **Desktop set rerun after PR #12.** The stricter date check drops any row whose printed date is impossible. Rerun the 244 files and compare against section 4.
 
 ## 10. Rules for the next engineer
