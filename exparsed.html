@@ -570,6 +570,13 @@ DEBIT_TAGS = (
     "TRANSFER_OUT",
     "OTHER",
 )
+# V1.7 execution order; the V3 handoff stage manifest reports one entry per stage.
+STAGES = (
+    "inventory/routes/coverage", "normalize/dedupe/reconcile", "account links and provisional tags",
+    "debit-first MCA discovery", "credit-first funding discovery", "event/renewal discovery",
+    "candidate-pair reconciliation", "finalized tags and position status",
+    "revenue, costs, returns, liquidity, capacity", "MCA completeness audit", "render and validate ten tables",
+)
 CREDIT_DISPOSITIONS = ("ATTACHED", "FINANCING_UNATTACHED", "COMPETING", "CUSTOMER_SUPPORTED", "OTHER_SUPPORTED", "UNRESOLVED")
 HARD_STRIP = {"STRIP_TRANSFER", "STRIP_REFUND", "STRIP_RECREDIT", "STRIP_OWNER"}
 # V1.7 evidence level of a STRIP_FUNDING gate.
@@ -781,6 +788,19 @@ GENERIC = set(
     "LLC INC CORP CO CAPITAL FUNDING FUND GROUP FINANCIAL FINANCE ADV ADVANCE MERCHANT SOLUTIONS "
     "SERVICES PARTNERS BUSINESS LENDING HOLDINGS THE OF AND USA".split()
 )
+
+
+def policy_hash():
+    """Hash of POLICY_VERSION and every policy number, name and word list; regex rules are named by pattern."""
+    items = sorted(
+        (k, v.pattern if isinstance(v, re.Pattern) else str(v))
+        for k, v in globals().items()
+        if k.isupper() and isinstance(v, (Decimal, int, str, tuple, dict, re.Pattern)) and k != "ENGINE_VERSION"
+    )
+    return hashlib.sha256(json.dumps(items).encode()).hexdigest()[:16]
+
+
+POLICY_HASH = policy_hash()
 
 
 class UWError(Exception):
@@ -3020,8 +3040,65 @@ class _Engine:
                                 required_evidence="an answer in the judgments file", severity="MINOR"))
         return out
 
+    def stages(self, exceptions):
+        """V3 handoff stage manifest for V1.7 execution-order stages 1 to 10 (11 is added after rendering).
+
+        Each stage reports counts, the material items a person must review, and hashes chained from the
+        ledger: a stage's input hash is the previous stage's output hash. NEEDS_REVIEW marks evidence
+        uncertainty; the run itself completed (a failed run raises UWError and returns no audit).
+        """
+        material = defaultdict(list)
+        stage_of = {"UNREADABLE SOURCE": 1, "REQUEST REQUIRED": 3, "VERIFY OWNERSHIP": 3,
+                    "UNRESOLVED CREDITS": 5, "U POSITION": 8}
+        for x in exceptions:
+            if x["severity"] == "MATERIAL" and x["type"] in stage_of:
+                material[stage_of[x["type"]]].append(x["type"])
+        if self.worst in ("Break", "Unverified"):
+            material[2].append(f"integrity {self.worst}")
+        competing = sum(f["v17_disposition"] == "COMPETING" for f in self.forward)
+        if competing:
+            material[7].append("COMPETING")
+        if getattr(self, "uncertain_block", None) or self.coverage_block:
+            material[9].append("verdict held by uncertainty or coverage")
+        events = Counter(e["kind"] for p in self.positions for e in p.events)
+        status = Counter(p.live_status for p in self.positions if not p.watch)
+        counts = {
+            1: dict(accounts=len(self.accts), statements=sum(len(a["statements"]) for a in self.accts.values()),
+                    unread=len(self.unread)),
+            2: dict(transactions=len(self.txns), duplicate_ids_dropped=sum(self.dropped.values()),
+                    pending=len(self.pending)),
+            3: dict(tags=dict(Counter(t.tag for t in self.txns)), account_requests=len(self.requests)),
+            4: dict(debit_groups=len(self.groups), nominated=len(self.debit_dispositions),
+                    positions=sum(not p.watch for p in self.positions), watch=sum(p.watch for p in self.positions)),
+            5: dict(candidates=len(self.cand), financing_gated=len(self.gate)),
+            6: dict(events=dict(events)),
+            7: dict(backward_searches=len(self.searches), forward_searches=len(self.forward),
+                    attached=len(self.attached), competing=competing),
+            8: dict(Y=status["Y"], U=status["U"], N=status["N"]),
+            9: dict(headline=self.headline, basis=self.basis, stack=self.stack, status=self.status),
+            10: dict(self.completeness, self_checks=len(self.checks)),
+        }
+        # What each output hash covers: the counts plus the stage's own results, so a changed tag,
+        # position or room changes the hash even when the counts do not.
+        detail = {
+            1: sorted(self.accts), 2: [t.id for t in self.txns], 3: [(t.id, t.tag) for t in self.txns],
+            4: sorted((p.pid, [t.id for t in p.txns]) for p in self.positions), 5: sorted(self.cand),
+            6: sorted((p.pid, e["kind"], e["txn_id"]) for p in self.positions for e in p.events),
+            7: sorted(self.attached.items()), 8: sorted((p.pid, p.live_status, p.cost) for p in self.positions),
+            9: [self.headline, self.conservative, self.basis, self.stack, self.status], 10: self.checks,
+        }
+        out, prev = [], self.sha
+        for k, name in enumerate(STAGES[:10], 1):
+            digest = stage_hash([counts[k], detail[k]])
+            out.append(dict(stage=k, name=name, status="NEEDS_REVIEW" if material[k] else "COMPLETE",
+                            input_hash=prev, policy_hash=POLICY_HASH, output_hash=digest, counts=counts[k],
+                            unresolved=sorted(set(material[k]))))
+            prev = digest
+        return out
+
     def audit(self):
         """Every fact the report shows, plus the provenance behind it. render() reads only this."""
+        exceptions = self.exceptions()
         searches_by_trigger = defaultdict(list)
         for s in self.searches:
             searches_by_trigger[s["anchor"]].append(s)
@@ -3142,7 +3219,8 @@ class _Engine:
             pending_observations=self.pending,
             sources=self.sources,
             duplicate_crosswalk=self.crosswalk,
-            exceptions=self.exceptions(),
+            exceptions=exceptions,
+            stages=self.stages(exceptions),
             credit_dispositions=self.credit_dispositions,
             peak_week=self.peak_week,
             obligations=self.ob_rows,
@@ -3296,6 +3374,10 @@ def cell(s):
         r"\s+", " ", str(s).replace("|", "/").replace("{", "(").replace("}", ")")
     ).strip()
     return s or "—"
+
+
+def stage_hash(x):
+    return hashlib.sha256(json.dumps(x, default=jsonable, sort_keys=True).encode()).hexdigest()[:16]
 
 
 def jsonable(o):
@@ -3593,6 +3675,9 @@ def underwrite(raw, judgments=None):
     audit = e.audit()
     report = render(audit)
     audit["report_gate"] = report_gate(report)
+    last = audit["stages"][-1]["output_hash"]
+    audit["stages"].append(dict(stage=11, name=STAGES[10], status="COMPLETE", input_hash=last, policy_hash=POLICY_HASH,
+                                output_hash=stage_hash(report), counts=dict(report_gate=audit["report_gate"]), unresolved=[]))
     return Result(e.questions_doc(), audit, report, e.status, len(audit["questions_open"]))
 
 
