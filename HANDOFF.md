@@ -1,6 +1,7 @@
 # exparsed handoff
 
-State on 2026-11-07 at `main` commit `10c0fe4`. Repo: https://github.com/surgecapgrp-jpg/exparsed (private).
+Code state on 2026-11-07 at `main` commit `10c0fe4` (PR #24, the last code change). Later commits that only
+edit this file are not listed. Repo: https://github.com/surgecapgrp-jpg/exparsed (private).
 This file replaces the 2026-10-26 handoff. The underwriting design detail is in `underwriting/docs/HANDOFF.md`,
 and the policy compliance detail is in `underwriting/docs/V1_7_MATRIX.md`.
 
@@ -164,6 +165,7 @@ execution order (H11), FLIGHT inflow scope (P15).
 | #22 | `2395260` | V1.7 D8, M14, D11: concurrent doubles, same-funder renewals, adverse scenario (policy V1.7b7) |
 | #23 | `318d906` | Handoff update after #22 |
 | #24 | `10c0fe4` | V1.7 R1, R3, R7, S3, S7: source, transaction and exception records (policy V1.7b8) |
+| #25 | `d5c4885` | Handoff update after #24 (handoff-only PRs after this one are not listed) |
 
 Rollback point before all underwriting work: `283bc50`.
 
@@ -289,7 +291,7 @@ the 19 readings in `underwriting/docs/HANDOFF.md` section 4.1.
     - `uw-engine`: 3 real commits, a local Python model server (replaced by Pyodide in PR #4) and Python 3.9 support. `main` needs Python 3.10+.
     - `deepen`: 6 real commits of refactors. Two fixes are ported (PR #12). Its newest-first day-end fix was not needed: `main` already reverses newest-first rows. The rest (parser script split, reader snapshots, one "needs OCR" rule) is optional.
 
-    `design-review-fixes`, `handoff-2026-11-05`, `date-and-export-fixes`, `handoff-update`, `tdd-open-items`, `handoff-pr14`, `b18-block-yes-only`, `handoff-pr16`, `model-call-module`, `handoff-pr18`, `v17-credit-coverage`, `handoff-pr20`, `v17-debit-side`, `handoff-pr22`, `v17-records`, `rebrand/surge-capital`, `underwriting-in-page` and `v17-batch1` to `v17-batch4` are merged and can be deleted.
+    `design-review-fixes`, `handoff-2026-11-05`, `date-and-export-fixes`, `handoff-update`, `tdd-open-items`, `handoff-pr14`, `b18-block-yes-only`, `handoff-pr16`, `model-call-module`, `handoff-pr18`, `v17-credit-coverage`, `handoff-pr20`, `v17-debit-side`, `handoff-pr22`, `v17-records`, `handoff-pr24`, `rebrand/surge-capital`, `underwriting-in-page` and `v17-batch1` to `v17-batch4` are merged and can be deleted.
 14. **Desktop set rerun after PR #12.** The stricter date check drops any row whose printed date is impossible. Rerun the 244 files and compare against section 4.
 
 ## 10. Rules for the next engineer
@@ -299,3 +301,5 @@ the 19 readings in `underwriting/docs/HANDOFF.md` section 4.1.
 - A policy value changes only with a named constant, a `POLICY_VERSION` bump and underwriter sign-off.
 - A new V1.7 behaviour gets a matrix row update and a test that fails on the old code.
 - The engine decides numbers. The model only answers `questions.json`, and every quote it gives must be verbatim.
+- Update this file in the same PR as the code change: header commit, PR table row, test counts, line numbers.
+  A docs-only PR afterwards is then not needed.
