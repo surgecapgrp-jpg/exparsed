@@ -46,7 +46,7 @@ from pathlib import Path
 
 D = Decimal
 ENGINE_VERSION = "3.4"
-POLICY_VERSION = "V1.8b2"
+POLICY_VERSION = "V1.8b3"
 
 # Policy parameters (V2.2 values with the V1.7 changes marked). Changing any value is a policy change: bump POLICY_VERSION.
 BUSINESS_DAYS_PER_MONTH = D(20)
@@ -68,6 +68,8 @@ PAYBACK_FACTOR = D("1.4")
 HOLDBACK_SHARE = D("0.60")
 FLIGHT_SHARE = D("0.30")
 FLIGHT_DAYS = 2
+SWEEP_RETURN_BD = 5  # V1.8 B3 (interpretation, needs sign-off): outflow up to 5 bd before the returned attempt
+THIN_DAY_COUNT = 5  # V1.8 B2: lowest valid EOD dates per account
 RETURN_MATCH_BD = 5  # recredit must follow its debit within this many business days
 CHAIN_GAP_BD = 10  # re-presentments within this gap belong to one attempt chain
 TOP_STREAMS = 6
@@ -589,6 +591,7 @@ class _Engine:
         self.returns_log()
         self.return_scan()
         self.liquidity()
+        self.character_evidence()
         self.narrative()
         self.completeness_audit()
         self.self_check()
@@ -2359,6 +2362,90 @@ class _Engine:
                     dict(date=c.date, inflow=c.amt, outflow=out, credit=c.id)
                 )
 
+    # ---- 10b. V1.8 character evidence (audit only; labels come later from the judge) ---------------
+    def character_evidence(self):
+        """V1.8 B1 to B3 evidence. Code lists facts; it never labels intent or changes capacity."""
+        covered = {a: [(s, e) for s, e in v["statements"]] for a, v in self.accts.items()}
+        cov = lambda a, d: any(s <= d <= e for s, e in covered[a])
+        finance = lambda t: t.tag.startswith("MCA_") or t.tag == "DEBT_SERVICE"
+        essential = ("PAYROLL", "RENT", "TAX", "INSURANCE", "DIRECT_COST", "UTILITIES")
+        # B1: expected versus observed pulls inside each position's observed servicing interval.
+        self.collections = []
+        for p in self.positions:
+            if p.watch:
+                continue
+            tried = sorted({t.date for t in p.txns})
+            row = dict(pid=p.pid, position=p.display, cadence=p.cadence, txn_ids=[t.id for t in p.txns],
+                       first=tried[0], last=tried[-1], cleared_days=len({t.date for t in p.cleared}),
+                       returned_days=len({t.date for t in p.txns if t.returned_by}),
+                       expected=None, missing=None, gap_cause="UNKNOWN")
+            acct = p.txns[0].acct
+            days = [tried[0] + timedelta(i) for i in range((tried[-1] - tried[0]).days + 1)]
+            if p.cadence not in CADENCE_FACTOR:
+                row["basis"] = f"not computed: cadence {p.cadence}"
+            elif any(e["kind"] not in ("DESCRIPTOR CHANGE", "STOPPED") for e in p.events):
+                row["basis"] = "not computed: payment or schedule changed inside the interval"
+            elif p.cadence != "daily" and not all(cov(acct, d) for d in days):
+                row["basis"] = "not computed: statement gap inside the interval"
+            else:
+                span = (tried[-1] - tried[0]).days
+                row["expected"] = (sum(1 for d in days if self.cal.is_bd(d) and cov(acct, d)) if p.cadence == "daily"
+                                   else span // 7 + 1 if p.cadence == "weekly"
+                                   else span // 14 + 1 if p.cadence == "biweekly"
+                                   else (tried[-1].year - tried[0].year) * 12 + tried[-1].month - tried[0].month + 1)
+                row["missing"] = max(0, row["expected"] - row["cleared_days"] - row["returned_days"])
+                row["basis"] = ("first to last observed attempt, covered days only; a missing pull is not a failed "
+                                "attempt and its cause is unknown")
+            self.collections.append(row)
+        # B2: lowest valid EOD dates per account plus every verified return date.
+        ret_day = {}
+        for e in self.t7:
+            if e["cls"] == "A":
+                rc = self.by_id[self.by_id[e["attempts"][0]].returned_by or e["attempts"][0]]
+                ret_day.setdefault((rc.acct, rc.date), []).append(e)
+        self.thin_days = []
+        for a, bals in self.eod.items():
+            low = sorted(bals, key=lambda d: (bals[d], d))[:THIN_DAY_COUNT]
+            for d in sorted(set(low) | {d for (x, d) in ret_day if x == a}):
+                day = [t for t in self.txns if t.acct == a and t.date == d]
+                ids = lambda f: [t.id for t in day if f(t)]
+                fin_ret = [e for e in ret_day.get((a, d), []) if finance(self.by_id[e["attempts"][0]])]
+                owner_out = ids(lambda t: t.dir == "debit" and t.tag in ("OWNER_DRAW", "TRANSFER_OUT") and not t.returned_by)
+                self.thin_days.append(dict(
+                    account=a, date=d, eod=bals.get(d), why="lowest EOD" if d in low else "return date",
+                    finance_cleared=ids(lambda t: t.dir == "debit" and finance(t) and not t.returned_by),
+                    essential_cleared=ids(lambda t: t.dir == "debit" and t.tag in essential and not t.returned_by),
+                    returns=[e["attempts"][0] for e in ret_day.get((a, d), [])],
+                    owner_injections=ids(lambda t: t.dir == "credit" and t.tag == "STRIP_OWNER"),
+                    owner_or_transfer_out=owner_out,
+                    finance_return_with_outflow=bool(fin_ret and owner_out),
+                    note="EOD only; same-day order and intraday balance are unknown"))
+        # B3: external deposit -> outflow within FLIGHT_DAYS -> returned finance attempt within SWEEP_RETURN_BD.
+        external = lambda t: t.dir == "credit" and not t.tag in HARD_STRIP and not t.returned_by
+        flight_ids = {f["credit"] for f in self.flights}
+        self.sweeps = []
+        for e in self.t7:
+            att = self.by_id[e["attempts"][0]]
+            if e["cls"] != "A" or att.dir != "debit" or not finance(att):
+                continue
+            lo = self.cal.add(att.date, -SWEEP_RETURN_BD)
+            for o in self.txns:
+                if not (o.acct == att.acct and o.dir == "debit" and o.tag in ("OWNER_DRAW", "TRANSFER_OUT")
+                        and not o.returned_by and lo <= o.date <= att.date):
+                    continue
+                deps = [c for c in self.txns if c.acct == o.acct and external(c)
+                        and o.date - timedelta(FLIGHT_DAYS) <= c.date <= o.date and (c.date, c.seq) < (o.date, o.seq)]
+                if not deps:
+                    continue
+                c = max(deps, key=lambda t: t.amt)
+                other = [b["last4"] for k, b in self.accts.items() if k != o.acct]
+                self.sweeps.append(dict(
+                    deposit=c.id, deposit_date=c.date, deposit_amount=c.amt, outflow=o.id, outflow_date=o.date,
+                    outflow_amount=o.amt, outflow_tag=o.tag,
+                    destination="supplied account" if any(l4 and l4 in o.desc for l4 in other) else "outside or unknown",
+                    returned_attempt=att.id, attempt_date=att.date, tier=e["tier"], flight_screen=c.id in flight_ids,
+                    note="timing only; purpose and intent are not established"))
+
     # ---- 11. narrative (deterministic except Core Operation) --------------------------------------
     def narrative(self):
         a_events = [e for e in self.t7 if e["cls"] == "A"]
@@ -2583,6 +2670,15 @@ class _Engine:
                 "HEADLINE = max(0, min(B, C))",
                 self.headline == max(D(0), min(self.room["B"], self.room["C"])),
             )
+        cited = [i for r in self.collections for i in r["txn_ids"]] + [
+            i for r in self.thin_days for k in ("finance_cleared", "essential_cleared", "returns",
+                                                "owner_injections", "owner_or_transfer_out") for i in r[k]
+        ] + [r[k] for r in self.sweeps for k in ("deposit", "outflow", "returned_attempt")]
+        ok("character evidence cites only ledger transactions (V1.8 B1 to B3)", all(i in self.by_id for i in cited))
+        ok(
+            "every sweep sequence ends in a Table 7 Class A finance return",
+            all(any(e["cls"] == "A" and s["returned_attempt"] in e["attempts"] for e in self.t7) for s in self.sweeps),
+        )
         scanned = {s["txn_id"] for s in self.scan}
         ok(
             "every return-word hit has an event or a dismissal reason (V1.8 R1)",
@@ -2675,7 +2771,10 @@ class _Engine:
                     attached=len(self.attached), competing=competing),
             8: dict(Y=status["Y"], U=status["U"], N=status["N"]),
             9: dict(headline=self.headline, basis=self.basis, stack=self.stack, status=self.status,
-                    return_scan=dict(Counter(s["disposition"] for s in self.scan))),
+                    return_scan=dict(Counter(s["disposition"] for s in self.scan)),
+                    character=dict(collections=sum(r["expected"] is not None for r in self.collections),
+                                   missing_pulls=sum(r["missing"] or 0 for r in self.collections),
+                                   thin_days=len(self.thin_days), sweeps=len(self.sweeps))),
             10: dict(self.completeness, self_checks=len(self.checks)),
         }
         # What each output hash covers: the counts plus the stage's own results, so a changed tag,
@@ -2826,6 +2925,7 @@ class _Engine:
             obligations=self.ob_rows,
             returns=self.t7,
             return_scan=self.scan,
+            character_evidence=dict(collections=self.collections, thin_days=self.thin_days, sweeps=self.sweeps),
             flights=self.flights,
             liquidity=dict(
                 od_days=sorted(self.od_days),

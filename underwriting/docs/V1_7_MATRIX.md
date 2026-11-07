@@ -439,3 +439,20 @@ V1.8 R1 asks for a record of every row with return wording, each linked to a ret
 | Real, both runs | Same reports. 5 hits, all DISMISSED: a bank claim reversal (credit $2,965 and debit $515) and 3 fee reversals of $34 |
 
 The scan reads only supplied rows. Missing pages or accounts limit it, and a scan with no hits is not proof of no returns.
+
+## V1.8 batch 3: character evidence, part 1 (2026-11-07; policy V1.8b3)
+
+V1.8 B1 to B3 evidence, computed by code and kept in `audit.character_evidence`. Nothing in the report changes. Labels (B4, B5) come in part 2 through the judge prompt.
+
+- `collections` (B1): for each established or probable position with a daily, weekly, biweekly or monthly cadence, expected pulls from the first to the last observed attempt, cleared days, returned days and missing pulls. Cause is always UNKNOWN. Not computed for VARIABLE or PROVISIONAL cadence, for a payment or schedule change inside the interval, or for a statement gap (weekly and longer). Daily counts covered business days only.
+- `thin_days` (B2): per account, the 5 lowest EOD dates (`THIN_DAY_COUNT`) plus every Class A return date. Each lists cleared finance and essential debits, returns, owner injections (STRIP_OWNER) and owner or transfer outflows, with a flag when a finance return and an outflow share a day. EOD only: same-day order is unknown.
+- `sweeps` (B3): external deposit, then an owner draw or transfer out within 2 days (`FLIGHT_DAYS`), then a Class A return on MCA or loan within 5 business days of the outflow (`SWEEP_RETURN_BD`). Destination is "supplied account" when the outflow names another supplied account's last four, else "outside or unknown". Timing only.
+- 2 self-checks: every cited transaction is in the ledger; every sweep ends in a Table 7 Class A finance return.
+
+`SWEEP_RETURN_BD` = 5 is an interpretation; V1.8 gives no window. It needs sign-off.
+
+| Run | Effect |
+| :--- | :--- |
+| All 4 saved runs | Same reports |
+| Real | 7 of 10 positions computed. Kapitus 56 of 56 weekly, Forward Financing 167 of 167 daily, Accord 49 of 50, MS Equities 57 of 58. 5 thin days, EOD -$171.66 to -$4,192.82; no returns, so 0 sweeps |
+| Sample | BlueOak 6 of 7 weekly, SunCap 19 of 19 daily, CFG 4 of 4 |

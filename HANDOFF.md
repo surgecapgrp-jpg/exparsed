@@ -181,6 +181,7 @@ the return-word scan log (R1), the character pass (B1 to B5) and the extra Table
 | #32 | `9cf4be8` | Sign-offs B7 (changed: no summed U test, policy V1.7b10), B9 (changed: D3 needs 2 debits only), B11, B12 (kept) |
 | #33 | `cc76a74` | Sign-offs B21 (changed: unmatched return credits are Class A, policy V1.7b11), B13 to B17, B19, B20 (kept) |
 | #35 | `2c70239` | V1.8 batch 1: T1 only on finance, unclear tier n/a, cure UNKNOWN (policy V1.8b1) |
+| #37 | `d3c0ca9` | V1.8 batch 2: return-word scan log, `audit.return_scan` (policy V1.8b2) |
 
 Rollback point before all underwriting work: `283bc50`.
 
@@ -341,9 +342,8 @@ All 22 matrix interpretations B1 to B22 are signed off. Waiting for sign-off: th
     `tdd-open-items`, `underwriting-in-page`, `v17-batch1` to `v17-batch4`, `v17-credit-coverage`, `v17-debit-side`, `v17-records`,
     `batch-harness-merge`, `signoff-b1-b6`, `signoff-b7-b12`, `signoff-b13-b21`, `handoff-pr33`, `v18-returns` and `handoff-pr35`. GitHub's "Automatically delete head branches" setting stops new ones piling up.
 14. **Desktop set rerun after PR #12.** The stricter date check drops any row whose printed date is impossible. Rerun the 244 files and compare against section 4.
-15. **V1.8 remaining.** Batch 1 done in PR #35; the return-word scan log (V1.8 R1) in batch 2. Next: the character pass (B1 to B5: expected
-    versus cleared collections, lowest-balance days, deposit-then-return sequences, character and failure-mode
-    labels from the judge prompt), then the extra Table 4 notes and Table 9 detail.
+15. **V1.8 remaining.** Batch 1 done in PR #35; the return-word scan log (V1.8 R1) in PR #37; character evidence part 1 (B1 to B3, audit only) in batch 3. Next: character pass part 2 (B4, B5: a judge question that reads `audit.character_evidence` and returns the
+    character and failure-mode labels for the WILL-PAY line; `SWEEP_RETURN_BD` sign-off), then the extra Table 4 notes and Table 9 detail.
 
 ## 10. Rules for the next engineer
 

@@ -949,6 +949,27 @@ class V17Batch4(unittest.TestCase):
         self.assertTrue(all(s["reason"] for s in r.audit["return_scan"]))
         self.assertIn("every return-word hit has an event or a dismissal reason (V1.8 R1)", r.audit["self_checks"])
 
+    def test_missing_daily_pull_is_counted_with_unknown_cause(self):
+        # V1.8 B1: expected versus cleared pulls inside the observed interval; cause stays UNKNOWN.
+        led = copy.deepcopy(LEDGER)
+        led["transactions"] = [t for t in led["transactions"] if t["txn_id"] != "T00010"]
+        row = next(c for c in run(led).audit["character_evidence"]["collections"] if c["position"] == "SUNCAP FUNDING")
+        self.assertEqual((row["expected"], row["cleared_days"], row["missing"], row["gap_cause"]), (19, 18, 1, "UNKNOWN"))
+
+    def test_sweep_to_return_sequence_is_listed(self):
+        # V1.8 B3: deposit, outflow within 2 days, then a returned finance attempt within 5 bd.
+        led = add_rows(LEDGER, [("OP", "2026-08-03", "9000.00", "credit", "ACME CORP ACH PMT"),
+                                ("OP", "2026-08-04", "6000.00", "debit", "ONLINE TRANSFER TO CHK 9999"),
+                                ("OP", "2026-08-05", "450.00", "debit", "RAPIDFUND LLC ACH DEBIT"),
+                                ("OP", "2026-08-06", "450.00", "credit", "RAPIDFUND LLC ACH DEBIT RETURN R01")], "SW")
+        r0 = run(led)
+        r = run(led, with_judgments(r0, [dict(question_id=q(r0, "RAPIDFUND LLC"), tag="MCA", funder="RapidFund")]))
+        ev = r.audit["character_evidence"]
+        s = [x for x in ev["sweeps"] if x["returned_attempt"] == "SW2"]
+        self.assertEqual([(x["deposit"], x["outflow"], x["destination"]) for x in s], [("SW0", "SW1", "outside or unknown")])
+        day = next(d for d in ev["thin_days"] if d["date"] == date(2026, 8, 6))
+        self.assertEqual((day["why"], day["returns"]), ("return date", ["SW2"]))
+
     def test_plain_wire_gets_no_finance_points(self):
         # M8: +2 needs explicit finance terms or a finance-origin wire.
         led = add_rows(LEDGER, [("OP", "2026-07-30", "9000.00", "credit", "WIRE IN ORIG ACME CUSTOMER REF 9")], "WR")
