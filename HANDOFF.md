@@ -170,7 +170,7 @@ execution order (H11), FLIGHT inflow scope (P15).
 | #27 | `101ea11` | Sign-off B22 kept (docs) |
 | #28 | `a62ecf9` | Stage manifest: `audit.stages`, one entry per V1.7 execution-order stage (open item 8) |
 | #29 | `82955fc` | Review queue: open questions answered by an underwriter in the judgments format (open item 11) |
-| #30 | this PR | Batch harness `tests/batch/run.js` from `batch-harness`; `ocr.js` runs under node; 25 merged branches deleted (open item 13) |
+| #30 | this PR | Batch harness `tests/batch/run.js` from `batch-harness`; `ocr.js` runs under node; merged branches listed for deletion (open item 13) |
 
 Rollback point before all underwriting work: `283bc50`.
 
@@ -304,11 +304,17 @@ the 19 readings in `underwriting/docs/HANDOFF.md` section 4.1.
     and shows the engine error. Table 1 notes are not in the queue; they stay in the report.
 12. **Pricing.** Deferred by request; not started.
 13. **Branches.** Done in PR #30. `tests/batch/run.js` and the `ocr.js` line in `run-node.js` are copied from
-    `batch-harness` (the branch shares no history with `main`). The 25 merged branches are deleted.
-    3 remote branches remain, none needed:
+    `batch-harness` (the branch shares no history with `main`). Branch deletes failed from the cloud session
+    (proxy HTTP 403). Delete the 25 merged branches listed below from a Mac clone or GitHub's Branches page.
+    3 unmerged remote branches are not needed either:
     - `batch-harness`: its 1 real commit is now in `main`. Delete it.
     - `uw-engine`: 3 commits, a local Python model server (replaced by Pyodide in PR #4) and Python 3.9 support. `main` needs Python 3.10+.
     - `deepen`: 6 commits of refactors. Two fixes are ported (PR #12). The rest (parser script split, reader snapshots, one "needs OCR" rule) is optional.
+
+    Merged, safe to delete: `b18-block-yes-only`, `b22-signoff`, `date-and-export-fixes`, `design-review-fixes`, `handoff-2026-11-05`,
+    `handoff-anchor`, `handoff-pr14` to `handoff-pr24`, `handoff-update`, `model-call-module`, `review-queue`, `stage-manifest`,
+    `tdd-open-items`, `underwriting-in-page`, `v17-batch1` to `v17-batch4`, `v17-credit-coverage`, `v17-debit-side`, `v17-records`,
+    and `batch-harness-merge` after PR #30. GitHub's "Automatically delete head branches" setting stops new ones piling up.
 14. **Desktop set rerun after PR #12.** The stricter date check drops any row whose printed date is impossible. Rerun the 244 files and compare against section 4.
 
 ## 10. Rules for the next engineer
