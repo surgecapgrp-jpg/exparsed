@@ -59,13 +59,13 @@ Count: 150 rows. 19 B1, 33 B2, 24 B3, 10 B4, 38 Met, 20 Partial, 3 Gap, 3 Page.
 
 | ID | V1.7 rule | Engine now | Status | Fix |
 | :--- | :--- | :--- | :--- | :--- |
-| R1 | SOURCE record per file | Account `integrity_note` plus `sources_unread` for files without rows | Partial | Per-file record with pages and reconciliation |
+| R1 | SOURCE record per file | `audit.sources`: one record per supplied file (account, period, Exparsed status, checks passed and failed, rows, pending, zero, flags, rows the page omitted) | B7 | Page counts per source still come from `source_ref` |
 | R2 | ACCOUNT record with ownership evidence and links | ID, name, last4, statements, integrity; unprovided linked accounts in `account_requests` | Partial | Ownership evidence per account |
-| R3 | TX record with originator ID, trace ID, sequence, evidence level | Adds `orig_id` from printed `ORIG ID:`. No trace ID; evidence level is on positions and strips. | Partial | Parse trace IDs when printed |
+| R3 | TX record with originator ID, trace ID, sequence, evidence level | Each `audit.transactions` record carries `sequence`, `source_ref` (file, page, row), `orig_id` (now read with or without the colon, masked or not) and `trace_id` (`TRACE#`, `TRACE NO`, `TRACE NUMBER`). Evidence level stays on positions and strips. | B7 | — |
 | R4 | DEBIT_CANDIDATE and CREDIT_CANDIDATE with a disposition each | `debit_dispositions` gives each nominated payee POSITION, WATCH or NON-MCA; forward searches give each candidate credit a V1.7 disposition | B2 | — |
 | R5 | MATCH with business and calendar gaps, rivals, decision | Backward candidates log business-day and calendar-day gaps, rivals and outcome | B2 | — |
 | R6 | POSITION with status basis, closure evidence, scenario cost | `live_status`, `status_basis`, `terminated` and `scenario_cost` are in the audit | B1 | — |
-| R7 | EXCEPTION records | `capacity.uncertainty` lists U and unresolved-credit sensitivities. Other exception types are missing. | Partial | B2, B3 |
+| R7 | EXCEPTION records | `audit.exceptions`: type, source_tx_ids, why_unresolved, possible_effect_on_capacity, required_evidence, severity, for U positions, unresolved credits, account requests, unreadable statements and open questions | B7 | — |
 | R8 | Never join on company name alone | Same judged funder joins payees only on a shared originator ID, sequential continuity, or open payment slots | B2 | — |
 | R9 | Evidence levels OBSERVED, CORROBORATED, INFERRED, UNKNOWN | Positions and STRIP_FUNDING gates carry OBSERVED, CORROBORATED, INFERRED or UNKNOWN | B2 | Sign-off B16 |
 
@@ -75,11 +75,11 @@ Count: 150 rows. 19 B1, 33 B2, 24 B3, 10 B4, 38 Met, 20 Partial, 3 Gap, 3 Page.
 | :--- | :--- | :--- | :--- | :--- |
 | S1 | Route paths A to D by content | Exparsed extracts PDFs, CSVs and scans; the engine reads Path A only | Page | — |
 | S2 | Inventory every file, page and account; unreadable files stay listed | Unread statements and non-statement documents stay in the inventory (Table 1, `audit.sources_unread`) | B3 | — |
-| S3 | Pending rows kept as non-cleared observations | Excluded and counted in a Table 1 note | Partial | B3 |
+| S3 | Pending rows kept as non-cleared observations | Excluded from totals, counted in a Table 1 note, listed in `audit.pending_observations` | B7 | — |
 | S4 | Sign and date conventions from labels and balances | Exparsed extraction | Page | — |
 | S5 | Last four alone never prove the same account | The adapter still groups files by `accountLast4`; Exparsed drops overlapping printouts of one account first | Partial | Group by full number or balance continuity when the export carries them |
 | S6 | Early account-link evidence | `account_links()` collects unprovided accounts from transfer text (masked numbers, names, ORIG CO), with flows and months | B3 | — |
-| S7 | Dedupe across copies with a crosswalk; keep identical distinct rows | Exparsed drops overlapping printouts (`lgOwnRows`). The adapter keeps identical rows as distinct IDs. No crosswalk in the audit. | Partial | B3 |
+| S7 | Dedupe across copies with a crosswalk; keep identical distinct rows | Exparsed drops overlapping printouts (`lgOwnRows`) and says so in `rowsOmitted`, now in the source record. Identical rows stay distinct; `audit.duplicate_crosswalk` lists them and each transaction names its source row. | B7 | Row-by-row list of the rows the page drops needs a page export change |
 | S8 | Reconcile balances, totals and continuity | Exparsed checks; the engine takes the status and cross-checks gross credits per month | Page | — |
 | S9 | Integrity labels and suffix order | Exparsed status mapped to Pass, Pass with flag, Unverified, Break; worst account sets the suffix | Met | — |
 | S10 | Calculation eligibility separate from integrity | A month is excluded when a material account is short, whatever the integrity label; the reason is in Table 1 | B3 | — |
@@ -362,3 +362,19 @@ Not in batch 4: report publication after rejected answer files (V3 handoff, done
 | Sample, both runs | Same report |
 | Real, no answers | Same positions and HEADLINE. Adverse notes: CAPITAL ONE $9,947, EMPIRE MERCHANTS $8,976, DOORDASH CAPITAL $1,323 (all U, not in stack) |
 | Real, saved answers | Same positions and HEADLINE $39,061. Adverse notes: REWARDS NETWORK $6,434 against $3,374 observed; DOORDASH CAPITAL $1,323 against $934 |
+
+## B7: records (open item 7, third batch; policy V1.7b8)
+
+| Row | Change |
+| :--- | :--- |
+| R1 | `audit.sources`, one record per supplied file |
+| R3 | `sequence`, `source_ref` with row number, `orig_id`, `trace_id` on each transaction record. `ORIG_ID` now matches `ORIG ID **318418` (no colon, masked), which the real ledger prints. |
+| R7 | `audit.exceptions` |
+| S3 | `audit.pending_observations` |
+| S7 | `audit.duplicate_crosswalk` and the page's `rowsOmitted` note in the source record |
+
+| Run | Effect |
+| :--- | :--- |
+| Sample, both runs | Same report |
+| Real, no answers | Same report and HEADLINE. 2,147 trace IDs and 2,057 originator IDs read (0 originator IDs before); 105 exception records (86 open questions, 11 U positions, 6 account requests, 1 VERIFY OWNERSHIP, 1 unresolved credits) |
+| Real, saved answers | Same HEADLINE $39,061. The KAPITUS to KAPITUS SERVICIN descriptor change now joins on "shared originator ID" (was "debits fill open slots"); 21 exception records |

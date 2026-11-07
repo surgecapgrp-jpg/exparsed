@@ -46,7 +46,7 @@ from pathlib import Path
 
 D = Decimal
 ENGINE_VERSION = "3.4"
-POLICY_VERSION = "V1.7b7"
+POLICY_VERSION = "V1.7b8"
 
 # Policy parameters (V2.2 values with the V1.7 changes marked). Changing any value is a policy change: bump POLICY_VERSION.
 BUSINESS_DAYS_PER_MONTH = D(20)
@@ -287,7 +287,9 @@ MCA_WORD = rx(
 # V1.7 D1 also finds finance words run into a longer token (HEADWAYCAPITAL).
 MCA_WORD_INSIDE = re.compile(r"CAPITAL|FUNDING|FINANC|LENDING|ADVANCE|MERCHANT")
 ORIG_CO = re.compile(r"ORIG CO NAME:\s*(.*?)\s+ORIG ID")
-ORIG_ID = re.compile(r"ORIG ID:\s*([A-Z0-9]{4,})")
+# Printed IDs, masked or not: "ORIG ID: 1234567890", "ORIG ID **318418", "TRACE# **704849".
+ORIG_ID = re.compile(r"ORIG ID:?\s*(\**[A-Z0-9]{4,})")
+TRACE_ID = re.compile(r"TRACE(?:#|\s+(?:NO\.?|NUMBER))?:?\s*(\**[0-9]{4,})")
 LEVY = rx("LEVY", "LIEN", r"GARNISH\w*")
 # V1.7 section 9: masked account numbers in transfer text, financing accounts, possible personal use.
 MASKED = re.compile(
@@ -405,6 +407,7 @@ class Txn:
     seq: int
     norm: str = ""
     orig_id: str = ""
+    trace_id: str = ""
     tag: str = ""
     tag_source: str = "rule"
     flags: list = field(default_factory=list)
@@ -708,6 +711,12 @@ class _Engine:
                 )
         # V1.7 section 1: supplied files the extraction could not read stay in the inventory.
         self.unread = led.get("sources_unread", [])
+        # V1.7 S3: pending rows are reported as observations and never enter totals.
+        self.pending = led.get("pending_observations", [])
+        self.sources = led.get("sources", [])
+        self.crosswalk = led.get("duplicate_crosswalk", [])  # V1.7 S7  # V1.7 R1: per-file records from the adapter, reported as given
+        for o in self.pending:
+            require(o.get("account_id") in self.accts, f"pending observation: unknown account {o.get('account_id')!r}")
         require(isinstance(self.unread, list), "ledger: sources_unread must be a list")
         self.worst = next(
             x
@@ -724,6 +733,8 @@ class _Engine:
             t.norm, u = norm(t.desc), t.desc.upper()
             m = ORIG_ID.search(u)
             t.orig_id = m.group(1) if m else ""
+            m = TRACE_ID.search(u)
+            t.trace_id = m.group(1) if m else ""
             other_last4 = [b["last4"] for k, b in self.accts.items() if k != t.acct]
             if t.dir == "credit":
                 t.tag = self.credit_rule(t, u, other_last4)
@@ -2515,6 +2526,46 @@ class _Engine:
         self.checks = checks
 
     # ---- 13. table rows and render ----------------------------------------------------------------
+    def exceptions(self):
+        """V1.7 R7: one EXCEPTION record per unresolved item, built from the findings already made."""
+        sev = lambda m: "MATERIAL" if m else "MINOR"
+        by_display = {p.display: p for p in self.positions}
+        out = []
+        for u in getattr(self, "uncertain", []):  # readiness() skips it when no HEADLINE is computed
+            if u["kind"] == "U position":
+                p = by_display[u["ref"]]
+                out.append(dict(type="U POSITION", source_tx_ids=[t.id for t in p.txns],
+                                why_unresolved="no collection in the live window and no closure proof",
+                                possible_effect_on_capacity=f"HEADLINE {usd(u['headline_if'])} if its {usd(u['monthly'])}/mo scenario is live",
+                                required_evidence="statements through today, a payoff letter or the contract",
+                                severity=sev(u["material"])))
+            else:
+                out.append(dict(type="UNRESOLVED CREDITS",
+                                source_tx_ids=[t.id for t in self.txns if t.tag == "STRIP_UNRESOLVED"],
+                                why_unresolved="candidate credits without customer or financing evidence",
+                                possible_effect_on_capacity=f"HEADLINE {usd(u['headline_if'])} if {usd(u['amount'])} is revenue",
+                                required_evidence="invoices, remittance detail or the sender's identity",
+                                severity=sev(u["material"])))
+        for r in self.requests:
+            out.append(dict(type=r["kind"], source_tx_ids=r["txn_ids"],
+                            why_unresolved=f"account {r['account']} not supplied ({r['why']})",
+                            possible_effect_on_capacity=f"{usd(r['monthly'])}/mo moves through it; could hold MCA payments or revenue",
+                            required_evidence=f"full statements for {r['account']}, {r['span']}",
+                            severity=sev(r["material"])))
+        for u in self.unread:
+            if u.get("statement", True):
+                out.append(dict(type="UNREADABLE SOURCE", source_tx_ids=[],
+                                why_unresolved=f"{u['name']}: {u['reason']}",
+                                possible_effect_on_capacity="its transactions are not in any figure",
+                                required_evidence="a readable copy or OCR", severity="MATERIAL"))
+        for q in self.questions:
+            if q["question_id"] not in self.answers:
+                out.append(dict(type="OPEN QUESTION", source_tx_ids=q["txn_ids"],
+                                why_unresolved=f"{q['type']} question {q['question_id']} unanswered; engine default applied",
+                                possible_effect_on_capacity="the default is the conservative reading",
+                                required_evidence="an answer in the judgments file", severity="MINOR"))
+        return out
+
     def audit(self):
         """Every fact the report shows, plus the provenance behind it. render() reads only this."""
         searches_by_trigger = defaultdict(list)
@@ -2634,6 +2685,10 @@ class _Engine:
             positions=[position(p) for p in self.positions],
             backward_searches=self.searches,
             forward_searches=self.forward,
+            pending_observations=self.pending,
+            sources=self.sources,
+            duplicate_crosswalk=self.crosswalk,
+            exceptions=self.exceptions(),
             credit_dispositions=self.credit_dispositions,
             peak_week=self.peak_week,
             obligations=self.ob_rows,
@@ -2665,6 +2720,10 @@ class _Engine:
             transactions=[
                 dict(
                     txn_id=t.id,
+                    sequence=t.seq,
+                    source_ref=t.src,
+                    orig_id=t.orig_id,
+                    trace_id=t.trace_id,
                     tag=t.tag,
                     tag_source=t.tag_source,
                     flags=t.flags,
