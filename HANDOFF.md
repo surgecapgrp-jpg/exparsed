@@ -1,6 +1,6 @@
 # exparsed handoff
 
-State on 2026-11-07 at `main` commit `2395260`. Repo: https://github.com/surgecapgrp-jpg/exparsed (private).
+State on 2026-11-07 at `main` commit `10c0fe4`. Repo: https://github.com/surgecapgrp-jpg/exparsed (private).
 This file replaces the 2026-10-26 handoff. The underwriting design detail is in `underwriting/docs/HANDOFF.md`,
 and the policy compliance detail is in `underwriting/docs/V1_7_MATRIX.md`.
 
@@ -162,6 +162,8 @@ execution order (H11), FLIGHT inflow scope (P15).
 | #20 | `1995141` | V1.7 C2 and A2: new senders on every rail, a disposition per credit (policy V1.7b6) |
 | #21 | `9411411` | Handoff update after #20 |
 | #22 | `2395260` | V1.7 D8, M14, D11: concurrent doubles, same-funder renewals, adverse scenario (policy V1.7b7) |
+| #23 | `318d906` | Handoff update after #22 |
+| #24 | `10c0fe4` | V1.7 R1, R3, R7, S3, S7: source, transaction and exception records (policy V1.7b8) |
 
 Rollback point before all underwriting work: `283bc50`.
 
@@ -191,6 +193,9 @@ Since V1.7b6 (PR #20) the saved real-ledger answers leave 1 question open: ADP T
 sender, stays out of Mar-26 revenue. Mar-26 is not a BASIS month, so HEADLINE does not move.
 Since V1.7b7 (PR #22) Table 4 notes show an adverse scenario for variable remitters: with saved answers,
 REWARDS NETWORK $6,434/mo (highest 20 bd) against $3,374 in the stack. The stack uses the observed figure.
+Since V1.7b8 (PR #24) the audit carries `sources`, `pending_observations`, `duplicate_crosswalk` and
+`exceptions`, and reads originator IDs printed without a colon (2,057 on the real ledger). With saved
+answers the KAPITUS descriptor change now joins on a shared originator ID; HEADLINE does not move.
 
 The real ledger (1 account, 3,069 rows, Sep 2025 to Oct 2026) was YES at $44,882 under policy V2.2.
 V1.7 makes it INSUFFICIENT DATA for 3 reasons:
@@ -225,7 +230,7 @@ the 19 readings in `underwriting/docs/HANDOFF.md` section 4.1.
 
 ## 7. Verification
 
-| Check | Result on `main` 2395260 |
+| Check | Result on `main` 10c0fe4 |
 | :--- | :--- |
 | `node tests/run-node.js` | 215 passed, 0 failed |
 | `python3 -m unittest discover -s tests` in `underwriting/` | 85 passed |
@@ -284,7 +289,7 @@ the 19 readings in `underwriting/docs/HANDOFF.md` section 4.1.
     - `uw-engine`: 3 real commits, a local Python model server (replaced by Pyodide in PR #4) and Python 3.9 support. `main` needs Python 3.10+.
     - `deepen`: 6 real commits of refactors. Two fixes are ported (PR #12). Its newest-first day-end fix was not needed: `main` already reverses newest-first rows. The rest (parser script split, reader snapshots, one "needs OCR" rule) is optional.
 
-    `design-review-fixes`, `handoff-2026-11-05`, `date-and-export-fixes`, `handoff-update`, `tdd-open-items`, `handoff-pr14`, `b18-block-yes-only`, `handoff-pr16`, `model-call-module`, `handoff-pr18`, `v17-credit-coverage`, `handoff-pr20`, `v17-debit-side`, `rebrand/surge-capital`, `underwriting-in-page` and `v17-batch1` to `v17-batch4` are merged and can be deleted.
+    `design-review-fixes`, `handoff-2026-11-05`, `date-and-export-fixes`, `handoff-update`, `tdd-open-items`, `handoff-pr14`, `b18-block-yes-only`, `handoff-pr16`, `model-call-module`, `handoff-pr18`, `v17-credit-coverage`, `handoff-pr20`, `v17-debit-side`, `handoff-pr22`, `v17-records`, `rebrand/surge-capital`, `underwriting-in-page` and `v17-batch1` to `v17-batch4` are merged and can be deleted.
 14. **Desktop set rerun after PR #12.** The stricter date check drops any row whose printed date is impossible. Rerun the 244 files and compare against section 4.
 
 ## 10. Rules for the next engineer
