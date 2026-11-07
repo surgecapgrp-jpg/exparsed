@@ -141,7 +141,7 @@ V2.2 leaves these points open. The engine picks one reading and states it here s
 
 | Check | Result |
 | :--- | :--- |
-| `python -m unittest discover -s tests` | 91 tests pass |
+| `python -m unittest discover -s tests` | 93 tests pass |
 | V1.7 report checker on every report the tests render | PASS (run inside `underwrite()`) |
 | Self-checks per run (unrounded) | 17 pass on the sample |
 | Fixtures against JSON Schemas | Pass with `jsonschema` 4.26 |
