@@ -8,6 +8,7 @@ Started as the V2.2 validator. V1.7 changes:
 - INSUFFICIENT DATA is allowed with two or more counted months, because material uncertainty and
   missing accounts are not fully visible in the report;
 - Table 7 Class accepts UNKNOWN (tier and cure n/a);
+- V1.8: Class A cure is Y, N or UNKNOWN, and a T1 row is never cured;
 - Commingling and Additional Accounts lines appear exactly once, in order, between What Would
   Flip This and the capacity-test line, with their fixed status words.
 
@@ -341,6 +342,9 @@ def validate(t):
         if r[3] == "B":
             require(r[4] == "n/a","Table 7: Class B cannot have return severity tier")
             require(r[6] == "n/a (paid by OD)","Table 7: Class B cure must be n/a (paid by OD)")
+        if r[3] == "A":
+            require(r[6].split(" ")[0] in ("Y","N","UNKNOWN"),"Table 7: Class A cure must be Y, N or UNKNOWN")
+            require(not (r[4] == "T1" and r[6].startswith("Y")),"Table 7: a T1 stop-pay is never cured")
 
     t8=t[SPEC[8][0]]
     require(len(t8)==1,"Table 8: expected one conclusion row")

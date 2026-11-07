@@ -196,9 +196,9 @@ Count: 150 rows. 19 B1, 33 B2, 24 B3, 10 B4, 38 Met, 20 Partial, 3 Gap, 3 Page.
 | K3 | Peak = max(observed, modeled current); peak holdback | Report Peak floored at stack/(52/12) and labelled modeled current floor; holdback over a counted month only; checker rejects a negative drop | B4 | — |
 | K4 | Returns classified once per attempt chain | Chains within 10 bd | Met | — |
 | K5 | FEE_NSF_OD is a fee, never a return | Yes | Met | — |
-| K6 | Class A, B and UNKNOWN | A return credit with no matching debit is Class A: T1 by code, else T2; cure "N (debit not found)" (B21 signed off 2026-11-07, V1.7b11). Class UNKNOWN is no longer produced | B3 | — |
-| K7 | T1, T2, T3 codes | T1 stop-pay and R05/R07/R08/R10/R29; T2 every other return on MCA, loan, payroll, rent, tax, insurance; T3 the rest | B4 | — |
-| K8 | Cure only within 2 bd with balance; MCA stop-pay never cured | MCA and loan (DEBT_SERVICE) stop-pays never cured | B4 | — |
+| K6 | Class A, B and UNKNOWN | A return credit with no matching debit is Class A (B21), tier n/a, cure "UNKNOWN (debit not found)" (V1.8 R3/R4, V1.8b1). Class UNKNOWN is no longer produced | V1.8 | — |
+| K7 | T1, T2, T3 codes | V1.8 R3: T1 only for a stop/block code on MCA or loan; the same code on payroll, rent, tax or insurance gives n/a; on any other item T3. T2 every other return on MCA, loan, payroll, rent, tax, insurance; T3 the rest | V1.8 | — |
+| K8 | Cure only within 2 bd with balance; MCA stop-pay never cured | T1 never cured. Y needs a cleared re-presentment within 2 bd with EOD >= 0. N for a re-presentment into overdraft or no re-presentment in a covered window. UNKNOWN when the balance or the 2 bd window is missing (V1.8 R4) | V1.8 | — |
 | K9 | Table 9 metrics; absent balances are "unavailable" | Six fixed rows | Met | — |
 
 ## 9. Commingling and missing accounts
@@ -404,3 +404,21 @@ B21 changed: a return credit with no matching debit is a Class A return, T1 for 
 | Run | Effect |
 | :--- | :--- |
 | Sample and real, both runs | Same reports. No saved run has a return credit without its debit |
+
+## V1.8 batch 1: return conflicts (2026-11-07; policy V1.8b1)
+
+V1.8 (MCA Capacity V1.8 Character Returns Enhanced) replaces V1.7. Its capacity rules match V1.7. Its return rules conflicted with the engine in 3 places, fixed here:
+
+| Row | V1.7 engine | V1.8 engine |
+| :--- | :--- | :--- |
+| K7 | Any stop/block code was T1, vendor items included | T1 only on MCA or loan. Payroll, rent, tax or insurance gives n/a. Other items give T3 |
+| K6 | Unmatched return credit was T1 by code, else T2, cure N | Tier n/a, cure UNKNOWN. Still Class A per B21 |
+| K8 | Missing balance or missing follow-up gave cure N | Cure UNKNOWN. A re-presentment into overdraft is N |
+
+The checker now requires a Class A cure of Y, N or UNKNOWN and rejects a cured T1 row. Table 9 and the WILL-PAY line now count tier n/a and cured, uncured and unknown cures.
+
+| Run | Effect |
+| :--- | :--- |
+| Sample and real, both runs | Same numbers. Table 9 detail and the WILL-PAY line gain the n/a and cure counts |
+
+Not in this batch: the V1.8 return-word scan log (R1), the character pass (B1 to B5) and the extra Table 4 and Table 9 detail.
