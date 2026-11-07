@@ -46,7 +46,7 @@ from pathlib import Path
 
 D = Decimal
 ENGINE_VERSION = "3.4"
-POLICY_VERSION = "V1.7b10"
+POLICY_VERSION = "V1.7b11"
 
 # Policy parameters (V2.2 values with the V1.7 changes marked). Changing any value is a policy change: bump POLICY_VERSION.
 BUSINESS_DAYS_PER_MONTH = D(20)
@@ -2253,15 +2253,16 @@ class _Engine:
                         attempts=[t.id],
                     )
                 )
-        # V1.7 K6: a return credit with no matching debit shows a returned attempt whose outcome is unknown.
+        # V1.7 K6, sign-off B21 (2026-11-07): a return credit with no matching debit is a Class A return.
+        # The debit is unknown, so it may be essential: T1 by code, else T2, and never cured.
         for c in self.txns:
             u = c.desc.upper()
             if c.dir == "credit" and c.tag == "STRIP_RECREDIT" and not c.returns and (RETURN_CODE.search(u) or "RETURN" in u):
-                code = RETURN_CODE.search(c.desc.upper())
+                code = RETURN_CODE.search(u)
                 self.t7.append(
-                    dict(date=c.date, who=c.norm, amt=c.amt, cls="UNKNOWN", tier="n/a",
+                    dict(date=c.date, who=c.norm, amt=c.amt, cls="A", tier="T1" if T1.search(u) else "T2",
                          desc=(f"ACH Rev {code.group(0)}; " if code else "") + "return credit, debit not found",
-                         cured="n/a", attempts=[c.id])
+                         cured="N (debit not found)", attempts=[c.id])
                 )
         self.t7.sort(key=lambda e: (e["date"], e["cls"]))
 

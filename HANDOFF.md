@@ -1,6 +1,6 @@
 # exparsed handoff
 
-Code state on 2026-11-07 at the merge of PR #32 (the last code change). Later commits that only
+Code state on 2026-11-07 at the merge of PR #33 (the last code change). Later commits that only
 edit this file are not listed. Repo: https://github.com/surgecapgrp-jpg/exparsed (private).
 This file replaces the 2026-10-26 handoff. The underwriting design detail is in `underwriting/docs/HANDOFF.md`,
 and the policy compliance detail is in `underwriting/docs/V1_7_MATRIX.md`.
@@ -118,7 +118,7 @@ naming its funder.
 
 ### 5.2 Policy V1.7 coverage
 
-`ENGINE_VERSION` 3.4, `POLICY_VERSION` V1.7b10. The matrix tracks 150 rules:
+`ENGINE_VERSION` 3.4, `POLICY_VERSION` V1.7b11. The matrix tracks 150 rules:
 
 | Status | Rows |
 | :--- | ---: |
@@ -172,7 +172,8 @@ execution order (H11), FLIGHT inflow scope (P15).
 | #29 | `82955fc` | Review queue: open questions answered by an underwriter in the judgments format (open item 11) |
 | #30 | (open) | Batch harness `tests/batch/run.js` from `batch-harness`; `ocr.js` runs under node; merged branches listed for deletion (open item 13) |
 | #31 | (open) | Sign-offs B1 (changed: $2,500 floor for STRIP_UNRESOLVED, policy V1.7b9), B4, B5, B6 (kept) |
-| #32 | this PR | Sign-offs B7 (changed: no summed U test, policy V1.7b10), B9 (changed: D3 needs 2 debits only), B11, B12 (kept) |
+| #32 | (open) | Sign-offs B7 (changed: no summed U test, policy V1.7b10), B9 (changed: D3 needs 2 debits only), B11, B12 (kept) |
+| #33 | this PR | Sign-offs B21 (changed: unmatched return credits are Class A, policy V1.7b11), B13 to B17, B19, B20 (kept) |
 
 Rollback point before all underwriting work: `283bc50`.
 
@@ -247,14 +248,21 @@ Signed off 2026-11-07:
 | B9 | Changed (PR #32): D3 links a payee with 2+ debits at an MCA series' amount within 30 days, whatever the payee's other debits. |
 | B11 | Kept: out-of-window credits scoring MED or HIGH within 30 days are INVESTIGATE only, never attached. |
 | B12 | Kept: payees given one funder join on a shared ORIG ID, a hand-off within 10 bd, or debits filling the other's gaps. |
+| B13 | Kept: finance words match whole words plus CAPITAL, FUNDING, FINANC, LENDING, ADVANCE or MERCHANT inside a word. |
+| B14 | Kept: gaps of 18 to 25 bd are monthly; a fixed monthly series with a finance word is MCA by default. |
+| B15 | Kept: peak load counts positions only; WATCH debits stay out. |
+| B16 | Kept: evidence levels CORROBORATED, OBSERVED, INFERRED, UNKNOWN as in the matrix. |
+| B17 | Kept: an account with 5%+ of credits drops its short months inside its own statement span only. |
+| B19 | Kept: CONFIRMED personal items are OWNER_DRAW and STRIP_OWNER; POSSIBLE items never set the status. |
+| B20 | Kept: a transfer naming a LOC, credit line or loan is DEBT_SERVICE. |
+| B21 | Changed (PR #33, policy V1.7b11): a return credit with no matching debit is Class A, T1 by code else T2, cure "N (debit not found)". |
 | B22 | Kept (PR #22, policy V1.7b7): same-amount same-day doubles count as a second schedule only on 3 consecutive debit days. A single double, such as the day after a holiday, is a catch-up payment. |
 
-Waiting for sign-off: B13 to B17, B19 to B21 in `underwriting/docs/V1_7_MATRIX.md`, and
-the 19 readings in `underwriting/docs/HANDOFF.md` section 4.1.
+All 22 matrix interpretations B1 to B22 are signed off. Waiting for sign-off: the 19 readings in `underwriting/docs/HANDOFF.md` section 4.1.
 
 ## 7. Verification
 
-| Check | Result on `main` after PR #32 |
+| Check | Result on `main` after PR #33 |
 | :--- | :--- |
 | `node tests/run-node.js` | 261 passed, 0 failed (`ocr.js` adds 44) |
 | `tests/batch/run.js` on `tests/samples` (pdf.js stubbed: the cloud session cannot reach cdnjs) | 3 non-PDF files read through the page; `compare` reports a planted downgrade and exits 1 |
@@ -287,7 +295,7 @@ the 19 readings in `underwriting/docs/HANDOFF.md` section 4.1.
    statements that run into January 2028 arrive.
 3. **Rejected-answer fallback.** Done in PR #14: a second rejection shows "Engine stopped: answers rejected
    twice (...); no report" and clears any earlier report.
-4. **Sign-offs.** B18 done in PR #16, B22 in PR #27, B1 and B4 to B6 in PR #31, B7, B9, B11 and B12 in PR #32. Next batch: B13 to B16. The other open interpretations remain (section 6).
+4. **Sign-offs.** B18 done in PR #16, B22 in PR #27, B1 and B4 to B6 in PR #31, B7, B9, B11 and B12 in PR #32, the rest of B13 to B21 in PR #33. Next: the 19 readings in `underwriting/docs/HANDOFF.md` section 4.1. The other open interpretations remain (section 6).
 5. **Standards fixes from the 2026-11-02 review.** Done in PR #14. The engine's inline numbers are named
    constants at the top of `uw.py`. The adapter uses `uw.WORST_ORDER`. `import uw` sits inside `page_run`'s
    `try`. The checker keeps its own named copy of 4 policy numbers, and a test fails when they differ from the
