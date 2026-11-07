@@ -565,6 +565,36 @@ class SignOffB18(unittest.TestCase):
         self.assertIn("coverage: unreadable statement OP-202610.pdf", r.audit["capacity"]["binding"])
 
 
+class CreditCoverage(unittest.TestCase):
+    """V1.7 C2 and A2: new senders on every rail are candidates; every cleared credit gets a disposition."""
+
+    def question_for(self, r, txn_id):
+        return next((x for x in r.questions["questions"] if x["type"] == "credit" and txn_id in x["txn_ids"]), None)
+
+    def test_new_ach_sender_is_a_funding_candidate(self):
+        led = add_rows(LEDGER, [("OP", "2026-07-14", "900.00", "credit", "ACH CREDIT NORTHWIND HOLDINGS")], "NW")
+        q = self.question_for(run(led), "NW0")
+        self.assertIsNotNone(q)
+        self.assertIn("new sender (ACH, transfer, deposit or check)", q["why"])
+
+    def test_established_customer_is_not_a_candidate(self):
+        rows = [("OP", f"2026-0{m}-15", "900.00", "credit", "ACH CREDIT NORTHWIND HOLDINGS") for m in (6, 7, 8)]
+        self.assertIsNone(self.question_for(run(add_rows(LEDGER, rows, "NW")), "NW0"))
+
+    def test_every_cleared_credit_has_one_disposition(self):
+        r = run(None, JUDGMENTS)
+        returned = {t["txn_id"] for t in r.audit["transactions"] if t.get("returned_by")}
+        cleared = [t["txn_id"] for t in LEDGER["transactions"] if t["direction"] == "credit" and t["txn_id"] not in returned]
+        got = {d["txn_id"]: d["disposition"] for d in r.audit["credit_dispositions"]}
+        self.assertEqual(sorted(got), sorted(cleared))
+        self.assertEqual(len(r.audit["credit_dispositions"]), len(cleared))
+        by_desc = {t["txn_id"]: t["description"] for t in LEDGER["transactions"]}
+        square = next(i for i in cleared if by_desc[i].startswith("SQUARE INC DEP"))
+        self.assertEqual(got[square], "CUSTOMER_SUPPORTED")
+        self.assertIn("ATTACHED", got.values())
+        self.assertLessEqual(set(got.values()), {"ATTACHED", "FINANCING_UNATTACHED", "COMPETING", "CUSTOMER_SUPPORTED", "OTHER_SUPPORTED", "UNRESOLVED"})
+
+
 class V17Batch4(unittest.TestCase):
     """V1.7 fixes from the 2026-11 spec review: peak floor, closure evidence, return tiers, wires, windows, binding."""
 

@@ -46,7 +46,7 @@ from pathlib import Path
 
 D = Decimal
 ENGINE_VERSION = "3.4"
-POLICY_VERSION = "V1.7b5"
+POLICY_VERSION = "V1.7b6"
 
 # Policy parameters (V2.2 values with the V1.7 changes marked). Changing any value is a policy change: bump POLICY_VERSION.
 BUSINESS_DAYS_PER_MONTH = D(20)
@@ -116,6 +116,7 @@ DEBIT_TAGS = (
     "TRANSFER_OUT",
     "OTHER",
 )
+CREDIT_DISPOSITIONS = ("ATTACHED", "FINANCING_UNATTACHED", "COMPETING", "CUSTOMER_SUPPORTED", "OTHER_SUPPORTED", "UNRESOLVED")
 HARD_STRIP = {"STRIP_TRANSFER", "STRIP_REFUND", "STRIP_RECREDIT", "STRIP_OWNER"}
 # V1.7 evidence level of a STRIP_FUNDING gate.
 GATE_LEVEL = {
@@ -889,7 +890,7 @@ class _Engine:
         }
 
     def candidates(self, tokens):
-        """Funding candidates: wires, explicit financing text, 3x median deposit, or a funder name."""
+        """Funding candidates: wires, new senders on other rails, explicit financing text, 3x median deposit, or a funder name."""
         self.established = self.established_revenue()
         ordinary = [
             t.amt
@@ -907,6 +908,10 @@ class _Engine:
             u, why = t.desc.upper(), []
             if WIRE.search(u):
                 why.append("wire")
+            # V1.7 C2: a sender seen fewer than 3 times over 2 months on ACH, transfer, deposit or check.
+            # Unclear transfers are asked about in their own question.
+            elif t.tag in ("REV_ACH", "REV_DEPOSIT") and t.norm not in self.established and "unclear_transfer" not in t.flags:
+                why.append("new sender (ACH, transfer, deposit or check)")
             if EXPLICIT_FIN.search(u):
                 why.append("explicit financing text")
             # Size alone does not make a recurring customer payer's deposit unusual.
@@ -2369,6 +2374,14 @@ class _Engine:
                 dict(group=name, txn_ids=[t.id for t in g["txns"]], passes=g["passes"], disposition=disp)
             )
         cleared = lambda d: [t for t in self.txns if t.dir == d and not t.returned_by]
+        # V1.7 A2: every cleared credit gets one disposition. Candidates take their forward-search result;
+        # the rest are customer revenue (processor, payer, recurring sender or answered) or a strip.
+        fwd_of = {f["anchor"]: f["v17_disposition"] for f in self.forward}
+        self.credit_dispositions = [
+            dict(txn_id=t.id, disposition=fwd_of.get(t.id) or (
+                "CUSTOMER_SUPPORTED" if t.tag in ("REV_PROCESSOR", "REV_PAYER") else self.credit_disposition(t, None)))
+            for t in cleared("credit")
+        ]
         fwd = Counter(f["v17_disposition"] for f in self.forward)
         self.completeness = dict(
             credits_scanned=len(cleared("credit")),
@@ -2421,6 +2434,12 @@ class _Engine:
             "every funding candidate has a forward search and disposition",
             set(self.cand) == {f["anchor"] for f in self.forward}
             and all(f["disposition"] for f in self.forward),
+        )
+        ok(
+            "every cleared credit has one V1.7 disposition",
+            sorted(d["txn_id"] for d in self.credit_dispositions)
+            == sorted(t.id for t in self.txns if t.dir == "credit" and not t.returned_by)
+            and all(d["disposition"] in CREDIT_DISPOSITIONS for d in self.credit_dispositions),
         )
         ok(
             "no credit attached to two triggers",
@@ -2600,6 +2619,7 @@ class _Engine:
             positions=[position(p) for p in self.positions],
             backward_searches=self.searches,
             forward_searches=self.forward,
+            credit_dispositions=self.credit_dispositions,
             peak_week=self.peak_week,
             obligations=self.ob_rows,
             returns=self.t7,

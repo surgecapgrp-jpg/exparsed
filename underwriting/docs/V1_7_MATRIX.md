@@ -120,7 +120,7 @@ Count: 150 rows. 19 B1, 33 B2, 24 B3, 10 B4, 38 Met, 20 Partial, 3 Gap, 3 Page.
 | ID | V1.7 rule | Engine now | Status | Fix |
 | :--- | :--- | :--- | :--- | :--- |
 | C1 | Explicit finance language or corroborated lender identity | `EXPLICIT_FIN` and funder-name tokens | Met | — |
-| C2 | New or ambiguous senders on wires, ACH, transfers, mobile deposits, checks | Wires only | Partial | B2 |
+| C2 | New or ambiguous senders on wires, ACH, transfers, mobile deposits, checks | Every wire, plus any ACH, transfer, deposit or check credit from a sender seen fewer than 3 times over 2 months ("new sender"). Unclear transfers keep their own question. | B5 | — |
 | C3 | Large or unusual credits; size alone is weak | 3x median, excluding established payers | Met | — |
 | C4 | Any credit in primary or expanded windows of a trigger | The 7 bd window scores every credit; the ±30-day window lists MED/HIGH credits as INVESTIGATE | B2 | — |
 | C5 | Documented advance or off-bank receipt | Document evidence path. No off-bank flag. | Partial | B2 |
@@ -216,7 +216,7 @@ Count: 150 rows. 19 B1, 33 B2, 24 B3, 10 B4, 38 Met, 20 Partial, 3 Gap, 3 Page.
 | ID | V1.7 rule | Engine now | Status | Fix |
 | :--- | :--- | :--- | :--- | :--- |
 | A1 | Debit coverage: every cleared debit scanned by D1 to D5 with a disposition | Every debit not tagged by a payroll, tax, rent, utility, insurance or fee rule is swept; each nominated payee has a disposition (self-check) | B2 | — |
-| A2 | Credit coverage: every cleared credit scanned by C1 to C5 | Candidates get forward dispositions; other credits are not dispositioned | Partial | B2 |
+| A2 | Credit coverage: every cleared credit scanned by C1 to C5 | `credit_dispositions`: one V1.7 disposition per cleared credit. Candidates take their forward-search result; processor, payer, recurring or answered credits are CUSTOMER_SUPPORTED; strips are OTHER_SUPPORTED or UNRESOLVED (self-check) | B5 | — |
 | A3 | Bidirectional link coverage | Primary and ±30-day windows in both directions | B2 | — |
 | A4 | Series and ID coverage | Each nominated payee maps to one position, WATCH row or NON-MCA tag; no debit in two positions (self-check) | B2 | — |
 | A5 | Live and closure coverage: every N has proof; every material U visible | Self-check "N only with closure evidence; U carries a scenario"; closure tied to the position (L6) | B4 | — |
@@ -331,3 +331,16 @@ Not in batch 4: report publication after rejected answer files (V3 handoff, done
 | Sample, saved answers | INSUFFICIENT DATA, $5,217 | Same; CFG funding match falls from HIGH 5 to MED 3 (the JKL customer wire loses +2) |
 | Real ledger, no answers | INSUFFICIENT DATA, $74,570 | Same; binding adds "CONSERVATIVE: Room D (worst month Feb-26)" |
 | Real ledger, saved answers | INSUFFICIENT DATA, $39,061 | Same; binding adds the conservative room |
+
+## B5: credit coverage (open item 7, first batch; policy V1.7b6)
+
+| Row | Change |
+| :--- | :--- |
+| C2 | New senders on ACH, transfers, deposits and checks become funding candidates. Unanswered, they default to STRIP_UNRESOLVED like any candidate. |
+| A2 | Every cleared credit carries one disposition in `audit.credit_dispositions`, checked by a self-check. |
+
+| Run | Before | After |
+| :--- | :--- | :--- |
+| Sample, both runs | — | Same report |
+| Real ledger, both runs | HEADLINE $74,570 / $39,061 | Same HEADLINE. ADP TAX 03/09/26 $168.50 becomes a candidate: one more question, Mar-26 True Revenue $79,721 to $79,553 (outside the BASIS months) |
+| Real ledger, saved answers | — | Dispositions: 1,030 CUSTOMER_SUPPORTED, 30 OTHER_SUPPORTED, 15 FINANCING_UNATTACHED, 6 ATTACHED, 2 COMPETING, 1 UNRESOLVED |
