@@ -227,7 +227,13 @@ Signed off 2026-11-06:
 | :--- | :--- |
 | B18 | Changed (PR #16, policy V1.7b5): a material missing account or an unreadable statement blocks YES only. A NO stands, because hidden MCA payments can only lower HEADLINE. The account stays under REQUEST REQUIRED and the binding line names it. |
 
-Waiting for sign-off: B1, B4 to B7, B9, B11 to B17, B19 to B22 in `underwriting/docs/V1_7_MATRIX.md`, and
+Signed off 2026-11-07:
+
+| # | Decision |
+| :--- | :--- |
+| B22 | Kept (PR #22, policy V1.7b7): same-amount same-day doubles count as a second schedule only on 3 consecutive debit days. A single double, such as the day after a holiday, is a catch-up payment. |
+
+Waiting for sign-off: B1, B4 to B7, B9, B11 to B17, B19 to B21 in `underwriting/docs/V1_7_MATRIX.md`, and
 the 19 readings in `underwriting/docs/HANDOFF.md` section 4.1.
 
 ## 7. Verification
