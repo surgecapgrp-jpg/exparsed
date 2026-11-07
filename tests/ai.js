@@ -18,6 +18,11 @@ T('A2 openrouter request: system first, function tools, response_format',
   /openrouter\.ai\/api\/v1\/chat\/completions$/.test(ro.url) && ro.init.headers.Authorization==='Bearer sk-or-x' && bo.messages[0].role==='system'
   && bo.messages[1].content==='hi' && bo.tools[0].type==='function' && bo.tools[0]['function'].parameters.type==='object' && bo.response_format.type==='json_schema', bo);
 
+// A2b one header builder per provider: judgments, chat and OCR send the same headers
+T('A2b judgment and chat requests use the shared provider headers',
+  JSON.stringify(aiRequest('claude', { key:'k', model:'claude-haiku-4-5' }, { system:'S', history:[] }).init.headers)===JSON.stringify(anthropicHeaders('k'))
+  && JSON.stringify(ro.init.headers)===JSON.stringify(openrouterHeaders('sk-or-x')) && rc.url===ANTHROPIC+'/v1/messages' && ro.url===OPENROUTER+'/api/v1/chat/completions');
+
 // A3-A5 reply parsing and tool results
 var pc=aiParse('claude', { stop_reason:'tool_use', content:[{ type:'thinking', thinking:'', signature:'s' }, { type:'text', text:'a' }, { type:'text', text:'b' }, { type:'tool_use', id:'tu1', name:'t', input:{ x:1 } }] });
 T('A3 claude parse keeps thinking blocks in the native message', pc.text==='ab' && pc.calls[0].id==='tu1' && pc.calls[0].input.x===1 && pc.assistant.content[0].type==='thinking' && !pc.refusal, pc);

@@ -4258,6 +4258,9 @@ Add `reason`: one sentence naming the fact you relied on. It is stored in the au
     // same warning and carries on, so this degrades to today's behaviour rather than failing.
     var PDFJS_STANDARD_FONTS="https://unpkg.com/pdfjs-dist@3.11.174/standard_fonts/";
 
+    /* @test-begin providers */
+    // One address and one header builder per provider. OCR, model lists, judgments and chat all
+    // call these, so a key, version or header change is made once.
     var ANTHROPIC="https://api.anthropic.com";
     var ANTHROPIC_VERSION="2023-06-01";
     // Anthropic requires this opt-in header for browser-side calls to bypass CORS.
@@ -4270,8 +4273,11 @@ Add `reason`: one sentence naming the fact you relied on. It is stored in the au
         'anthropic-dangerous-direct-browser-access':'true'
       };
     }
-
     var OPENROUTER="https://openrouter.ai";
+    function openrouterHeaders(key){
+      return { 'Content-Type':'application/json', 'Authorization':'Bearer '+key, 'X-Title':'exparsed' };
+    }
+    /* @test-end */
     var MAC_DEFAULT_URL="http://127.0.0.1:8091";    // mac_ocr_server.py's default port
     // mac_ocr_server.py sits in the same folder as this html. Opened from disk, the page knows
     // that folder, so the start command names the real path and stays right if the folder moves.
@@ -9233,7 +9239,7 @@ Add `reason`: one sentence naming the fact you relied on. It is stored in the au
        Both providers use the keys from Settings > AI providers. Requests are non-streaming:
        judgments and chat replies stay under AI_MAX_TOKENS. History is kept in each provider's
        own message shape and appended unchanged, so Claude's thinking blocks go back as sent. */
-    var AI_URL={ claude:'https://api.anthropic.com/v1/messages', openrouter:'https://openrouter.ai/api/v1/chat/completions' };
+    var AI_URL={ claude:ANTHROPIC+'/v1/messages', openrouter:OPENROUTER+'/api/v1/chat/completions' };
     var AI_MAX_TOKENS=16000;
     var AI_TOOL_ROUNDS=8;
     var AI_TOOL_RESULT_MAX=60000;
@@ -9242,14 +9248,14 @@ Add `reason`: one sentence naming the fact you relied on. It is stored in the au
     function aiRequest(prov, cfg, req){
       var headers, body;
       if(prov==='claude'){
-        headers={ 'Content-Type':'application/json', 'x-api-key':cfg.key, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' };
+        headers=anthropicHeaders(cfg.key);
         body={ model:cfg.model, max_tokens:req.maxTokens||AI_MAX_TOKENS,
           system:[{ type:'text', text:req.system, cache_control:{ type:'ephemeral' } }], messages:req.history };
         if(req.tools) body.tools=req.tools.map(function(t){ return { name:t.name, description:t.description, input_schema:t.schema }; });
         if(req.schema) body.output_config={ format:{ type:'json_schema', schema:req.schema } };
         if(AI_FALLBACK_MODELS.test(cfg.model)){ headers['anthropic-beta']='server-side-fallback-2026-07-01'; body.fallbacks='default'; }
       } else {
-        headers={ 'Content-Type':'application/json', 'Authorization':'Bearer '+cfg.key, 'X-Title':'exparsed' };
+        headers=openrouterHeaders(cfg.key);
         body={ model:cfg.model, max_tokens:req.maxTokens||AI_MAX_TOKENS, messages:[{ role:'system', content:req.system }].concat(req.history) };
         if(req.tools) body.tools=req.tools.map(function(t){ return { type:'function', 'function':{ name:t.name, description:t.description, parameters:t.schema } }; });
         if(req.schema) body.response_format={ type:'json_schema', json_schema:{ name:'judgments', strict:false, schema:req.schema } };
@@ -9849,7 +9855,7 @@ Add `reason`: one sentence naming the fact you relied on. It is stored in the au
     });
 
     function listOpenRouterModels(key){
-      fetch(OPENROUTER+'/api/v1/models',{ headers:{ 'Authorization':'Bearer '+key } })
+      fetch(OPENROUTER+'/api/v1/models',{ headers:{ 'Authorization':openrouterHeaders(key).Authorization } })   // GET: the same request headers as before, no body headers
         .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
         .then(function(res){
           if(!res.ok || res.j.error){
@@ -10275,7 +10281,7 @@ Add `reason`: one sentence naming the fact you relied on. It is stored in the au
           };
           if(!isImg && engine) body.plugins=[{ id:'file-parser', pdf:{ engine:engine } }];
           return fetch(OPENROUTER+'/api/v1/chat/completions',{
-            method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+key, 'X-Title':'exparsed' },
+            method:'POST', headers:openrouterHeaders(key),
             signal:signal, body:JSON.stringify(body)
           });
         },
