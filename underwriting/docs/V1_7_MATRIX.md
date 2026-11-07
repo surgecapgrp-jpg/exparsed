@@ -104,7 +104,7 @@ Count: 150 rows. 19 B1, 33 B2, 24 B3, 10 B4, 38 Met, 20 Partial, 3 Gap, 3 Page.
 | :--- | :--- | :--- | :--- | :--- |
 | D1 | Name and ID pass: finance language, aliases, originator and trace IDs | `MCA_WORD`, finance words inside a token (HEADWAYCAPITAL), the `ORIG CO NAME` payee and `ORIG ID` for identity | B2 | Sign-off B13 |
 | D2 | Cadence pass incl. variable amounts, skips, splits, changes; keep 1 to 2 items | Cadence per payee incl. monthly; fixed daily/weekly/biweekly series without a finance word become WATCH when unanswered | B2 | — |
-| D3 | Amount pass across changed descriptors and rails | A payee with 2+ debits at an MCA series' level, at least half its debits, within 30 days of the series | B2 | Sign-off B9 |
+| D3 | Amount pass across changed descriptors and rails | A payee with 2+ debits at an MCA series' level within 30 days of the series (B9 signed off 2026-11-07: the half-of-payee rule is gone) | B2 | — |
 | D4 | Funding-linked pass: rescan debits after a suspected funding credit | A new payee within 30 days after an explicit financing credit, when it repeats at daily/weekly/biweekly gaps or shares a word with the sender | B2 | Sign-off B8 |
 | D5 | Exception pass: returns, stop-pays, fees, processor net settlements, missing-account transfers | Returned attempts of finance-word payees are nominated (D5). Hidden collections are not recovered. | Partial | Recover collections behind failed attempts |
 | D6 | Reverse consolidations, processor splits, off-bank deductions | None | Gap | B2 |
@@ -247,7 +247,7 @@ Count: 150 rows. 19 B1, 33 B2, 24 B3, 10 B4, 38 Met, 20 Partial, 3 Gap, 3 Page.
 | B4 | U scenario cost | The last sustained monthly cost. For VARIABLE, cleared debits in the 20 bd ending at the last debit. **Signed off 2026-11-07, kept.** |
 | B5 | "30 covered business days without collections" | Business days after the last cleared debit, through coverage end, inside the debit account's statement periods. **Signed off 2026-11-07, kept.** |
 | B6 | Current window "through the end of the relevant account's available coverage" | The debit account's last statement end date. **Signed off 2026-11-07, kept.** |
-| B7 | Combined U exposure | When no single U position is material, the sum of all U scenarios is tested. A material sum marks every U material. |
+| B7 | Combined U exposure | Each U position is tested alone. **Signed off 2026-11-07, changed:** the sum of immaterial U scenarios is no longer tested (V1.7b10). |
 
 ## Batch 1 effect on saved runs
 
@@ -265,10 +265,10 @@ The $1 HEADLINE moves come from 52/12 replacing 4.333. With V1.7, a real ledger 
 | # | V1.7 text | Engine reading |
 | ---: | :--- | :--- |
 | B8 | D4 "rescan all subsequent and nearby debits" after a suspected financing credit | A payee whose first debit falls within 30 days after an explicit financing credit is nominated only if it repeats at daily, weekly or biweekly gaps, or shares a word with the sender. Without that filter the real ledger nominated a bar, a convenience store and Zelle payments. **Decided 2026-11-02: kept.** |
-| B9 | D3 "repeated same or similar collection amounts under changing descriptors" | 2+ debits at a default MCA series' most common amount, forming at least half the payee's cleared debits, within 30 days of the series. One $390 check among 194 checks does not count. |
+| B9 | D3 "repeated same or similar collection amounts under changing descriptors" | 2+ debits at a default MCA series' most common amount, within 30 days of the series. **Signed off 2026-11-07, changed:** the payee's other debits no longer matter (was: the hits had to be half of them). One $390 check among 194 checks still does not count: it is 1 debit. |
 | B10 | D2 cadence without a funder name | An unanswered fixed daily, weekly or biweekly series becomes a WATCH row. Fixed monthly series without a finance word (rent-like bills) stay NON-MCA. On the real ledger, this catches KAPITUS and ACCORD BUSINESS when no answers exist. **Decided 2026-11-02: kept.** It catches KAPITUS and ACCORD BUSINESS; a model answer removes a false WATCH row. |
-| B11 | Expanded window "plausible out-of-window relationships" | Credits scoring 3+ points (MED or HIGH) within ±30 calendar days. They are listed as INVESTIGATE and never attached. |
-| B12 | "A descriptor change with a corroborated originator ID and continuity is usually the same position" | Two payees given the same funder join when they share an `ORIG ID`, when one starts within 10 business days after the other stops, or when one's debits fall inside the other's span on days without its debits. The real ledger joins KAPITUS SERVICIN into KAPITUS on the third rule. ZLUR FUNDING LLC shares a day with ZLUR FUNDING, so it stays separate (U, $1,980 STRESS). |
+| B11 | Expanded window "plausible out-of-window relationships" | Credits scoring 3+ points (MED or HIGH) within ±30 calendar days. They are listed as INVESTIGATE and never attached. **Signed off 2026-11-07, kept.** |
+| B12 | "A descriptor change with a corroborated originator ID and continuity is usually the same position" | Two payees given the same funder join when they share an `ORIG ID`, when one starts within 10 business days after the other stops, or when one's debits fall inside the other's span on days without its debits. The real ledger joins KAPITUS SERVICIN into KAPITUS on the third rule. ZLUR FUNDING LLC shares a day with ZLUR FUNDING, so it stays separate (U, $1,980 STRESS). **Signed off 2026-11-07, kept.** |
 | B13 | D1 finance language | Word matches, plus CAPITAL, FUNDING, FINANC, LENDING, ADVANCE or MERCHANT inside a token. This finds HEADWAYCAPITAL and FORWARD FINANCIN. It also nominates EMPIRE MERCHANTS (a liquor distributor) until the model answers. |
 | B14 | Monthly cadence x1 | Gaps of 18 to 25 business days. A fixed monthly series with a finance word is MCA by default (HEADWAYCAPITAL, $7,442/mo, silent since 03/31/26, so U). |
 | B15 | WATCH rows in Table 4b | Peak load counts positions only. WATCH debits stay out because their identity is unproved. |
@@ -388,3 +388,11 @@ B1 changed: `UNRESOLVED_FLOOR = D("2500")`. An unanswered or "unsure" candidate 
 | Sample, both runs | Same report |
 | Real, no answers | STRIP_UNRESOLVED $244,097 in 14 months to $230,179 in 12. BASIS $137,284 to $137,951. HEADLINE $74,570 to $74,970. Still INSUFFICIENT DATA |
 | Real, saved answers | Same HEADLINE $39,061. ADP TAX 03/09/26 $168.50 (the 1 open question) stays in revenue: Mar-26 True Revenue $79,553 to $79,721 |
+
+## Sign-offs B7, B9, B11, B12 (2026-11-07; policy V1.7b10)
+
+B7 changed: U positions are tested one by one. The "U positions combined" test is removed. It also crashed the run: `exceptions()` read an `amount` key that the combined row did not have. B9 changed: D3 links a payee with 2+ debits at an MCA series' amount within 30 days, however many other debits the payee has. B11 and B12 are kept as written.
+
+| Run | Effect |
+| :--- | :--- |
+| Sample and real, both runs | Same reports. No saved run had a combined U test or a D3 link that the half-of-payee rule blocked |

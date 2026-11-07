@@ -505,7 +505,7 @@ from pathlib import Path
 
 D = Decimal
 ENGINE_VERSION = "3.4"
-POLICY_VERSION = "V1.7b9"
+POLICY_VERSION = "V1.7b10"
 
 # Policy parameters (V2.2 values with the V1.7 changes marked). Changing any value is a policy change: bump POLICY_VERSION.
 BUSINESS_DAYS_PER_MONTH = D(20)
@@ -1354,8 +1354,8 @@ class _Engine:
                 lo = g["cleared"][0].date - timedelta(EXPANDED_WINDOW_CAL)
                 hi = g["cleared"][-1].date + timedelta(EXPANDED_WINDOW_CAL)
                 hit = [t for t in h["cleared"] if t.amt == level and lo <= t.date <= hi]
-                # One coincidental amount in a large payee (checks) is not a link.
-                if len(hit) >= 2 and 2 * len(hit) >= len(h["cleared"]):
+                # Sign-off B9 (2026-11-07): 2 same-amount debits link, however busy the payee. One never does.
+                if len(hit) >= 2:
                     h["passes"].append(f"D3 same amount {usd(level)} as {g['funder']}")
                     h["ask"] = True
                     break
@@ -2572,15 +2572,7 @@ class _Engine:
             self.uncertain.append(
                 dict(kind="U position", ref=p.display, monthly=p.scenario, headline_if=hl, material=p.material)
             )
-        if len(u) > 1 and not any(p.material for p in u):
-            total = sum((p.scenario for p in u), D(0))
-            flips, hl = view(self.basis, w, self.stack + total)
-            if total >= five or flips != base:
-                for p in u:
-                    p.material = True
-                self.uncertain.append(
-                    dict(kind="U positions combined", ref=f"{len(u)} positions", monthly=total, headline_if=hl, material=True)
-                )
+        # Sign-off B7 (2026-11-07): each U position is tested alone; immaterial ones are not summed.
         unres = sum((self.month_rows[k]["unresolved"] for k in self.months), D(0))
         if unres:
             alt = {k: self.month_rows[k]["true"] + self.month_rows[k]["unresolved"] for k in self.counted}

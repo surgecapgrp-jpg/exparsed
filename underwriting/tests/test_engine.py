@@ -560,6 +560,37 @@ class SignOffB1(unittest.TestCase):
         self.assertEqual(uw.UNRESOLVED_FLOOR, D("2500"))
 
 
+class SignOffB7B9(unittest.TestCase):
+    """Sign-offs B7 and B9 (2026-11-07): U positions are tested one by one; D3 needs 2 same-amount debits only."""
+
+    def test_u_positions_are_not_summed(self):
+        led = copy.deepcopy(LEDGER)
+        led["documents"].append(dict(doc_id="DOC-3", kind="payoff_letter", text="SunCap Funding: balance paid in full 06/26/2026."))
+        days = ["2026-06-01", "2026-06-08", "2026-06-15", "2026-06-22", "2026-06-29", "2026-07-06", "2026-07-13"]
+        for name in ("ALPHA CAPITAL ACH", "BETA FUNDING ACH"):
+            led = add_debits(led, name, "40.00", days, name[:2])
+        r0 = run(led)
+        sun = q(r0, "SUNCAP FUNDING")
+        answers = [a for a in known(r0, JUDGMENTS["answers"]) if a["question_id"] != sun] + [
+            dict(question_id=sun, tag="MCA", funder="SunCap Funding",
+                 terminated=dict(kind="document", doc_id="DOC-3", quote="paid in full"))
+        ]
+        # Each U scenario is $173/mo. At a 0.5% share ($260 of BASIS) neither is material; their $347 sum would be.
+        with mock.patch.object(uw, "MATERIAL_SHARE", D("0.005")):
+            r = run(led, with_judgments(r0, answers))
+        self.assertEqual([p["material"] for p in r.audit["positions"] if p["live_status"] == "U"], [False, False])
+        self.assertNotIn("U positions combined", [u["kind"] for u in r.audit["capacity"]["uncertainty"]])
+        self.assertEqual(r.status, "YES")
+
+    def test_d3_links_two_same_amount_debits_in_a_busier_payee(self):
+        rows = [("2026-09-08", "525.00"), ("2026-09-15", "525.00")] + [
+            (d, "81.40") for d in ("2026-09-01", "2026-09-10", "2026-09-17", "2026-09-24", "2026-09-29")
+        ]
+        led = add_rows(LEDGER, [("OP", d, a, "debit", "ACH DEBIT WEB PMT 88213") for d, a in rows], "G")
+        w = next(p for p in run(led).audit["positions"] if p["watch"])
+        self.assertIn("D3 same amount $525 as RAPIDFUND LLC", w["status_basis"])
+
+
 class SignOffB18(unittest.TestCase):
     """Sign-off B18 (2026-11-06): a missing or unreadable statement blocks YES only, as V1.7 section 9 says."""
 
