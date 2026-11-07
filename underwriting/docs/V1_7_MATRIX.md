@@ -109,7 +109,7 @@ Count: 150 rows. 19 B1, 33 B2, 24 B3, 10 B4, 38 Met, 20 Partial, 3 Gap, 3 Page.
 | D5 | Exception pass: returns, stop-pays, fees, processor net settlements, missing-account transfers | Returned attempts of finance-word payees are nominated (D5). Hidden collections are not recovered. | Partial | Recover collections behind failed attempts |
 | D6 | Reverse consolidations, processor splits, off-bank deductions | None | Gap | B2 |
 | D7 | Generic descriptors cannot join payments | Grouping is by normalized description | Partial | B2 |
-| D8 | Concurrent schedules under one funder are separate positions | Split when 3+ days hold same-day debits differing by >10%, or when same-amount doubles fall on 3 consecutive debit days. An isolated same-amount double (the day after a holiday) is a catch-up. | B6 | Sign-off B22 |
+| D8 | Concurrent schedules under one funder are separate positions | Split when 3+ days hold same-day debits differing by >10%, or when same-amount doubles fall on 3 consecutive debit days. An isolated same-amount double (the day after a holiday) is a catch-up. | B6 | — (B22 signed off 2026-11-07) |
 | D9 | Series: 3+ cleared; EARLY FINANCE for 1 to 2 with finance evidence; others WATCH | CONFIRMED, PROBABLE, U for provisional cadence, and UNRESOLVED WATCH rows | B2 | — |
 | D10 | Amounts: cleared only, attempt chains, >10% for 3 payments, temporary cuts, frequency changes | Implemented as written | Met | — |
 | D11 | Variable remittance: documented level plus adverse scenario | VARIABLE cost = cleared debits in the last 20 bd; `adverse_cost` = highest 20 bd of cleared debits in the series, in Table 4 notes, never in the stack | B6 | — |
@@ -355,7 +355,7 @@ Not in batch 4: report publication after rejected answer files (V3 handoff, done
 
 | # | V1.7 text | Engine reading |
 | ---: | :--- | :--- |
-| B22 | "Track different concurrent schedules under one funder as separate POSITION IDs" | Same-amount doubles count as a second schedule only on 3 consecutive debit days. On the real ledger, MS Equities, Eminent and ZLUR show doubles only on the business day after Memorial Day and Juneteenth (and 2 other single days); these stay one position each. |
+| B22 | "Track different concurrent schedules under one funder as separate POSITION IDs" | Same-amount doubles count as a second schedule only on 3 consecutive debit days. On the real ledger, MS Equities, Eminent and ZLUR show doubles only on the business day after Memorial Day and Juneteenth (and 2 other single days); these stay one position each. **Signed off 2026-11-07, kept.** |
 
 | Run | Effect |
 | :--- | :--- |
