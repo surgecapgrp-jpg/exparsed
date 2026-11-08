@@ -505,7 +505,7 @@ from pathlib import Path
 
 D = Decimal
 ENGINE_VERSION = "3.4"
-POLICY_VERSION = "V1.8b8"
+POLICY_VERSION = "V1.8b9"
 
 # Policy parameters (V2.2 values with the V1.7 changes marked). Changing any value is a policy change: bump POLICY_VERSION.
 BUSINESS_DAYS_PER_MONTH = D(20)
@@ -537,6 +537,7 @@ RETURN_MATCH_BD = 5  # recredit must follow its debit within this many business 
 CHAIN_GAP_BD = 10  # re-presentments within this gap belong to one attempt chain
 TOP_STREAMS = 6
 FIXED_SHARE = D("0.8")   # share of payments in same-amount runs that makes a series fixed-amount
+DETECT_SHARE = D("0.6")  # reading 1 sign-off 2026-11-08: same-amount share that makes a series MCA by default
 LARGE_DEPOSIT_MULTIPLE = 3  # a credit at this multiple of the median deposit is unusual
 # Sign-off B1 (2026-11-07): an unresolved candidate credit under this amount is not material and keeps its rule tag.
 UNRESOLVED_FLOOR = D("2500")
@@ -1324,7 +1325,7 @@ class _Engine:
                 else "PROVISIONAL"
             )
             regular = len(cleared) >= SERIES_MIN_DEBITS and cadence in CADENCE_FACTOR
-            # MCA remittances are fixed amounts: same-amount runs of 3+ cover >=80% of payments.
+            # MCA by default: same-amount runs of 3+ cover >= DETECT_SHARE of payments (reading 1).
             all_cleared = [t for s in series for t in s if not t.returned_by]
             fixed = sum(
                 len(r)
@@ -1335,7 +1336,7 @@ class _Engine:
                 )
                 if len(r) >= SUSTAIN_PAYMENTS
             )
-            regular = regular and fixed >= FIXED_SHARE * len(all_cleared)
+            regular = regular and fixed >= DETECT_SHARE * len(all_cleared)
             word = bool(MCA_WORD.search(name) or MCA_WORD_INSIDE.search(name))
             early = (
                 0 < len(cleared) < SERIES_MIN_DEBITS

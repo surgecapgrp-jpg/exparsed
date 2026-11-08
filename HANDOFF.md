@@ -18,7 +18,7 @@ underwrites the merchant for MCA capacity under policy V1.8.
 | Underwriting engine | Experiment. Policy V1.7 batches 1 to 4 and V1.8 batches 1 to 7 and sign-offs P15, M9 merged. Run on 1 real ledger and 1 synthetic ledger. |
 | Underwrite button and chat | Built and tested with a mocked browser run. Never run in real Chrome with real Pyodide and a real key. |
 | UI | Surge Capital theme (PR #9, merged 2026-11-04). |
-| Tests | 265 JS tests, 106 engine tests, 19 end-to-end page checks: all pass on `main`. |
+| Tests | 265 JS tests, 107 engine tests, 19 end-to-end page checks: all pass on `main`. |
 
 The next step is a real Chrome run on 3 to 5 real merchant files (section 9, item 1).
 
@@ -120,7 +120,7 @@ naming its funder.
 
 ### 5.2 Policy V1.7 coverage
 
-`ENGINE_VERSION` 3.4, `POLICY_VERSION` V1.8b8. The matrix tracks 150 rules:
+`ENGINE_VERSION` 3.4, `POLICY_VERSION` V1.8b9. The matrix tracks 150 rules:
 
 | Status | Rows |
 | :--- | ---: |
@@ -278,8 +278,11 @@ Signed off 2026-11-08:
 | :--- | :--- |
 | P15 | Changed (policy V1.8b8): FLIGHT tests every external credit of 3x median deposit or more. Transfers, refunds, recredits, owner strips and returned credits are left out. |
 | M9 | Changed (policy V1.8b8): a model-identified sender is not financing proof. The credit is STRIP_UNRESOLVED at any amount, unattached, with a Table 1 verify note. |
+| Reading 1 | Changed (policy V1.8b9): default MCA needs same-amount runs on 60% of cleared debits (`DETECT_SHARE`). VARIABLE keeps 80%. |
+| Readings 2, 4 to 6, 9 to 11, 13, 14, 17, 19 | Kept, as written in `underwriting/docs/HANDOFF.md` section 4.1. |
+| Readings 3, 7, 8, 12, 15, 16, 18 | Marked replaced by later batches or sign-offs. |
 
-All 22 matrix interpretations B1 to B22 are signed off. Waiting for sign-off: the 19 readings in `underwriting/docs/HANDOFF.md` section 4.1.
+All 22 matrix interpretations B1 to B22 and all 19 readings in `underwriting/docs/HANDOFF.md` section 4.1 are signed off.
 
 ## 7. Verification
 
@@ -287,7 +290,7 @@ All 22 matrix interpretations B1 to B22 are signed off. Waiting for sign-off: th
 | :--- | :--- |
 | `node tests/run-node.js` | 265 passed, 0 failed (`ocr.js` adds 44) |
 | `tests/batch/run.js` on `tests/samples` (pdf.js stubbed: the cloud session cannot reach cdnjs) | 3 non-PDF files read through the page; `compare` reports a planted downgrade and exits 1 |
-| `python3 -m unittest discover -s tests` in `underwriting/` | 106 passed |
+| `python3 -m unittest discover -s tests` in `underwriting/` | 107 passed |
 | Engine self-checks per run | 17 pass on the sample |
 | Report checker on every rendered report | PASS |
 | End-to-end page run (headless Chromium, real engine behind a local server, mocked Pyodide and model, 3-month CSV) | 19 of 19 (Q1 and Q3 now expect the character row; Q4 checks an underwriter override) |
@@ -316,7 +319,7 @@ All 22 matrix interpretations B1 to B22 are signed off. Waiting for sign-off: th
    statements that run into January 2028 arrive.
 3. **Rejected-answer fallback.** Done in PR #14: a second rejection shows "Engine stopped: answers rejected
    twice (...); no report" and clears any earlier report.
-4. **Sign-offs.** B18 done in PR #16, B22 in PR #27, B1 and B4 to B6 in PR #31, B7, B9, B11 and B12 in PR #32, the rest of B13 to B21 in PR #33. Next: the 19 readings in `underwriting/docs/HANDOFF.md` section 4.1. The other open interpretations remain (section 6).
+4. **Sign-offs.** B18 done in PR #16, B22 in PR #27, B1 and B4 to B6 in PR #31, B7, B9, B11 and B12 in PR #32, the rest of B13 to B21 in PR #33. The 19 readings in `underwriting/docs/HANDOFF.md` section 4.1 followed on 2026-11-08 (reading 1 changed, policy V1.8b9).
 5. **Standards fixes from the 2026-11-02 review.** Done in PR #14. The engine's inline numbers are named
    constants at the top of `uw.py`. The adapter uses `uw.WORST_ORDER`. `import uw` sits inside `page_run`'s
    `try`. The checker keeps its own named copy of 4 policy numbers, and a test fails when they differ from the

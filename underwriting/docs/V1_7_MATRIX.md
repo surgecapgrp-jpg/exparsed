@@ -514,3 +514,14 @@ Signed off 2026-11-08, "extra pull". A daily position's next scheduled pull no l
 | :--- | :--- |
 | Sample, defaults and saved answers | Same reports. FLIGHT events stay at 2; no saved answer uses `sender_identified` |
 | Real ledger, defaults and saved answers | Not rerun: the ledger is not in this session. FLIGHT count may rise; HEADLINE cannot move from P15. M9 moves funding links only if a saved answer uses `sender_identified` |
+
+## Sign-offs on HANDOFF readings 1 to 19 (2026-11-08; policy V1.8b9)
+
+- Replaced, no decision: readings 3 (P15), 7, 8, 12, 15, 16 and 18. Each is now described by a merged batch or a signed B row.
+- Kept: readings 2, 4, 5, 6, 9, 10, 11, 13, 14, 17 and 19.
+- Changed, reading 1: a series is MCA by default when same-amount runs of 3+ cover at least 60% of its cleared debits (`DETECT_SHARE`). It was 80%. The fixed-or-VARIABLE test (reading 13) and the concurrent-track test (reading 14) keep 80% (`FIXED_SHARE`), so a 60 to 79% series is a VARIABLE MCA costed by its last 20 bd.
+
+| Run | Effect |
+| :--- | :--- |
+| Sample, defaults and saved answers | Same reports |
+| Real ledger, defaults and saved answers | Not rerun: the ledger is not in this session. Defaults may find more positions; saved answers already settle each payee the model was asked about |

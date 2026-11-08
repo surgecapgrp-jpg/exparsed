@@ -1270,5 +1270,22 @@ class SignOffP15M9(unittest.TestCase):
         self.assertIn("not proof of financing", r.report)
 
 
+
+class SignOffReadings(unittest.TestCase):
+    """Sign-offs on HANDOFF section 4.1 readings (2026-11-08; policy V1.8b9)."""
+
+    def test_reading1_daily_series_with_70_percent_same_amount_is_mca(self):
+        days = ["2026-09-%02d" % d for d in (14, 15, 16, 17, 18, 21, 22, 23, 24, 25)]
+        led = copy.deepcopy(LEDGER)
+        amounts = ["400.00"] * 7 + ["455.00", "512.00", "389.00"]
+        led["transactions"] += [
+            dict(txn_id=f"R1{i}", account_id="OP", date=d, amount=a, direction="debit",
+                 description="ZORRO REMIT ACH DEBIT", balance=None)
+            for i, (d, a) in enumerate(zip(days, amounts))
+        ]
+        p = pos(run(led), "ZORRO REMIT")
+        self.assertTrue(p and not p[0]["watch"])  # 7 of 10 in one run: MCA at 60%, not at 80%
+
+
 if __name__ == "__main__":
     unittest.main()
