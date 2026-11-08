@@ -1174,6 +1174,23 @@ class RealDataShapes(unittest.TestCase):
             ],
         }
 
+    def test_tagged_funding_documents_reach_the_engine(self):
+        sys.path.insert(0, str(ROOT / "adapter"))
+        import exparsed_adapter
+
+        src = self.statement_src()
+        contract = "PURCHASE AND SALE OF FUTURE RECEIVABLES. Daily payment $450.00. " + "x" * exparsed_adapter.DOC_TEXT_CAP
+        src["files"] += [
+            dict(name="contract.pdf", status="not-statement", docKind="funding contract", rows=[], markdown=contract),
+            dict(name="credit.pdf", status="not-statement", docKind="credit report", rows=[], markdown="EQUIFAX score 700"),
+        ]
+        out = exparsed_adapter.convert(src, [])
+        self.assertEqual([(d["doc_id"], d["kind"], d["truncated"]) for d in out["documents"]],
+                         [("contract.pdf", "funding_contract", True)])
+        self.assertEqual(len(out["documents"][0]["text"]), exparsed_adapter.DOC_TEXT_CAP)
+        r = uw.underwrite(raw(out))
+        self.assertEqual([d["doc_id"] for d in r.questions["documents"]], ["contract.pdf"])
+
     def test_page_run_reads_statement_rows_and_reports_errors(self):
         sys.path.insert(0, str(ROOT / "adapter"))
         import exparsed_adapter

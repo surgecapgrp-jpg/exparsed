@@ -169,6 +169,10 @@
           },
           "text": {
             "type": "string"
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when the adapter cut the text at DOC_TEXT_CAP characters"
           }
         }
       }
