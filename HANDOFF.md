@@ -16,9 +16,9 @@ underwrites the merchant for MCA capacity under policy V1.8.
 | :--- | :--- |
 | Statement reader | In use. 140 of 244 Desktop-set files verify from text; 29 of 42 scans verify through Mac OCR. |
 | Underwriting engine | Experiment. Policy V1.7 batches 1 to 4 and V1.8 batches 1 to 7 and sign-offs P15, M9, readings 1 to 19 and gaps D6, L11, L13 merged. Run on 1 real ledger and 1 synthetic ledger. |
-| Underwrite button and chat | Built and tested with a mocked browser run. Never run in real Chrome with real Pyodide and a real key. |
+| Underwrite button and chat | Run live 2026-11-08 in headless Chromium: real Pyodide from the CDN, Claude Sonnet 5.5 through OpenRouter, synthetic files only. Never run on real merchant files. |
 | UI | Surge Capital theme (PR #9, merged 2026-11-04). |
-| Tests | 265 JS tests, 116 engine tests, 19 end-to-end page checks: all pass on `main`. |
+| Tests | 267 JS tests, 116 engine tests, 19 end-to-end page checks: all pass on `main`. |
 
 The next step is a real Chrome run on 3 to 5 real merchant files (section 9, item 1).
 
@@ -296,7 +296,7 @@ All 22 matrix interpretations B1 to B22 and all 19 readings in `underwriting/doc
 
 | Check | Result on `main` after PR #48 |
 | :--- | :--- |
-| `node tests/run-node.js` | 265 passed, 0 failed (`ocr.js` adds 44) |
+| `node tests/run-node.js` | 267 passed, 0 failed (`ocr.js` adds 44) |
 | `tests/batch/run.js` on `tests/samples` (pdf.js stubbed: the cloud session cannot reach cdnjs) | 3 non-PDF files read through the page; `compare` reports a planted downgrade and exits 1 |
 | `python3 -m unittest discover -s tests` in `underwriting/` | 116 passed |
 | Engine self-checks per run | 17 pass on the sample |
@@ -304,7 +304,7 @@ All 22 matrix interpretations B1 to B22 and all 19 readings in `underwriting/doc
 | End-to-end page run (headless Chromium, real engine behind a local server, mocked Pyodide and model, 3-month CSV) | 19 of 19 (Q1 and Q3 now expect the character row; Q4 checks an underwriter override) |
 | Real ledger gross credits per month against the page's `computed` figures | Equal to the cent, 13 of 13 months |
 | `bash tests/run.sh` (macOS JavaScriptCore) | Not run since PR #4 |
-| Real Chrome, real Pyodide, real Claude or OpenRouter key | Never run |
+| Real Pyodide and a real model key (headless Chromium, cloud session, environment "exparsed") | 2026-11-08: 4 runs on synthetic files, 15 to 30 s each. Contract, payoff and character answers all applied. Real merchant files not run |
 
 ## 8. Locations outside the repo
 
@@ -319,7 +319,9 @@ All 22 matrix interpretations B1 to B22 and all 19 readings in `underwriting/doc
 
 ## 9. Open items, in order
 
-1. **Live run.** Open `main`'s `exparsed.html` in Chrome, add a key, underwrite 3 to 5 real merchant files.
+1. **Live run.** Done on synthetic files on 2026-11-08 (headless Chromium, OpenRouter, Claude Sonnet 5.5). The run found the character
+   read was never applied: with `text` optional in the structured-output schema, the model left it out. Fixed by a
+   character-round schema that requires `text`, plus one retry with the engine's error. Still open: underwrite 3 to 5 real merchant files.
    Record Pyodide load time, page freeze, model cost, rejected answers. This is the one check never done.
    On hold since 2026-11-06 by request. A cloud session cannot do it: cdn.jsdelivr.net is blocked, it has no key, and the merchant files are on the Mac.
 2. **Holidays.** Done in PR #14: the 9 Federal Reserve 2027 dates are in `HOLIDAYS`. A statement period

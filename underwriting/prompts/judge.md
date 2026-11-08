@@ -66,7 +66,7 @@ The engine ties the document to the one position whose funder shares a name word
 
 Asked in a second round, after your other answers are applied. `facts` holds the engine's evidence: Class A returns with tier and cure, expected versus cleared collections per position, the lowest-balance days and return dates with what cleared that day, deposit-then-outflow-then-return sequences, overdraft days and coverage limits. `allowed` lists the labels the evidence can support; the engine rejects any other.
 
-Answer `tag` (character risk) and `failure_mode`, each from `allowed`, plus `text`: 2 or 3 sentences, at most 400 characters.
+Answer `tag` (character risk) and `failure_mode`, each from `allowed`, plus `text`: 2 or 3 sentences, at most 400 characters. `text` is required; an answer without it is rejected.
 
 - `tag`: `LOW` when finance payments cleared in the observed intervals, no T1 return, and thin-day priorities held. `ELEVATED` for strained finance payments, unexplained missing pulls, recurring T2 returns or adverse priorities without proof of intent. `HIGH` for repeated finance-specific stops or blocks, an uncured T1 with no servicing explanation, or recurring deposit-then-return sequences. `INDETERMINATE` when accounts, attempt history or balances are missing.
 - `failure_mode`: `CAPACITY` when shortfalls hit essential payments broadly or cures and injections show recovery. `POSSIBLE VOLITIONAL` only when finance returns coincide with discretionary outflows while funds were available. `MIXED` when both hold. `INDETERMINATE` otherwise.

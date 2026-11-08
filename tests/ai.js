@@ -130,6 +130,26 @@ uwUnderwrite('claude', cfgC, 'P', engineChar(true), fakeJudge([good, charAns]), 
   T('A14d a rejected character read keeps the first result with a note',
     o.result.report==='counts only' && o.judgments.answers.length===1 && /character read not applied/.test(o.note) && /HIGH/.test(o.note), o);
 });
+// A14g a character read rejected once is retried with the engine error, then applied
+function engineCharOnce(){
+  var rejected=false, inner=engineChar(false);
+  return function(j){
+    var p=j && JSON.parse(j), c=p && p.answers.filter(function(a){ return a.question_id==='Q-character-1'; })[0];
+    if(c && !rejected){ rejected=true; return { ok:false, error:'judgment Q-character-1: text is missing; character needs text, 2 or 3 sentences' }; }
+    return inner(j);
+  };
+}
+var gSteps=[];
+uwUnderwrite('claude', cfgC, 'P', engineCharOnce(), fakeJudge([good, charAns, charAns]), function(t){ gSteps.push(t); }).then(function(o){
+  T('A14g a rejected character read gets one retry with the engine error, then applies',
+    o.result.report==='character ELEVATED, 2 answers' && !o.note && /rejected the character read/.test(gSteps[2]) && /text is missing/.test(gSteps[2]), [o, gSteps]);
+});
+// A14h the character round sends a schema that requires text (a live run left optional text out every time)
+var schemas=[], fj=fakeJudge([good, charAns]);
+uwUnderwrite('claude', cfgC, 'P', engineChar(false), function(prov, cfg, req){ schemas.push(req.schema); return fj(prov, cfg, req); }, function(){}).then(function(){
+  T('A14h character round requires tag, failure_mode and text; the first round keeps the shared schema',
+    schemas[0]===UW_JUDGMENTS_SCHEMA && schemas[1].properties.answers.items.required.join()==='question_id,tag,failure_mode,text', schemas.map(function(s){ return s && s.properties.answers.items.required; }));
+});
 // A14e-A14f V1.8 character row: listed even when answered, with the engine's allowed labels; picks become one answer
 var cq=uwQueue({ ok:true, questions:{ questions:[{ question_id:'Q-character-1', type:'character', default:'INDETERMINATE',
   allowed:{ character:['LOW','ELEVATED'], failure_mode:['CAPACITY','INDETERMINATE'] } }] },
