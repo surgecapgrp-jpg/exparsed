@@ -23,7 +23,8 @@ var PG=function(){ return { hasText:false, lines:[] }; };
     ['whole text layer broken',            rec({ suspectText:true }),                            'broken-text', 'Run OCR', 'err'],
     ['broken pages, text reconciles',      withLedger(rec({ suspectPages:[2] }), 'verified'),    'readable', null, 'ok'],
     ['broken pages, text does not',        withLedger(rec({ suspectPages:[2] }), 'untestable'),  'broken-pages', 'OCR full doc', 'warn'],
-    ['clean text layer',                   rec({}),                                              'readable', null, 'ok']
+    ['clean text layer',                   withLedger(rec({}), 'untestable'),                    'readable', null, 'ok'],
+    ['text the ledger cannot read',        withLedger(rec({}), 'needs-ocr'),                     'unreadable-text', 'Run OCR', 'err']
   ];
   cases.forEach(function(c){
     var n=fileOcrNeed(c[1]);
@@ -31,6 +32,7 @@ var PG=function(){ return { hasText:false, lines:[] }; };
   });
   t('O1 auto-OCR for a fully scanned file', fileOcrNeed(rec({ scanned:2 })).autoOcr===true);
   t('O1 auto-OCR for a broken text layer', fileOcrNeed(rec({ suspectText:true })).autoOcr===true);
+  t('O1 auto-OCR when the ledger says needs-ocr', fileOcrNeed(withLedger(rec({}), 'needs-ocr')).autoOcr===true);
   t('O1 no auto-OCR after a failed OCR', fileOcrNeed(rec({ scanned:2, ocrStatus:'error: 500' })).autoOcr===false);
   t('O1 auto-OCR for a photo', fileOcrNeed(rec({ type:'image', pages:[] })).autoOcr===true);
   t('O1 auto-OCR for a damaged PDF', fileOcrNeed(rec({ pdfOpenFailed:'bad xref', pages:[] })).autoOcr===true);

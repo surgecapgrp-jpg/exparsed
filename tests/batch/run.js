@@ -164,7 +164,10 @@ async function run(dir, outFile, opts) {
       const f = todo[next++],
         rel = path.relative(dir, f);
       let res;
-      const timer = new Promise((r) => setTimeout(() => r(null), limit));
+      let timeout;
+      const timer = new Promise(
+        (r) => (timeout = setTimeout(() => r(null), limit)),
+      );
       try {
         res = await Promise.race([
           p.evaluate(
@@ -186,6 +189,7 @@ async function run(dir, outFile, opts) {
           },
         ];
       }
+      clearTimeout(timeout); // a pending timer kept node alive up to 120 s after the last file
       if (!res) {
         res = [
           {
