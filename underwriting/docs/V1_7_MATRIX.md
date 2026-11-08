@@ -198,7 +198,7 @@ Count: 150 rows. 19 B1, 33 B2, 24 B3, 10 B4, 38 Met, 20 Partial, 3 Gap, 3 Page.
 | K5 | FEE_NSF_OD is a fee, never a return | Yes | Met | — |
 | K6 | Class A, B and UNKNOWN | A return credit with no matching debit is Class A (B21), tier n/a, cure "UNKNOWN (debit not found)" (V1.8 R3/R4, V1.8b1). Class UNKNOWN is no longer produced | V1.8 | — |
 | K7 | T1, T2, T3 codes | V1.8 R3: T1 only for a stop/block code on MCA or loan; the same code on payroll, rent, tax or insurance gives n/a; on any other item T3. T2 every other return on MCA, loan, payroll, rent, tax, insurance; T3 the rest | V1.8 | — |
-| K8 | Cure only within 2 bd with balance; MCA stop-pay never cured | T1 never cured. Y needs a cleared re-presentment within 2 bd with EOD >= 0. N for a re-presentment into overdraft or no re-presentment in a covered window. UNKNOWN when the balance or the 2 bd window is missing (V1.8 R4) | V1.8 | — |
+| K8 | Cure only within 2 bd with balance; MCA stop-pay never cured | T1 never cured. Y needs a cleared re-presentment within 2 bd with EOD >= 0; for a daily position only an extra pull counts (V1.8b6). N for a re-presentment into overdraft or no re-presentment in a covered window. UNKNOWN when the balance or the 2 bd window is missing (V1.8 R4) | V1.8 | — |
 | K9 | Table 9 metrics; absent balances are "unavailable" | Six fixed rows | Met | — |
 
 ## 9. Commingling and missing accounts
@@ -485,3 +485,11 @@ V1.8 B4 and B5: the judge picks the character and failure-mode labels from the b
 | Sample | BlueOak 6 of 7 (1 missing), CFG 4 of 4, SunCap 19 of 19 |
 
 Found, not changed: the cure rule (K8) accepts any later debit to the same payee of equal or higher amount within 2 bd. For a daily MCA, the next scheduled pull counts as the cure of a returned pull. V1.8 R4 asks for a re-presentment of the same obligation.
+
+## V1.8 batch 6: cure needs an extra pull (2026-11-08; policy V1.8b6)
+
+Signed off 2026-11-08, "extra pull". A daily position's next scheduled pull no longer cures a returned pull. Inside the 2 bd window, only a pull beyond the schedule counts: a second same-payee pull on one day, or one pull of at least the regular level plus the returned amount. Weekly and slower payees keep the old rule, because their next regular pull falls outside 2 bd.
+
+| Run | Effect |
+| :--- | :--- |
+| All 4 saved runs | Same reports. No saved run has a return on a daily position |

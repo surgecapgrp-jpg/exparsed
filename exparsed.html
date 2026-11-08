@@ -505,7 +505,7 @@ from pathlib import Path
 
 D = Decimal
 ENGINE_VERSION = "3.4"
-POLICY_VERSION = "V1.8b5"
+POLICY_VERSION = "V1.8b6"
 
 # Policy parameters (V2.2 values with the V1.7 changes marked). Changing any value is a policy change: bump POLICY_VERSION.
 BUSINESS_DAYS_PER_MONTH = D(20)
@@ -2652,6 +2652,7 @@ class _Engine:
 
     # ---- 10. returns and liquidity ----------------------------------------------------------------
     def returns_log(self):
+        pos_of = {t.id: p for p in self.positions for t in p.txns}
         returned = [t for t in self.txns if t.returned_by]
         chains = []
         for t in returned:
@@ -2683,19 +2684,26 @@ class _Engine:
             else:
                 tier = "T3"
             hi = self.cal.add(rc.date, CURE_WINDOW_BD)
-            cure = next(
-                (
-                    t
-                    for t in self.txns
-                    if t.dir == "debit"
-                    and not t.returned_by
-                    and t.norm == first.norm
-                    and t.amt >= first.amt
-                    and rc.date <= t.date <= hi
-                    and (t.date, t.seq) > (rc.date, rc.seq)
-                ),
-                None,
-            )
+            later = [
+                t
+                for t in self.txns
+                if t.dir == "debit"
+                and not t.returned_by
+                and t.norm == first.norm
+                and rc.date <= t.date <= hi
+                and (t.date, t.seq) > (rc.date, rc.seq)
+            ]
+            p = pos_of.get(first.id)
+            if p and p.cadence == "daily":
+                # Sign-off 2026-11-08 (V1.8 R4, "extra pull"): a daily payee's next scheduled pull is not a cure.
+                # Only a pull beyond the schedule counts: a second pull on one day, or one pull that covers
+                # the regular level plus the returned amount.
+                per_day = Counter(t.date for t in later)
+                cure = next((t for t in reversed(later) if t.amt >= first.amt and per_day[t.date] >= 2), None) or next(
+                    (t for t in later if t.amt >= p.level + first.amt), None)
+            else:
+                # Weekly and slower payees have no regular pull inside 2 bd, so any matching debit is extra.
+                cure = next((t for t in later if t.amt >= first.amt), None)
             # V1.8 R4: Y needs a cleared re-presentment within 2 bd with funds available (EOD >= 0).
             # UNKNOWN when the balance or the 2 bd follow-up window is missing from the statements.
             if tier == "T1":
