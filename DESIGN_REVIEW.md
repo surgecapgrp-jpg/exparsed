@@ -1,10 +1,10 @@
 # exparsed design review
 
-Date: 8 November 2026. Scope: `exparsed.html` (11,627 lines, 4,447 of them the embedded engine copy), `mac_ocr_server.py`, `underwriting/`, `tests/`, at `main` commit `7f04353`. This review replaces the 2 November review, which covered commit `195252c`. That text stays in git history.
+Date: 8 November 2026. Scope: `exparsed.html` (11,664 lines, 4,446 of them the embedded engine copy), `mac_ocr_server.py`, `underwriting/`, `tests/`, at `main` commit `d3e324d`. This review replaces the 2 November review, which covered commit `195252c`. That text stays in git history.
 
 ## Answer
 
-The two core modules are deep and stay as they are: the statement reader behind `lgFileLedger(f)` and the underwriting engine behind `underwrite(raw, judgments)`. Four of the 2 November findings are done, plus half of a fifth. One major seam is still open: the page reaches Claude and OpenRouter through two separate modules.
+The two core modules are deep and stay as they are: the statement reader behind `lgFileLedger(f)` and the underwriting engine behind `underwrite(raw, judgments)`. Five of the 2 November findings are done, and one is half done. One major seam is still open: the page reaches Claude and OpenRouter through two separate modules.
 
 | # | Finding | Status | Where |
 | ---: | :--- | :--- | :--- |
@@ -24,12 +24,12 @@ The two core modules are deep and stay as they are: the statement reader behind 
 
 | Module | Interface | Depth |
 | :--- | :--- | :--- |
-| Statement reader | `lgFileLedger(f)` returns a ledger record `L` (`exparsed.html:9387`) | Deep. A file goes in and a checked ledger comes out. The record has no written shape (finding B). |
-| Ledger export | `lgLedgerExport(list, opts)` returns `ledger-v1` (`:9451`) | Deep. Every downstream user reads it. |
-| Computed figures | `lgComputed(list)` (`:9551`) | Deep. The engine now cross-checks it on every run. |
-| Model calls | `aiCall(prov, cfg, req, fetchFn)` (`:9953`) | Shallow. `aiRequest`, `aiParse` and `aiToolResults` each branch on `prov==='claude'` (finding A). |
-| OCR cloud read | `cloudOcrRead(f, port, hooks)` (`:9805`) with `claudePort` and `openrouterPort` (`:10964`, `:10997`) | Medium. Each port rebuilds the provider request that `aiRequest` already builds (finding A). |
-| Underwriting engine | `underwrite(raw, judgments) -> Result` (`underwriting/engine/uw.py:3632`), `render(audit)` (`:3593`) | Deep. 3,693 lines; `_Engine` has 57 methods behind one function (finding D). |
+| Statement reader | `lgFileLedger(f)` returns a ledger record `L` (`exparsed.html:9427`) | Deep. A file goes in and a checked ledger comes out. The record shape is in the `LedgerRecord` typedef (finding B). |
+| Ledger export | `lgLedgerExport(list, opts)` returns `ledger-v1` (`:9491`) | Deep. Every downstream user reads it. |
+| Computed figures | `lgComputed(list)` (`:9591`) | Deep. The engine now cross-checks it on every run. |
+| Model calls | `aiCall(prov, cfg, req, fetchFn)` (`:9993`) | Shallow. `aiRequest`, `aiParse` and `aiToolResults` each branch on `prov==='claude'` (finding A). |
+| OCR cloud read | `cloudOcrRead(f, port, hooks)` (`:9845`) with `claudePort` and `openrouterPort` (`:11001`, `:11036`) | Medium. Each port rebuilds the provider request that `aiRequest` already builds (finding A). |
+| Underwriting engine | `underwrite(raw, judgments) -> Result` (`underwriting/engine/uw.py:3635`), `render(audit)` (`:3596`) | Deep. 3,693 lines; `_Engine` has 53 methods behind one function (finding D). |
 | Adapter | `page_run(ledger_text, judgments_text, owners)` (`underwriting/adapter/exparsed_adapter.py:100`) | Right size. Returns JSON on every error path, with file and line for bugs. |
 | Review queue | `uwQueue(r)` reads `q.allowed` from engine questions | Shallow by design. It keeps no tag list of its own. |
 | Mac OCR server | HTTP on port 8091: `/health`, `/pdf`, `/ocr` | Deep. The page and a separate process sit on each side. |
@@ -42,10 +42,10 @@ The two core modules are deep and stay as they are: the statement reader behind 
 Deferred on 8 November 2026. Blocker: no real merchant statements or Claude and OpenRouter keys in the review session. Resume when both exist. Synthetic fixtures in `tests/ai.js` can start the `modelCall` interface; the OCR switch waits for the before-and-after run.
 
 The page reaches Claude and OpenRouter in two places:
-- Judgments and chat call `aiCall` (`:9953`). `aiRequest` (`:9918`) builds URL, headers and body; `aiParse` (`:9936`) reads the reply.
-- OCR calls `claudePort` and `openrouterPort` (`:10964`, `:10997`). Each has 6 methods (`encode`, `check`, `send`, `read`, `fail`, `emptyHelp`) and its own `fetch`, body and stream reader (`readAnthropicStream` `:10926`, `readChatStream` `:10939`).
-- PR #18 already shares the header builders `anthropicHeaders` (`:4938`) and `openrouterHeaders` (`:4947`).
-- Readiness is still checked twice: `PROVIDER_DEFS[k].ready` (`:10696`) and `aiCfg()` (`:11484`).
+- Judgments and chat call `aiCall` (`:9993`). `aiRequest` (`:9958`) builds URL, headers and body; `aiParse` (`:9976`) reads the reply.
+- OCR calls `claudePort` and `openrouterPort` (`:11001`, `:11036`). Each has 6 methods (`encode`, `check`, `send`, `read`, `fail`, `emptyHelp`) and its own `fetch`, body and stream reader (`readAnthropicStream` `:10963`, `readChatStream` `:10976`).
+- PR #18 already shares the header builders `anthropicHeaders` (`:4941`) and `openrouterHeaders` (`:4950`).
+- Readiness is still checked twice: `PROVIDER_DEFS[k].ready` (`:10732`) and `aiCfg()` (`:11521`).
 
 Deletion test: delete either path and its callers must rebuild the same provider knowledge (URL, body shape, stream format, error mapping). Two adapters vary across this seam, so the seam is real. It exists twice.
 
@@ -57,29 +57,29 @@ Tests: `tests/ai.js` already drives request and reply shapes through a fake `fet
 
 Verify: one real scanned PDF through Claude OCR and one through OpenRouter, before and after, give the same ledger status and row count. About 1 day. Medium risk, because it touches working OCR.
 
-### B. The ledger record `L` has no written shape (done)
+### B. The ledger record `L` has no written shape (done in PR #54)
 
-`lgFileLedger` returns an object whose 30 distinct fields are read as `L.x` across the page. Most are optional and read as `L.x||default`. Each consumer (render, export, computed, integrity report) must know which reader leaves which field empty. That knowledge lives only in the code.
+`lgFileLedger` returns an object whose 26 fields are read as `L.x` across the page. Most are optional and read as `L.x||default`. Each consumer (render, export, computed, integrity report) must know which reader leaves which field empty. That knowledge lives only in the code.
 
-Proposal: one JSDoc `@typedef` beside `lgFinalize` (`:8082`). It lists each field, the readers that set it, and when it is absent. No code change. About 1 hour.
+Proposal: one JSDoc `@typedef` beside `lgFinalize` (`:8119`). It lists each field, the readers that set it, and when it is absent. No code change. About 1 hour.
 
 ### C. Each Run converts the same ledger several times
 
-`uwEngine(ledgerText)` (`:11508`) calls `page_run` once per engine round: defaults, judgments, and the character round. Each call runs `normalized()` and `underwrite()` from the JSON text again. The 2 November review measured 0.4 s per call in CPython on the 3,069-row real ledger, so a Run spends roughly 1 to 4 s of Pyodide main-thread time.
+`uwEngine(ledgerText)` (`:11545`) calls `page_run` once per engine round: defaults, judgments, and the character round. Each call runs `normalized()` and `underwrite()` from the JSON text again. The 2 November review measured 0.4 s per call in CPython on the 3,069-row real ledger, so a Run spends roughly 1 to 4 s of Pyodide main-thread time.
 
 Proposal: none until it is measured in the page. Time one Run in Chrome on the real ledger first. Cache the normalized bytes between rounds only if a Run takes over 5 s.
 
 ### D. The engine class is large, and its interface still holds
 
-`underwriting/engine/uw.py` grew from 2,479 to 3,693 lines in 6 days. `_Engine` (`:609`) holds 57 methods. Only `underwrite()` and `render()` are public, and the 116 engine tests cross `underwrite()`. Callers and tests see none of this growth.
+`underwriting/engine/uw.py` grew from 2,479 to 3,693 lines in 6 days. `_Engine` (`:609`) holds 53 methods. Only `underwrite()` and `render()` are public, and the 116 engine tests cross `underwrite()`. Callers and tests see none of this growth.
 
 No change now. Split a stage into its own module when a change to one stage breaks tests of an unrelated stage.
 
 ## Suggested order
 
 1. Underwrite 3 to 5 real merchant files (`HANDOFF.md` section 9, item 1). Findings A and C both need those runs as their before-and-after baseline.
-2. Finding B (1 hour). Verify `node tests/run-node.js` stays at 267 passed.
+2. Finding B: done in PR #54. `node tests/run-node.js` stays at 267 passed.
 3. Finding C measurement (15 minutes, during step 1).
 4. Finding A (1 day), deferred. Blocked on step 1's files and keys. Verify with the OCR before-and-after check above.
 
-Decision: **Proceed** with step 1 and finding B. **Experiment** with finding A behind the OCR comparison. **Defer** finding A until step 1 has files and keys, and findings C and D until a measurement or a failing test calls for them.
+Decision: **Proceed** with step 1. Finding B is done. **Experiment** with finding A behind the OCR comparison. **Defer** finding A until step 1 has files and keys, and findings C and D until a measurement or a failing test calls for them.
