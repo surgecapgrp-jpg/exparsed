@@ -1,6 +1,6 @@
 # exparsed handoff
 
-Code state on 2026-11-08 at the merge of PR #47 (the last code change). Later commits that only
+Code state on 2026-11-08 at the merge of PR #48 (the last code change). Later commits that only
 edit this file are not listed. Repo: https://github.com/surgecapgrp-jpg/exparsed (private).
 This file replaces the 2026-10-26 handoff. The underwriting design detail is in `underwriting/docs/HANDOFF.md`,
 and the policy compliance detail is in `underwriting/docs/V1_7_MATRIX.md`. Policy V1.8 (MCA Capacity V1.8
@@ -15,7 +15,7 @@ underwrites the merchant for MCA capacity under policy V1.8.
 | Part | State |
 | :--- | :--- |
 | Statement reader | In use. 140 of 244 Desktop-set files verify from text; 29 of 42 scans verify through Mac OCR. |
-| Underwriting engine | Experiment. Policy V1.7 batches 1 to 4 and V1.8 batches 1 to 7 and sign-offs P15, M9 and readings 1 to 19 merged. Run on 1 real ledger and 1 synthetic ledger. |
+| Underwriting engine | Experiment. Policy V1.7 batches 1 to 4 and V1.8 batches 1 to 7 and sign-offs P15, M9, readings 1 to 19 and gaps D6, L11, L13 merged. Run on 1 real ledger and 1 synthetic ledger. |
 | Underwrite button and chat | Built and tested with a mocked browser run. Never run in real Chrome with real Pyodide and a real key. |
 | UI | Surge Capital theme (PR #9, merged 2026-11-04). |
 | Tests | 265 JS tests, 116 engine tests, 19 end-to-end page checks: all pass on `main`. |
@@ -192,6 +192,7 @@ the return-word scan log (R1), the character pass (B1 to B5) and the extra Table
 | #45 | `dbe1131` | Sign-offs on readings 1 to 19 in `underwriting/docs/HANDOFF.md` 4.1; reading 1 changed: default MCA at 60% same-amount (policy V1.8b9) |
 | #46 | `3c47bee` | Gaps part A: the adapter passes tagged contracts, payoff letters and processor statements to the engine as `documents` |
 | #47 | `22de89d` | Gaps part B: L11 contract cost (higher of contract and observed) and L13 payoff note from documents (policy V1.8b10) |
+| #48 | `e9dcd42` | Gap part C: D6 processor holdbacks as off-bank stack rows; reverse consolidation flag (policy V1.8b11) |
 
 Rollback point before all underwriting work: `283bc50`.
 
@@ -293,7 +294,7 @@ All 22 matrix interpretations B1 to B22 and all 19 readings in `underwriting/doc
 
 ## 7. Verification
 
-| Check | Result on `main` after PR #47 |
+| Check | Result on `main` after PR #48 |
 | :--- | :--- |
 | `node tests/run-node.js` | 265 passed, 0 failed (`ocr.js` adds 44) |
 | `tests/batch/run.js` on `tests/samples` (pdf.js stubbed: the cloud session cannot reach cdnjs) | 3 non-PDF files read through the page; `compare` reports a planted downgrade and exits 1 |
@@ -337,7 +338,7 @@ All 22 matrix interpretations B1 to B22 and all 19 readings in `underwriting/doc
    builds a different provider's message shape. Streaming OCR and non-streaming judgments keep separate request code.
 7. **V1.7 gaps D6, L11, L13** and the partial rows (section 5.2). B5 (PR #20) closed C2 and A2; B6 (PR #22)
    closed D8, M14 and D11; B7 (PR #24) closed R1, R3, R7, S3 and S7; 8 partial rows remain. Document-based gaps run in 3 PRs. Part A (PR #46): the adapter passes tagged contracts, payoff letters and
-   processor statements as `documents`. Part B (L11, L13) is PR #47. Part C (D6) follows #47. P15 and M9 are signed off (policy V1.8b8).
+   processor statements as `documents`. Part B (L11, L13) is PR #47. Part C (D6) is PR #48. No gaps remain; 8 partial rows do. P15 and M9 are signed off (policy V1.8b8).
 8. **Stage manifest.** Done in PR #28. `audit.stages` holds one entry per V1.7 execution-order stage (11):
    status COMPLETE or NEEDS_REVIEW, input hash (chained from the ledger hash), policy hash (`POLICY_HASH`,
    over every policy constant and rule pattern), counts, output hash and the material items to review.
