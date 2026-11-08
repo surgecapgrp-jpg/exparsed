@@ -971,7 +971,7 @@ class V17Batch4(unittest.TestCase):
         self.assertEqual((day["why"], day["returns"]), ("return date", ["SW2"]))
         # V1.8 report detail: the position's Table 4 notes carry the return; Table 9 FLIGHT lists the sequence.
         rapid = next(l for l in r.report.splitlines() if l.startswith("| RAPIDFUND"))
-        self.assertIn("Returns: 1 Class A (T2 1); cured 1, uncured 0, unknown 0", rapid)
+        self.assertIn("Returns: 1 Class A (T2 1); cured 0, uncured 1, unknown 0", rapid)
         flight = next(l for l in r.report.splitlines() if l.startswith("| FLIGHT events"))
         self.assertIn("sweep-to-return 1: 08/03/26 $9,000 in, 08/04/26 $6,000 out (outside or unknown), "
                       "return of 08/05/26 attempt; timing only, intent not shown", flight)
@@ -1011,6 +1011,21 @@ class V17Batch4(unittest.TestCase):
             a = dict(dict(question_id=cid, text="x" * 20), **extra)
             with self.assertRaisesRegex(uw.UWError, msg):
                 run(None, with_judgments(r0, [a]))
+
+    def test_daily_mca_cure_needs_an_extra_pull(self):
+        # Sign-off 2026-11-08 (extra pull): the next scheduled daily pull is no cure; a second pull that day is.
+        rows = [("OP", "2026-08-05", "450.00", "debit", "RAPIDFUND LLC ACH DEBIT"),
+                ("OP", "2026-08-06", "450.00", "credit", "RAPIDFUND LLC ACH DEBIT RETURN R01")]
+        def cured(extra):
+            led = add_rows(LEDGER, rows + extra, "XP")
+            for t in led["transactions"]:
+                if t["txn_id"].startswith("XP"):
+                    t["balance"] = "5000.00"
+            r0 = run(led)
+            r = run(led, with_judgments(r0, [dict(question_id=q(r0, "RAPIDFUND LLC"), tag="MCA", funder="RapidFund")]))
+            return next(e for e in r.audit["returns"] if e["attempts"][0] == "XP0")["cured"]
+        self.assertTrue(cured([]).startswith("N"))
+        self.assertTrue(cured([("OP", "2026-08-07", "450.00", "debit", "RAPIDFUND LLC ACH DEBIT")]).startswith("Y"))
 
     def test_plain_wire_gets_no_finance_points(self):
         # M8: +2 needs explicit finance terms or a finance-origin wire.
