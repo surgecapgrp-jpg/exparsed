@@ -1239,5 +1239,36 @@ class Schemas(unittest.TestCase):
             )
 
 
+
+class SignOffP15M9(unittest.TestCase):
+    """Sign-offs P15 and M9 (2026-11-08; policy V1.8b8)."""
+
+    def test_flight_counts_a_large_credit_from_an_established_customer(self):
+        led = add_rows(
+            LEDGER,
+            [("OP", d, "900.00", "credit", "ACH CREDIT ACME FOODS INV") for d in ("2026-06-05", "2026-07-06", "2026-08-05")]
+            + [
+                ("OP", "2026-09-08", "20000.00", "credit", "ACH CREDIT ACME FOODS INV"),
+                ("OP", "2026-09-09", "9000.00", "debit", "CHECK 4411"),
+                ("OP", "2026-09-15", "20000.00", "credit", "ONLINE TRANSFER FROM SAV XXXXXX5678"),
+                ("OP", "2026-09-16", "9000.00", "debit", "CHECK 4412"),
+            ],
+            "P15",
+        )
+        flights = {f["credit"] for f in run(led).audit["flights"]}
+        self.assertIn("P153", flights)  # established payer, 3x median, 45% out in 1 day
+        self.assertNotIn("P155", flights)  # own-money transfer in is not an inflow for FLIGHT
+
+    def test_model_named_sender_leaves_revenue_but_is_not_financing(self):
+        e = run()
+        ans = dict(question_id=q(e, kind="credit"), tag="STRIP_FUNDING",
+                   evidence=dict(kind="sender_identified", quote="JKL HOLDINGS"))
+        r = run(judgments=with_judgments(e, [ans]))
+        self.assertEqual(tags(r, LEDGER, "JKL"), ["STRIP_UNRESOLVED"])
+        self.assertFalse(pos(r, "CFG")[0]["fundings"])
+        self.assertEqual(month(r, "2026-09")["unresolved"], D(30000))
+        self.assertIn("not proof of financing", r.report)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -29,7 +29,7 @@ The default for every credit question is `STRIP_UNRESOLVED`: the credit stays ou
 `STRIP_FUNDING`, `STRIP_TRANSFER` and `STRIP_OWNER` remove money from revenue, so they need `evidence`:
 
 - `bank_text`: the description itself says loan, advance, MCA or financing. `quote` is the exact words from the description.
-- `sender_identified` (`STRIP_FUNDING` only): you know the sender in the description is a finance company. `quote` is the sender name exactly as it appears. The engine flags these for human verification.
+- `sender_identified` (`STRIP_FUNDING` only): you know the sender in the description is a finance company. `quote` is the sender name exactly as it appears. The engine keeps the credit out of revenue as STRIP_UNRESOLVED, does not treat it as proof of financing or attach it to a position, and flags it for human verification. Prefer `bank_text` or `document` when either applies.
 - `document`: a supplied document proves it. Give `doc_id` and an exact `quote` from that document. For `STRIP_FUNDING` the document must also state the credit amount.
 
 The engine rejects the whole file when a quote is not a verbatim substring of the source. Do not paraphrase.
