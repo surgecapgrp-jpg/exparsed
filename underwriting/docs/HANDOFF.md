@@ -92,33 +92,33 @@ The three V2.2 overrides are enforced by self-checks that fail the run:
 2. `no live cost removed by payoff estimate`. The 1.4x payback appears only as a Notes estimate.
 3. Report Peak Weekly = max(observed peak week, modeled current weekly), per V1.7 K3 (batch 4). Drop Since Peak is never negative; the checker rejects one.
 
-### 4.1 Interpretations that need underwriter sign-off
+### 4.1 Interpretations and their sign-off
 
 Policy V1.7 is being adopted in batches. `docs/V1_7_MATRIX.md` maps every V1.7 rule to the engine, lists what batches 1 to 3 changed, and adds interpretations B1 to B21 for sign-off.
 
-V2.2 leaves these points open. The engine picks one reading and states it here so it can be reviewed in one place.
+V2.2 leaves these points open. The engine picks one reading and states it here so it can be reviewed in one place. All 19 were settled on 2026-11-08: 7 are replaced by later batches, 11 kept, 1 changed.
 
-| # | V2.2 text | Engine reading |
-| ---: | :--- | :--- |
-| 1 | "Detect MCA series" | Default MCA when a payee has 3+ cleared debits at daily/weekly/biweekly cadence, same-amount runs of 3+ cover 80% of them, and the name has a funder word or the cadence is daily. 1 to 2 debits qualify only with a funder word and a debit inside the live window. The LLM can overrule both. V1.7 batch 2: monthly cadence counts, finance words inside a token count, and unanswered finance-looking payees become WATCH rows (matrix B8 to B13). |
-| 2 | Class B "debit paid into overdraft" | The debit that moves the balance from 0 or above to below 0. Later debits while overdrawn are not separate events. |
-| 3 | FLIGHT "an inflow" | Replaced by P15 sign-off (2026-11-08, V1.8b8): every external credit of at least 3x the median deposit. On the real ledger, applying it to every candidate with no floor gave 155 events, mostly $300 inflows. |
-| 4 | Peak week "5 business days of statement coverage" | At least 5 covered business days in the Mon to Sun week, on the accounts that carry MCA collections (V1.7 batches 3 and 4). Holiday weeks with 4 business days are skipped. |
-| 5 | THIN_BALANCE and lowest balance | Thin days use combined end-of-day balance across accounts, business days only. Lowest balance is the lowest single-account end-of-day balance. |
-| 6 | T3 "small discretionary debits" | Every Class A chain that is not T1 or T2. Since batch 4, every non-T1 return on MCA, loan, payroll, rent, tax or insurance is T2. |
-| 7 | "Pre-file requires evidence" | V1.7 batch 1: no longer inferred. A first debit within 2 payment gaps of coverage start gets the note "funding may precede coverage (unproven)"; Funding Date shows Not found. |
-| 8 | Mixed calendar and statement-period accounts | V1.7 batch 3: every account uses calendar months; Days Counted is the union of covered days, and each material account needs 18 (matrix B17). |
-| 9 | Balance field | Exparsed balance is the balance after that row. |
-| 10 | Funding columns with several fundings | Columns show the latest attached funding. Earlier ones are listed in Notes. |
-| 11 | Return pairing | A recredit matches a debit with the same account and amount in the prior 5 business days. Re-presentments within 10 business days form one chain. |
-| 12 | Defaults for unanswered questions | V1.7 batch 1: unanswered candidate credits become STRIP_UNRESOLVED (out of revenue, not called financing). Unknown payees stay OTHER (outside obligations). |
-| 13 | Payment level for share-of-sales remittance (V2.2 assumes fixed payments) | A confirmed series where same-amount runs cover under 80% of payments is VARIABLE. Monthly cost = cleared debits in the last 20 business days. No amount events. The real ledger has two: DoorDash Capital and Rewards Network. |
-| 14 | Concurrent contracts from one payee | Split only when 3+ days have same-day debits that differ by more than 10%. Same-amount doubles are catch-up payments. A split whose tracks are not fixed-amount stays one VARIABLE position. |
-| 15 | Backward search on a Pre-file start | V1.7 batch 1: every START trigger is searched, since Pre-file is no longer inferred. |
-| 16 | Descriptor change | V1.7 batch 2: payees given the same funder join only on a shared originator ID, sequential continuity, or open payment slots (matrix B12). `KAPITUS SERVICIN` joins `KAPITUS` on open slots. |
-| 17 | "Large/unusual credits" for the forward search | 3x median deposit counts only for payers without an established pattern (3+ credits in 2+ months). Credits from a payee the business also pays are always candidates. |
-| 18 | Statement-cycle grouping | Removed in V1.7 batch 3: revenue uses calendar posting months for every account. |
-| 19 | Table 4 "Possible" notes | Shown for MED or HIGH leading candidates only. LOW candidates stay in `audit.json`. |
+| # | V2.2 text | Engine reading | Sign-off |
+| ---: | :--- | :--- | :--- |
+| 1 | "Detect MCA series" | Default MCA when a payee has 3+ cleared debits at daily/weekly/biweekly cadence, same-amount runs of 3+ cover 80% of them, and the name has a funder word or the cadence is daily. 1 to 2 debits qualify only with a funder word and a debit inside the live window. The LLM can overrule both. V1.7 batch 2: monthly cadence counts, finance words inside a token count, and unanswered finance-looking payees become WATCH rows (matrix B8 to B13). | Changed 2026-11-08 (V1.8b9): default MCA needs same-amount runs on 60% of cleared debits (`DETECT_SHARE`). VARIABLE still uses 80% (`FIXED_SHARE`). |
+| 2 | Class B "debit paid into overdraft" | The debit that moves the balance from 0 or above to below 0. Later debits while overdrawn are not separate events. | Kept 2026-11-08. |
+| 3 | FLIGHT "an inflow" | Replaced by P15 sign-off (2026-11-08, V1.8b8): every external credit of at least 3x the median deposit. On the real ledger, applying it to every candidate with no floor gave 155 events, mostly $300 inflows. | Replaced by P15 (V1.8b8). |
+| 4 | Peak week "5 business days of statement coverage" | At least 5 covered business days in the Mon to Sun week, on the accounts that carry MCA collections (V1.7 batches 3 and 4). Holiday weeks with 4 business days are skipped. | Kept 2026-11-08. |
+| 5 | THIN_BALANCE and lowest balance | Thin days use combined end-of-day balance across accounts, business days only. Lowest balance is the lowest single-account end-of-day balance. | Kept 2026-11-08. |
+| 6 | T3 "small discretionary debits" | Every Class A chain that is not T1 or T2. Since batch 4, every non-T1 return on MCA, loan, payroll, rent, tax or insurance is T2. | Kept 2026-11-08. |
+| 7 | "Pre-file requires evidence" | V1.7 batch 1: no longer inferred. A first debit within 2 payment gaps of coverage start gets the note "funding may precede coverage (unproven)"; Funding Date shows Not found. | Replaced by V1.7 batch 1. |
+| 8 | Mixed calendar and statement-period accounts | V1.7 batch 3: every account uses calendar months; Days Counted is the union of covered days, and each material account needs 18 (matrix B17). | Replaced by V1.7 batch 3 and B17. |
+| 9 | Balance field | Exparsed balance is the balance after that row. | Kept 2026-11-08. |
+| 10 | Funding columns with several fundings | Columns show the latest attached funding. Earlier ones are listed in Notes. | Kept 2026-11-08. |
+| 11 | Return pairing | A recredit matches a debit with the same account and amount in the prior 5 business days. Re-presentments within 10 business days form one chain. | Kept 2026-11-08. |
+| 12 | Defaults for unanswered questions | V1.7 batch 1: unanswered candidate credits become STRIP_UNRESOLVED (out of revenue, not called financing). Unknown payees stay OTHER (outside obligations). | Replaced by V1.7 batch 1 and B1. |
+| 13 | Payment level for share-of-sales remittance (V2.2 assumes fixed payments) | A confirmed series where same-amount runs cover under 80% of payments is VARIABLE. Monthly cost = cleared debits in the last 20 business days. No amount events. The real ledger has two: DoorDash Capital and Rewards Network. | Kept 2026-11-08 at 80%. |
+| 14 | Concurrent contracts from one payee | Split only when 3+ days have same-day debits that differ by more than 10%. Same-amount doubles are catch-up payments. A split whose tracks are not fixed-amount stays one VARIABLE position. | Kept 2026-11-08. |
+| 15 | Backward search on a Pre-file start | V1.7 batch 1: every START trigger is searched, since Pre-file is no longer inferred. | Replaced by V1.7 batch 1. |
+| 16 | Descriptor change | V1.7 batch 2: payees given the same funder join only on a shared originator ID, sequential continuity, or open payment slots (matrix B12). `KAPITUS SERVICIN` joins `KAPITUS` on open slots. | Replaced by V1.7 batch 2 and B12. |
+| 17 | "Large/unusual credits" for the forward search | 3x median deposit counts only for payers without an established pattern (3+ credits in 2+ months). Credits from a payee the business also pays are always candidates. | Kept 2026-11-08. |
+| 18 | Statement-cycle grouping | Removed in V1.7 batch 3: revenue uses calendar posting months for every account. | Replaced by V1.7 batch 3. |
+| 19 | Table 4 "Possible" notes | Shown for MED or HIGH leading candidates only. LOW candidates stay in `audit.json`. | Kept 2026-11-08. |
 
 ### 4.2 Not implemented
 
@@ -167,4 +167,4 @@ Defaults missed Kapitus, Rewards Network, DoorDash Capital and Accord because th
 
 ## 8. Next action
 
-Experiment: run the V2.2 LLM-only prompt and this engine on the same 10 real Exparsed ledgers. Compare true revenue, stripped funding, funding-to-debit matches, live stack and HEADLINE per ledger. Resolve each disagreement against the source rows, and get sign-off on the 19 readings in section 4.1 before broader use.
+Experiment: run the V2.2 LLM-only prompt and this engine on the same 10 real Exparsed ledgers. Compare true revenue, stripped funding, funding-to-debit matches, live stack and HEADLINE per ledger. Resolve each disagreement against the source rows, and re-check the readings in section 4.1 against those results.
