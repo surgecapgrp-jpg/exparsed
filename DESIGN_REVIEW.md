@@ -8,7 +8,7 @@ The two core modules are deep and stay as they are: the statement reader behind 
 
 | # | Finding | Status | Where |
 | ---: | :--- | :--- | :--- |
-| 1 | Two code paths for one provider pair | Open. Next item after the real-merchant-file run | Finding A |
+| 1 | Two code paths for one provider pair | Deferred 8 Nov 2026. Blocked on real merchant files and API keys | Finding A |
 | 2 | Engine interface leaked internals | Done in PR #5 (`0248393`). `_Engine` is private and 0 tests read its attributes | |
 | 3 | Engine silently recomputed Exparsed's `computed` figures | Done in PR #5. The adapter passes `exparsed_computed` and the engine cross-checks it | |
 | 4 | Three parsers for one row string | Done in PR #5. `uwLedgerRows` is deleted | |
@@ -37,7 +37,9 @@ The two core modules are deep and stay as they are: the statement reader behind 
 
 ## Open findings
 
-### A. Two code paths for the same two providers
+### A. Two code paths for the same two providers (deferred)
+
+Deferred on 8 November 2026. Blocker: no real merchant statements or Claude and OpenRouter keys in the review session. Resume when both exist. Synthetic fixtures in `tests/ai.js` can start the `modelCall` interface; the OCR switch waits for the before-and-after run.
 
 The page reaches Claude and OpenRouter in two places:
 - Judgments and chat call `aiCall` (`:9953`). `aiRequest` (`:9918`) builds URL, headers and body; `aiParse` (`:9936`) reads the reply.
@@ -78,6 +80,6 @@ No change now. Split a stage into its own module when a change to one stage brea
 1. Underwrite 3 to 5 real merchant files (`HANDOFF.md` section 9, item 1). Findings A and C both need those runs as their before-and-after baseline.
 2. Finding B (1 hour). Verify `node tests/run-node.js` stays at 267 passed.
 3. Finding C measurement (15 minutes, during step 1).
-4. Finding A (1 day). Verify with the OCR before-and-after check above.
+4. Finding A (1 day), deferred. Blocked on step 1's files and keys. Verify with the OCR before-and-after check above.
 
-Decision: **Proceed** with step 1 and finding B. **Experiment** with finding A behind the OCR comparison. **Defer** findings C and D until a measurement or a failing test calls for them.
+Decision: **Proceed** with step 1 and finding B. **Experiment** with finding A behind the OCR comparison. **Defer** finding A until step 1 has files and keys, and findings C and D until a measurement or a failing test calls for them.
