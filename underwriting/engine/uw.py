@@ -46,7 +46,7 @@ from pathlib import Path
 
 D = Decimal
 ENGINE_VERSION = "3.4"
-POLICY_VERSION = "V1.8b7"
+POLICY_VERSION = "V1.8b8"
 
 # Policy parameters (V2.2 values with the V1.7 changes marked). Changing any value is a policy change: bump POLICY_VERSION.
 BUSINESS_DAYS_PER_MONTH = D(20)
@@ -133,12 +133,18 @@ STAGES = (
 )
 CREDIT_DISPOSITIONS = ("ATTACHED", "FINANCING_UNATTACHED", "COMPETING", "CUSTOMER_SUPPORTED", "OTHER_SUPPORTED", "UNRESOLVED")
 HARD_STRIP = {"STRIP_TRANSFER", "STRIP_REFUND", "STRIP_RECREDIT", "STRIP_OWNER"}
+
+
+def is_external_credit(t):
+    """A credit that is not own money moving back (transfer, refund, recredit, owner) and was not returned."""
+    return t.dir == "credit" and t.tag not in HARD_STRIP and not t.returned_by
+
+
 # V1.7 evidence level of a STRIP_FUNDING gate.
 GATE_LEVEL = {
     "bank_text": "OBSERVED",
     "document": "CORROBORATED",
     "named_funder_series": "CORROBORATED",
-    "sender_identified": "INFERRED",
 }
 OBLIGATION_ROWS = [
     ("PAYROLL", "Payroll"),
@@ -1550,7 +1556,7 @@ class _Engine:
         all_tokens = {p.funder: funder_tokens(p.funder) for p in self.positions}
         cand = self.candidates(all_tokens)
         # Apply credit judgments, then the gate. Rule-verifiable evidence outranks a judgment.
-        self.gate = {}
+        self.gate, model_sender = {}, {}
         for q in self.questions:
             a = self.answers.get(q["question_id"])
             if q["type"] != "credit":
@@ -1562,7 +1568,11 @@ class _Engine:
                         t.tag, t.tag_source = "STRIP_UNRESOLVED", "default"
                     continue
                 t.tag, t.tag_source = a["tag"], "judgment"
-                if a["tag"] == "STRIP_FUNDING":
+                if a["tag"] == "STRIP_FUNDING" and a["evidence"]["kind"] == "sender_identified":
+                    # M9 sign-off 2026-11-08: model knowledge of the sender leaves revenue but is not financing proof.
+                    t.tag = "STRIP_UNRESOLVED"
+                    model_sender[i] = a["evidence"]
+                elif a["tag"] == "STRIP_FUNDING":
                     self.gate[i] = a["evidence"]
         for i in cand:
             t = self.by_id[i]
@@ -1572,10 +1582,13 @@ class _Engine:
         for i, g in self.gate.items():
             t = self.by_id[i]
             t.tag, t.tag_source = "STRIP_FUNDING", g["by"]
-            if g["kind"] == "sender_identified":
+        for i, g in model_sender.items():
+            if i not in self.gate:
+                t = self.by_id[i]
                 self.notes[t.acct].append(
                     f"LLM-identified funder for {mdy(t.date)} {usd(t.amt)} credit "
-                    f"('{g['quote']}'); verify before relying"
+                    f"('{g['quote']}'); out of revenue as STRIP_UNRESOLVED, not proof of financing; "
+                    "verify with bank text or a document"
                 )
         cand.update({i: cand.get(i, ["financing evidence"]) for i in self.gate})
         self.cand = cand
@@ -2367,7 +2380,8 @@ class _Engine:
                 d += timedelta(1)
         self.flights, used = [], set()
         for c in self.txns:
-            if c.id not in self.cand or not self.median or c.amt < 3 * self.median:
+            # P15 sign-off 2026-11-08: every external credit of 3x median deposit or more.
+            if not is_external_credit(c) or not self.median or c.amt < 3 * self.median:
                 continue
             outs = [
                 t
@@ -2444,7 +2458,6 @@ class _Engine:
                     finance_return_with_outflow=bool(fin_ret and owner_out),
                     note="EOD only; same-day order and intraday balance are unknown"))
         # B3: external deposit -> outflow within FLIGHT_DAYS -> returned finance attempt within SWEEP_RETURN_BD.
-        external = lambda t: t.dir == "credit" and not t.tag in HARD_STRIP and not t.returned_by
         flight_ids = {f["credit"] for f in self.flights}
         self.sweeps = []
         for e in self.t7:
@@ -2456,7 +2469,7 @@ class _Engine:
                 if not (o.acct == att.acct and o.dir == "debit" and o.tag in ("OWNER_DRAW", "TRANSFER_OUT")
                         and not o.returned_by and lo <= o.date <= att.date):
                     continue
-                deps = [c for c in self.txns if c.acct == o.acct and external(c)
+                deps = [c for c in self.txns if c.acct == o.acct and is_external_credit(c)
                         and o.date - timedelta(FLIGHT_DAYS) <= c.date <= o.date and (c.date, c.seq) < (o.date, o.seq)]
                 if not deps:
                     continue

@@ -80,7 +80,7 @@ Bank descriptions reach the LLM as data. Whatever text the LLM writes, only enum
 
 - Financing gate condition 1: the credit text matches explicit financing wording (`LOAN`, `MCA`, `FINANCING`, `DISBURSE*`, `CASH ADVANCE`, `MERCHANT ADVANCE`, `ADVANCE FUNDING/PROCEEDS`).
 - Financing gate condition 3: the credit names the funder of a confirmed 3+ payment series, and its descriptor is not an established customer pattern.
-- Conditions 2 and 4 (sender identity, documents) come only from judgments. `sender_identified` strips are listed in Table 1 Notes for human verification.
+- Conditions 2 and 4 (sender identity, documents) come only from judgments. A `sender_identified` answer is not proof (M9, V1.8b8): the credit is STRIP_UNRESOLVED, unattached, and listed in Table 1 Notes for human verification.
 
 ## 4. Policy
 
@@ -102,7 +102,7 @@ V2.2 leaves these points open. The engine picks one reading and states it here s
 | ---: | :--- | :--- |
 | 1 | "Detect MCA series" | Default MCA when a payee has 3+ cleared debits at daily/weekly/biweekly cadence, same-amount runs of 3+ cover 80% of them, and the name has a funder word or the cadence is daily. 1 to 2 debits qualify only with a funder word and a debit inside the live window. The LLM can overrule both. V1.7 batch 2: monthly cadence counts, finance words inside a token count, and unanswered finance-looking payees become WATCH rows (matrix B8 to B13). |
 | 2 | Class B "debit paid into overdraft" | The debit that moves the balance from 0 or above to below 0. Later debits while overdrawn are not separate events. |
-| 3 | FLIGHT "an inflow" | Funding candidates and STRIP_FUNDING credits of at least 3x the median deposit. On the real ledger, applying it to every candidate gave 155 events, mostly $300 inflows. |
+| 3 | FLIGHT "an inflow" | Replaced by P15 sign-off (2026-11-08, V1.8b8): every external credit of at least 3x the median deposit. On the real ledger, applying it to every candidate with no floor gave 155 events, mostly $300 inflows. |
 | 4 | Peak week "5 business days of statement coverage" | At least 5 covered business days in the Mon to Sun week, on the accounts that carry MCA collections (V1.7 batches 3 and 4). Holiday weeks with 4 business days are skipped. |
 | 5 | THIN_BALANCE and lowest balance | Thin days use combined end-of-day balance across accounts, business days only. Lowest balance is the lowest single-account end-of-day balance. |
 | 6 | T3 "small discretionary debits" | Every Class A chain that is not T1 or T2. Since batch 4, every non-T1 return on MCA, loan, payroll, rent, tax or insurance is T2. |

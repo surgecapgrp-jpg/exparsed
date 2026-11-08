@@ -15,7 +15,7 @@ Status values:
 
 Batch 2 covered debit-first discovery (D1 to D5), WATCH rows, the ±30-day two-way match, evidence levels and position identity. Rows still marked B2 in the Fix column were deferred: off-bank collections, contractual cost, payoff ties and variable adverse scenarios. **B3** covers accounts, commingling, missing-account requests, the V1.7 ten-table format and its checker.
 
-Count: 150 rows. 19 B1, 33 B2, 24 B3, 10 B4, 38 Met, 20 Partial, 3 Gap, 3 Page.
+Count: 150 rows. 19 B1, 33 B2, 23 B3, 8 B4, 2 B5, 3 B6, 5 B7, 5 V1.8, 38 Met, 8 Partial, 3 Gap, 3 Page.
 
 ## Contract hard rules
 
@@ -51,7 +51,7 @@ Count: 150 rows. 19 B1, 33 B2, 24 B3, 10 B4, 38 Met, 20 Partial, 3 Gap, 3 Page.
 | P12 | PROLONGED_SILENCE = 30 covered bd | 30 covered business days, then U | B1 | — |
 | P13 | CURE_WINDOW = 2 bd | 2 | Met | — |
 | P14 | THIN_BALANCE = EOD < 3 x (stack / 20) | Same; the stack holds Y positions only | Met | — |
-| P15 | FLIGHT = >30% of one inflow leaves within 48 h | >30% within 2 calendar days; inflows limited per HANDOFF interpretation 3 | Partial | Sign-off: inflow scope |
+| P15 | FLIGHT = >30% of one inflow leaves within 48 h | >30% within 2 calendar days of any external credit of 3x median deposit or more: transfers, refunds, recredits, owner strips and returned credits are left out (signed off 2026-11-08, V1.8b8) | V1.8 | — |
 | P16 | COMMINGLING severity thresholds | LOW, MODERATE and HIGH per account-month on confirmed items | B3 | — |
 | P17 | CAPACITY_UNCERTAINTY: material if it changes verdict, binding, or >=5% of BASIS | `MATERIAL_SHARE = 0.05`, tested by `readiness()` | B1 | — |
 
@@ -138,7 +138,7 @@ Count: 150 rows. 19 B1, 33 B2, 24 B3, 10 B4, 38 Met, 20 Partial, 3 Gap, 3 Page.
 | M6 | Coverage test A: every trigger has backward and expanded dispositions | Backward and expanded dispositions per trigger (self-check) | B2 | — |
 | M7 | Coverage test B: every candidate credit has forward and expanded dispositions | Forward and expanded dispositions per candidate credit (self-check) | B2 | — |
 | M8 | Pair score points +3, +2, +2, +1, -3; HIGH, MED, LOW, NONE | +2 needs explicit finance terms or a wire that names the funder or carries finance wording; plain customer wires get 0 | B4 | — |
-| M9 | Proof gate: financing text, document, or independent evidence of the sender | `bank_text`, `document`, `named_funder_series`; `sender_identified` from the LLM is flagged for human verification | Partial | Sign-off: is LLM knowledge "independent evidence"? |
+| M9 | Proof gate: financing text, document, or independent evidence of the sender | `bank_text`, `document`, `named_funder_series`. A model `sender_identified` answer is not proof: the credit is STRIP_UNRESOLVED, unattached, with a Table 1 verify note (signed off 2026-11-08, V1.8b8) | V1.8 | — |
 | M10 | Link gate; rivals listed; ties are COMPETING | Rivals logged; ties and cross-position reuse are AMBIGUOUS | Met | — |
 | M11 | One credit cannot fund two unrelated positions | Self-check | Met | — |
 | M12 | Early match: unknown cadence gets a STRESS scenario only | Provisional cadence becomes U with STRESS = max debit x20 | B1 | — |
@@ -272,7 +272,7 @@ The $1 HEADLINE moves come from 52/12 replacing 4.333. With V1.7, a real ledger 
 | B13 | D1 finance language | Word matches, plus CAPITAL, FUNDING, FINANC, LENDING, ADVANCE or MERCHANT inside a token. This finds HEADWAYCAPITAL and FORWARD FINANCIN. It also nominates EMPIRE MERCHANTS (a liquor distributor) until the model answers. **Signed off 2026-11-07, kept.** |
 | B14 | Monthly cadence x1 | Gaps of 18 to 25 business days. A fixed monthly series with a finance word is MCA by default (HEADWAYCAPITAL, $7,442/mo, silent since 03/31/26, so U). **Signed off 2026-11-07, kept.** |
 | B15 | WATCH rows in Table 4b | Peak load counts positions only. WATCH debits stay out because their identity is unproved. **Signed off 2026-11-07, kept.** |
-| B16 | Evidence levels | CORROBORATED: an attached funding with a bank-text, document or named-funder gate, or closure evidence. OBSERVED: a finance word in the payee. INFERRED: the model or a cadence rule says MCA with no finance word. UNKNOWN: WATCH. Strip gates map `bank_text` to OBSERVED, `document` and `named_funder_series` to CORROBORATED, and `sender_identified` to INFERRED. **Signed off 2026-11-07, kept.** |
+| B16 | Evidence levels | CORROBORATED: an attached funding with a bank-text, document or named-funder gate, or closure evidence. OBSERVED: a finance word in the payee. INFERRED: the model or a cadence rule says MCA with no finance word. UNKNOWN: WATCH. Strip gates map `bank_text` to OBSERVED, `document` and `named_funder_series` to CORROBORATED, and `sender_identified` to INFERRED. **Signed off 2026-11-07, kept.** Since M9 (V1.8b8) `sender_identified` never gates, so no strip carries INFERRED. |
 
 Not in batch 2: same-day same-amount doubles stay one position (D8, HANDOFF interpretation 14); off-bank collections (D6, T7); contractual cost and payoff ties (L11, L13); variable adverse scenarios (D11); alternative tags (T1); new-sender ACH and mobile credits (C2).
 
@@ -504,3 +504,13 @@ Signed off 2026-11-08, "extra pull". A daily position's next scheduled pull no l
 | Run | Effect |
 | :--- | :--- |
 | All 4 saved runs | Same reports |
+
+## Sign-offs P15 and M9 (2026-11-08; policy V1.8b8)
+
+- P15, changed: FLIGHT tests every external credit of at least 3x the median deposit. External leaves out STRIP_TRANSFER, STRIP_REFUND, STRIP_RECREDIT, STRIP_OWNER and returned credits; it is the same test the V1.8 sweep evidence uses (`is_external_credit`). Before, only funding candidates and STRIP_FUNDING credits were tested, so a large deposit from an established customer was skipped.
+- M9, changed: a `sender_identified` STRIP_FUNDING answer is not proof of financing. The credit becomes STRIP_UNRESOLVED at any amount, stays out of revenue, and attaches to no position. Table 1 notes "out of revenue as STRIP_UNRESOLVED, not proof of financing; verify with bank text or a document". A rule gate (financing text or a named funder series) on the same credit still makes it STRIP_FUNDING. The B2 add-back test now covers these credits.
+
+| Run | Effect |
+| :--- | :--- |
+| Sample, defaults and saved answers | Same reports. FLIGHT events stay at 2; no saved answer uses `sender_identified` |
+| Real ledger, defaults and saved answers | Not rerun: the ledger is not in this session. FLIGHT count may rise; HEADLINE cannot move from P15. M9 moves funding links only if a saved answer uses `sender_identified` |

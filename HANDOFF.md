@@ -18,7 +18,7 @@ underwrites the merchant for MCA capacity under policy V1.8.
 | Underwriting engine | Experiment. Policy V1.7 batches 1 to 4 and V1.8 batches 1 to 7 merged. Run on 1 real ledger and 1 synthetic ledger. |
 | Underwrite button and chat | Built and tested with a mocked browser run. Never run in real Chrome with real Pyodide and a real key. |
 | UI | Surge Capital theme (PR #9, merged 2026-11-04). |
-| Tests | 265 JS tests, 104 engine tests, 19 end-to-end page checks: all pass on `main`. |
+| Tests | 265 JS tests, 106 engine tests, 19 end-to-end page checks: all pass on `main`. |
 
 The next step is a real Chrome run on 3 to 5 real merchant files (section 9, item 1).
 
@@ -120,7 +120,7 @@ naming its funder.
 
 ### 5.2 Policy V1.7 coverage
 
-`ENGINE_VERSION` 3.4, `POLICY_VERSION` V1.8b7. The matrix tracks 150 rules:
+`ENGINE_VERSION` 3.4, `POLICY_VERSION` V1.8b8. The matrix tracks 150 rules:
 
 | Status | Rows |
 | :--- | ---: |
@@ -132,7 +132,8 @@ naming its funder.
 | Changed in B5 (credit coverage C2, A2; PR #20) | 2 |
 | Changed in B6 (debit side D8, M14, D11; PR #22) | 3 |
 | Changed in B7 (records R1, R3, R7, S3, S7; PR #24) | 5 |
-| Partial | 10 |
+| Changed in V1.8 (K6, K7, K8; sign-offs P15, M9) | 5 |
+| Partial | 8 |
 | Gap | 3 |
 | Handled by the page | 3 |
 
@@ -140,8 +141,7 @@ Gaps: D6 (reverse consolidations, processor splits, off-bank deductions), L11 (c
 separate from observed), L13 (contract or lender payoff tied to the position).
 
 Partial rows, grouped: ownership evidence (R2), account identity beyond last four (S5), alternative tags (T1), off-bank exposure (T7, C5), hidden collections behind failed attempts (D5),
-generic descriptors (D7), LLM sender identity as proof (M9),
-execution order (H11), FLIGHT inflow scope (P15).
+generic descriptors (D7), execution order (H11).
 
 V1.8 batch 1 (PR #35) changed rows K6, K7 and K8 to the V1.8 return rules: T1 only on MCA or loan, tier n/a
 for an unclear item, cure UNKNOWN when the balance or follow-up window is missing. Not built yet from V1.8:
@@ -271,6 +271,13 @@ Signed off 2026-11-07:
 | B21 | Changed (PR #33, policy V1.7b11): a return credit with no matching debit is Class A, T1 by code else T2, cure "N (debit not found)". V1.8 (PR #35, V1.8b1) keeps Class A and sets tier n/a, cure "UNKNOWN (debit not found)". |
 | B22 | Kept (PR #22, policy V1.7b7): same-amount same-day doubles count as a second schedule only on 3 consecutive debit days. A single double, such as the day after a holiday, is a catch-up payment. |
 
+Signed off 2026-11-08:
+
+| # | Decision |
+| :--- | :--- |
+| P15 | Changed (policy V1.8b8): FLIGHT tests every external credit of 3x median deposit or more. Transfers, refunds, recredits, owner strips and returned credits are left out. |
+| M9 | Changed (policy V1.8b8): a model-identified sender is not financing proof. The credit is STRIP_UNRESOLVED at any amount, unattached, with a Table 1 verify note. |
+
 All 22 matrix interpretations B1 to B22 are signed off. Waiting for sign-off: the 19 readings in `underwriting/docs/HANDOFF.md` section 4.1.
 
 ## 7. Verification
@@ -279,7 +286,7 @@ All 22 matrix interpretations B1 to B22 are signed off. Waiting for sign-off: th
 | :--- | :--- |
 | `node tests/run-node.js` | 265 passed, 0 failed (`ocr.js` adds 44) |
 | `tests/batch/run.js` on `tests/samples` (pdf.js stubbed: the cloud session cannot reach cdnjs) | 3 non-PDF files read through the page; `compare` reports a planted downgrade and exits 1 |
-| `python3 -m unittest discover -s tests` in `underwriting/` | 104 passed |
+| `python3 -m unittest discover -s tests` in `underwriting/` | 106 passed |
 | Engine self-checks per run | 17 pass on the sample |
 | Report checker on every rendered report | PASS |
 | End-to-end page run (headless Chromium, real engine behind a local server, mocked Pyodide and model, 3-month CSV) | 19 of 19 (Q1 and Q3 now expect the character row; Q4 checks an underwriter override) |
@@ -318,8 +325,8 @@ All 22 matrix interpretations B1 to B22 are signed off. Waiting for sign-off: th
    judgments and chat. The 3 `prov==='claude'` branches in `aiRequest`, `aiParse` and `aiToolResults` stay: each
    builds a different provider's message shape. Streaming OCR and non-streaming judgments keep separate request code.
 7. **V1.7 gaps D6, L11, L13** and the partial rows (section 5.2). B5 (PR #20) closed C2 and A2; B6 (PR #22)
-   closed D8, M14 and D11; B7 (PR #24) closed R1, R3, R7, S3 and S7; 10 partial rows remain. Next: the document-based
-   gaps (L11, L13, D6), which need the page to pass documents to the engine. P15 and M9 need sign-off first.
+   closed D8, M14 and D11; B7 (PR #24) closed R1, R3, R7, S3 and S7; 8 partial rows remain. Next: the document-based
+   gaps (L11, L13, D6), which need the page to pass documents to the engine. P15 and M9 are signed off (policy V1.8b8).
 8. **Stage manifest.** Done in PR #28. `audit.stages` holds one entry per V1.7 execution-order stage (11):
    status COMPLETE or NEEDS_REVIEW, input hash (chained from the ledger hash), policy hash (`POLICY_HASH`,
    over every policy constant and rule pattern), counts, output hash and the material items to review.
