@@ -1,6 +1,6 @@
 # exparsed handoff
 
-Code state on 2026-11-08 at the merge of PR #48 (the last code change). Later commits that only
+Code state on 2026-11-08 at the merge of PR #50 (the last code change). Later commits that only
 edit this file are not listed. Repo: https://github.com/surgecapgrp-jpg/exparsed (private).
 This file replaces the 2026-10-26 handoff. The underwriting design detail is in `underwriting/docs/HANDOFF.md`,
 and the policy compliance detail is in `underwriting/docs/V1_7_MATRIX.md`. Policy V1.8 (MCA Capacity V1.8
@@ -193,6 +193,7 @@ the return-word scan log (R1), the character pass (B1 to B5) and the extra Table
 | #46 | `3c47bee` | Gaps part A: the adapter passes tagged contracts, payoff letters and processor statements to the engine as `documents` |
 | #47 | `22de89d` | Gaps part B: L11 contract cost (higher of contract and observed) and L13 payoff note from documents (policy V1.8b10) |
 | #48 | `e9dcd42` | Gap part C: D6 processor holdbacks as off-bank stack rows; reverse consolidation flag (policy V1.8b11) |
+| #50 | `b1f2428` | Character read: its own schema requires `text`; one retry on rejection (found by the first live run) |
 
 Rollback point before all underwriting work: `283bc50`.
 
@@ -294,7 +295,7 @@ All 22 matrix interpretations B1 to B22 and all 19 readings in `underwriting/doc
 
 ## 7. Verification
 
-| Check | Result on `main` after PR #48 |
+| Check | Result on `main` after PR #50 |
 | :--- | :--- |
 | `node tests/run-node.js` | 267 passed, 0 failed (`ocr.js` adds 44) |
 | `tests/batch/run.js` on `tests/samples` (pdf.js stubbed: the cloud session cannot reach cdnjs) | 3 non-PDF files read through the page; `compare` reports a planted downgrade and exits 1 |
