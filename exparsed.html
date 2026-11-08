@@ -1526,6 +1526,7 @@ class _Engine:
                     transactions=[self.txn_view(t)],
                     why=why + near,
                     default="STRIP_UNRESOLVED",
+                    allowed=list(CREDIT_TAGS),
                 )
             )
         unclear = defaultdict(list)
@@ -1542,6 +1543,7 @@ class _Engine:
                     count=len(ts),
                     why=["transfer wording; sending account not supplied"],
                     default="STRIP_UNRESOLVED",
+                    allowed=list(CREDIT_TAGS),
                 )
             )
         for name, g in sorted(self.groups.items()):
@@ -1563,6 +1565,7 @@ class _Engine:
                     sample_descriptions=sorted({t.desc for t in ts})[:3],
                     why=g["passes"],
                     default="MCA" if g["default_mca"] else g["tag"],
+                    allowed=list(DEBIT_TAGS),
                 )
             )
         for d in self.docs.values():
@@ -9964,9 +9967,6 @@ Add `reason`: one sentence naming the fact you relied on. It is stored in the au
       });
     }
     // Review queue: the engine's open questions for an underwriter, answered in the judgments format.
-    // Tag lists copy engine/uw.py CREDIT_TAGS and DEBIT_TAGS; test_review_queue_tags_match_the_engine checks them.
-    var UW_CREDIT_TAGS=['REV_PROCESSOR','REV_ACH','REV_WIRE','REV_DEPOSIT','REV_PAYER','STRIP_FUNDING','STRIP_TRANSFER','STRIP_REFUND','STRIP_OWNER','STRIP_RECREDIT','STRIP_UNRESOLVED'];
-    var UW_DEBIT_TAGS=['MCA','PAYROLL','OWNER_DRAW','RENT','UTILITIES','INSURANCE','TAX','DEBT_SERVICE','DIRECT_COST','TRANSFER_OUT','OTHER'];
     var UW_NEEDS_QUOTE=/^STRIP_(FUNDING|TRANSFER|OWNER)$/;   // the engine rejects these without a verbatim quote
     function uwMoney(a){ var n=Math.abs(+a); return '$'+n.toLocaleString('en-US',{ minimumFractionDigits:2, maximumFractionDigits:2 }); }
     function uwShortDate(iso){ var p=String(iso).split('-'); return p.length===3 ? p[1]+'/'+p[2]+'/'+p[0].slice(2) : String(iso); }
@@ -9986,7 +9986,7 @@ Add `reason`: one sentence naming the fact you relied on. It is stored in the au
         }
         return { question_id:q.question_id, type:q.type, default:q.default, why:q.why||[],
           title: core ? 'What does the business do?' : credit ? 'Credit '+(q.txn_ids||[]).length+' transaction(s)' : 'Debits to '+q.descriptor+' ('+(q.txn_ids||[]).length+')',
-          tags: core ? [] : credit ? UW_CREDIT_TAGS.slice() : UW_DEBIT_TAGS.slice(),
+          tags: core ? [] : (q.allowed||[]).slice(),
           lines: credit ? (q.transactions||[]).map(function(t){ return uwShortDate(t.date)+' '+uwMoney(t.amount)+' '+t.description; })
                : core ? (q.streams||[]).map(function(s){ return s.stream+' '+s.share; }) : (q.sample_descriptions||[]) };
       });
