@@ -15,7 +15,7 @@ Status values:
 
 Batch 2 covered debit-first discovery (D1 to D5), WATCH rows, the ±30-day two-way match, evidence levels and position identity. Rows still marked B2 in the Fix column were deferred: off-bank collections, contractual cost, payoff ties and variable adverse scenarios. **B3** covers accounts, commingling, missing-account requests, the V1.7 ten-table format and its checker.
 
-Count: 150 rows. 19 B1, 33 B2, 23 B3, 8 B4, 2 B5, 3 B6, 5 B7, 5 V1.8, 38 Met, 8 Partial, 3 Gap, 3 Page.
+Count: 150 rows. 19 B1, 33 B2, 23 B3, 8 B4, 2 B5, 3 B6, 5 B7, 7 V1.8, 38 Met, 8 Partial, 1 Gap, 3 Page.
 
 ## Contract hard rules
 
@@ -163,9 +163,9 @@ Count: 150 rows. 19 B1, 33 B2, 23 B3, 8 B4, 2 B5, 3 B6, 5 B7, 5 V1.8, 38 Met, 8 
 | L8 | Total Live Stack sums Y only; U stays out | Yes (self-check) | B1 | — |
 | L9 | Cost: daily x20, weekly x52/12, biweekly x26/12, monthly x1 | Daily, weekly, biweekly and monthly (18 to 25 bd gaps, x1) | B2 | Sign-off B14 |
 | L10 | Temporary reductions use the prior sustained payment | TEMP CUT events | Met | — |
-| L11 | CONTRACTUAL cost separate from observed | None | Gap | B2 |
+| L11 | CONTRACTUAL cost separate from observed | Judge `document` question reads payment and frequency from a funding contract, quote checked. Table 4 shows CONTRACTUAL; the stack (Y) or scenario (U) takes the higher of contract and observed (V1.8b10) | V1.8 | — |
 | L12 | 1.4x payoff as SCENARIO only | Labeled "SCENARIO est. remaining ... not closure evidence" | B1 | — |
-| L13 | Contract or lender payoff tied to the position | None | Gap | B2 |
+| L13 | Contract or lender payoff tied to the position | Judge `document` question reads a payoff balance and good-through date, both quote checked, tied to the one position sharing a funder word. Table 4 PAYOFF note replaces the 1.4x estimate; never closure; stale after its date (V1.8b10) | V1.8 | — |
 | L14 | Non-MCA loans in DEBT_SERVICE; no double count | DEBT_SERVICE rule tag; MCA debits are tagged MCA_ only | Met | — |
 | L15 | Do not merge two positions because the funder name matches | See R8 | B2 | — |
 | L16 | Material U blocks YES; NO stands only if unknowns cannot reverse it | `readiness()` | B1 | — |
@@ -536,3 +536,17 @@ Signed off 2026-11-08, "extra pull". A daily position's next scheduled pull no l
 | :--- | :--- |
 | Sample, defaults and saved answers | Same reports. The sample has no documents |
 | Real ledger | Same: the saved export has no tagged documents. Not rerun here |
+
+## Gaps L11 and L13, part B: contract and payoff terms (2026-11-08; policy V1.8b10)
+
+- One `document` question per funding contract or payoff letter (`DOC_QUESTION_KINDS`). The model answers CONTRACT, PAYOFF, UNRELATED or unsure, with `funder` and `terms`.
+- The engine rejects an answer whose `quote` is not verbatim in the document or does not print `amount`, and a `date_quote` that does not print `good_through` (`states_amount`, `states_date`).
+- The answer applies to the one non-WATCH position whose funder shares a name word with `funder`. With none or several, Table 1 notes the document and nothing changes.
+- L11, signed off "higher of the two": the contract's monthly cost (amount x cadence factor) replaces a lower observed cost in the stack for a Y position, or in the scenario for a U position. Table 4 shows "CONTRACTUAL $X frequency = $Y/mo (doc)". When it raises the stack, a note says so.
+- L13, signed off "replace 1.4x": "PAYOFF $X good through MM/DD/YY (doc); not closure evidence" replaces the 1.4x estimate. It is marked stale when the good-through date is before the last transaction. Status never changes.
+- The review queue leaves document questions out; only the model answers them for now.
+
+| Run | Effect |
+| :--- | :--- |
+| Sample, defaults and saved answers | Same reports. The sample document is kind `funding_agreement`, which gets no question |
+| Real ledger | Same: no tagged documents. Not rerun here |

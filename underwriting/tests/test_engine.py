@@ -1304,5 +1304,65 @@ class SignOffReadings(unittest.TestCase):
         self.assertTrue(p and not p[0]["watch"])  # 7 of 10 in one run: MCA at 60%, not at 80%
 
 
+
+class GapsL11L13(unittest.TestCase):
+    """L11 contract cost and L13 payoff from documents (2026-11-08; policy V1.8b10)."""
+
+    def setUp(self):
+        self.led = copy.deepcopy(LEDGER)
+        self.led["documents"] += [
+            dict(doc_id="C1", kind="funding_contract",
+                 text="Revenue purchase agreement with BLUEOAK ADV. Weekly remittance: $1,500.00 every Monday."),
+            dict(doc_id="P1", kind="payoff_letter",
+                 text="RAPIDFUND LLC payoff letter. Payoff amount $21,400.00, good through 08/31/2026."),
+        ]
+        self.e = run(self.led)
+        self.qc, self.qp = (next(x["question_id"] for x in self.e.questions["questions"] if x.get("doc_id") == d)
+                            for d in ("C1", "P1"))
+
+    def answer(self, *answers):
+        return run(self.led, with_judgments(self.e, list(answers)))
+
+    def contract(self, amount="1500.00", quote="Weekly remittance: $1,500.00", funder="BlueOak Adv"):
+        return dict(question_id=self.qc, tag="CONTRACT", funder=funder,
+                    terms=dict(amount=amount, frequency="weekly", quote=quote))
+
+    def test_higher_contract_payment_replaces_observed_cost_in_the_stack(self):
+        r = self.answer(self.contract())
+        self.assertEqual(r.audit["capacity"]["live_stack"], self.e.audit["capacity"]["live_stack"] + D(300) * W)
+        self.assertIn("Stack uses CONTRACTUAL $6,500/mo over observed $5,200/mo", r.report)
+
+    def test_lower_contract_payment_leaves_observed_cost(self):
+        led = copy.deepcopy(self.led)
+        led["documents"][-2]["text"] = led["documents"][-2]["text"].replace("1,500.00", "1,000.00")
+        e = run(led)
+        r = run(led, with_judgments(e, [dict(self.contract("1000", "Weekly remittance: $1,000.00"),
+                                             question_id=q(e, kind="document"))]))
+        self.assertEqual(r.audit["capacity"]["live_stack"], e.audit["capacity"]["live_stack"])
+        self.assertIn("CONTRACTUAL $1,000 weekly = $4,333/mo (C1)", r.report)
+
+    def test_payoff_replaces_the_payback_estimate_and_is_not_closure(self):
+        r = self.answer(dict(question_id=self.qp, tag="PAYOFF", funder="RAPIDFUND",
+                             terms=dict(amount="21400", quote="Payoff amount $21,400.00",
+                                        good_through="2026-08-31", date_quote="good through 08/31/2026")))
+        row = next(l for l in r.report.splitlines() if l.startswith("| RAPIDFUND"))
+        self.assertIn("PAYOFF $21,400 good through 08/31/26 (P1); not closure evidence; stale", row)
+        self.assertNotIn("1.4x model", row)
+        self.assertEqual(pos(r, "RAPIDFUND")[0]["live_status"], "Y")
+
+    def test_terms_must_be_printed_in_the_quote(self):
+        with self.assertRaisesRegex(uw.UWError, "quote does not state amount 1600.00"):
+            self.answer(self.contract("1600"))
+        with self.assertRaisesRegex(uw.UWError, "date_quote does not state 2026-09-30"):
+            self.answer(dict(question_id=self.qp, tag="PAYOFF", funder="RAPIDFUND",
+                             terms=dict(amount="21400", quote="Payoff amount $21,400.00",
+                                        good_through="2026-09-30", date_quote="good through 08/31/2026")))
+
+    def test_unmatched_funder_is_noted_and_not_applied(self):
+        r = self.answer(self.contract(funder="ZEPHYR CAPITAL"))
+        self.assertEqual(r.audit["capacity"]["live_stack"], self.e.audit["capacity"]["live_stack"])
+        self.assertIn("contract C1 for ZEPHYR CAPITAL matched 0 positions; not applied", r.report)
+
+
 if __name__ == "__main__":
     unittest.main()
