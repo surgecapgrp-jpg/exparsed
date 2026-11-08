@@ -1,0 +1,15 @@
+name: test
+on: [pull_request, push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22 }
+      - uses: actions/setup-python@v6
+        with: { python-version: "3.12" }
+      - run: pip install jsonschema  # else the Schemas test skips
+      - run: node tests/run-node.js
+      - run: python3 -m unittest discover -s tests
+        working-directory: underwriting
