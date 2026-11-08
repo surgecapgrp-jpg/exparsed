@@ -16,7 +16,7 @@
         "required": ["question_id"],
         "properties": {
           "question_id": {"type": "string", "pattern": "^Q-(credit|debit|core|character|document)-[0-9a-f]{10}$"},
-          "tag": {"type": "string", "description": "credit: a credit tag (STRIP_UNRESOLVED is the default) or unsure. debit_group: MCA, a debit tag, AMBIGUOUS_<LABEL> or unsure. character: LOW, ELEVATED, HIGH, INDETERMINATE or unsure, from the question's allowed list. document: CONTRACT, PAYOFF, UNRELATED or unsure."},
+          "tag": {"type": "string", "description": "credit: a credit tag (STRIP_UNRESOLVED is the default) or unsure. debit_group: MCA, a debit tag, AMBIGUOUS_<LABEL> or unsure. character: LOW, ELEVATED, HIGH, INDETERMINATE or unsure, from the question's allowed list. document: CONTRACT, PAYOFF, HOLDBACK, UNRELATED or unsure, from the question's allowed list."},
           "failure_mode": {"enum": ["CAPACITY", "POSSIBLE VOLITIONAL", "MIXED", "INDETERMINATE"], "description": "character only, from the question's allowed list."},
           "funder": {"type": "string", "maxLength": 40},
           "evidence": {"$ref": "#/$defs/evidence"},
@@ -36,7 +36,7 @@
       "description": "document only. quote is verbatim from the document and prints amount; date_quote is verbatim and prints good_through.",
       "properties": {
         "amount": {"type": "string", "description": "CONTRACT: the payment per period. PAYOFF: the payoff balance. Digits, optional cents."},
-        "frequency": {"enum": ["daily", "weekly", "biweekly", "monthly"], "description": "CONTRACT only."},
+        "frequency": {"enum": ["daily", "weekly", "biweekly", "monthly"], "description": "CONTRACT and HOLDBACK."},
         "good_through": {"type": "string", "description": "PAYOFF only, YYYY-MM-DD."},
         "quote": {"type": "string", "minLength": 3},
         "date_quote": {"type": "string"}

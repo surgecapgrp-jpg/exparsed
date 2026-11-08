@@ -53,13 +53,12 @@ Pick one tag:
 
 ### `document`
 
-One supplied funding contract or payoff letter (`doc_id`, `kind`). Read it in `documents`. Pick one tag:
-
-`CONTRACT`, `PAYOFF`, `UNRELATED`, `unsure`.
+One supplied funding contract, payoff letter or processor statement (`doc_id`, `kind`). Read it in `documents`. Pick one tag from the question's `allowed` list, or `unsure`:
 
 - `CONTRACT`: the document sets a payment for one funder. Give `funder` (the funder's name as it appears in the debit payees) and `terms`: `amount` (payment per period), `frequency` (`daily`, `weekly`, `biweekly` or `monthly`) and `quote`, an exact passage of the document that prints the amount.
 - `PAYOFF`: the document states a payoff balance for one funder. Give `funder` and `terms`: `amount` (payoff balance), `quote` printing it, and, when the document states one, `good_through` (YYYY-MM-DD) with `date_quote`, an exact passage that prints that date.
-- `UNRELATED`: the document holds no payment or payoff terms for a funder.
+- `HOLDBACK` (processor statements only): the processor withheld money for a funder before paying the merchant. Give `funder` and `terms`: `amount` withheld per period, `frequency` of that period, and `quote` printing the amount. The engine adds it to the stack as an off-bank position.
+- `UNRELATED`: the document holds no payment, payoff or holdback terms for a funder.
 
 The engine ties the document to the one position whose funder shares a name word with `funder`; with none or several, it notes the document and does not apply it. A contract payment above the observed cost replaces it in the stack. A payoff is shown in Table 4 and never closes a position.
 

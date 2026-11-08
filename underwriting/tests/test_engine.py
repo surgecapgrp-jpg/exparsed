@@ -1364,5 +1364,39 @@ class GapsL11L13(unittest.TestCase):
         self.assertIn("contract C1 for ZEPHYR CAPITAL matched 0 positions; not applied", r.report)
 
 
+
+class GapD6(unittest.TestCase):
+    """D6 processor holdbacks and reverse consolidation flag (2026-11-08; policy V1.8b11)."""
+
+    def setUp(self):
+        self.led = copy.deepcopy(LEDGER)
+        self.led["documents"].append(dict(doc_id="PS1", kind="processor_statement",
+                                          text="Merchant statement September 2026. Advance holdback - ZEN CAPITAL: $3,100.00"))
+        self.e = run(self.led)
+        self.qid = q(self.e, kind="document")
+
+    def holdback(self, tag="HOLDBACK"):
+        return run(self.led, with_judgments(self.e, [dict(question_id=self.qid, tag=tag, funder="ZEN CAPITAL", terms=dict(
+            amount="3100", frequency="monthly", quote="Advance holdback - ZEN CAPITAL: $3,100.00"))]))
+
+    def test_processor_holdback_is_an_off_bank_stack_row(self):
+        r = self.holdback()
+        self.assertEqual(r.audit["capacity"]["live_stack"], self.e.audit["capacity"]["live_stack"] + D(3100))
+        row = next(l for l in r.report.splitlines() if l.startswith("| ZEN CAPITAL (off-bank)"))
+        self.assertIn("| Off-bank | Y |", row)
+        self.assertTrue(row.rstrip().endswith("| $3,100 |"))
+
+    def test_processor_document_cannot_answer_contract(self):
+        with self.assertRaisesRegex(uw.UWError, "tag 'CONTRACT' not in"):
+            self.holdback("CONTRACT")
+
+    def test_fixed_finance_word_credits_are_flagged_without_cost(self):
+        led = add_rows(LEDGER, [("OP", d, "2000.00", "credit", "ACH CREDIT ZEN CAPITAL PAYMENT")
+                                for d in ("2026-08-03", "2026-08-10", "2026-08-17", "2026-08-24")], "RC")
+        r = run(led)
+        self.assertIn("possible reverse consolidation: 4 weekly credits of $2,000 from", r.report)
+        self.assertEqual(r.audit["capacity"]["live_stack"], run().audit["capacity"]["live_stack"])
+
+
 if __name__ == "__main__":
     unittest.main()

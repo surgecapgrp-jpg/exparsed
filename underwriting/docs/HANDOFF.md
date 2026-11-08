@@ -124,7 +124,7 @@ V2.2 leaves these points open. The engine picks one reading and states it here s
 ### 4.2 Not implemented
 
 - PDF Path B extraction checks. Exparsed already extracts and reconciles; the adapter passes its status through.
-- Reverse-consolidation disclosure by month.
+- Reverse-consolidation disclosure by month. D6 (V1.8b11) flags fixed-cadence credits from a finance-word sender in Table 1 notes, with no cost.
 - Same-name renewal after a gap is handled as STOPPED then RESTARTED inside one position, with a funding search on the restart. V2.2 4E describes the same outcome.
 - A holiday calendar beyond 2027. `adapter/exparsed_adapter.py` carries Federal Reserve holidays for 2025 to 2027 and stops with an error on a later year; extend `HOLIDAYS` each year.
 

@@ -505,7 +505,7 @@ from pathlib import Path
 
 D = Decimal
 ENGINE_VERSION = "3.4"
-POLICY_VERSION = "V1.8b10"
+POLICY_VERSION = "V1.8b11"
 
 # Policy parameters (V2.2 values with the V1.7 changes marked). Changing any value is a policy change: bump POLICY_VERSION.
 BUSINESS_DAYS_PER_MONTH = D(20)
@@ -624,8 +624,14 @@ CADENCE_FACTOR = {
     "monthly": D(1),
 }
 # Gaps L11 and L13 (2026-11-08, V1.8b10): the model reads terms from these document kinds, one question each.
-DOC_QUESTION_KINDS = ("funding_contract", "payoff_letter")
-DOC_TAGS = ("CONTRACT", "PAYOFF", "UNRELATED")
+# D6 (2026-11-08, V1.8b11): processor documents answer HOLDBACK, an off-bank collection with its own stack row.
+DOC_QUESTION_KINDS = {
+    "funding_contract": ("CONTRACT", "PAYOFF", "UNRELATED"),
+    "payoff_letter": ("CONTRACT", "PAYOFF", "UNRELATED"),
+    "processor_statement": ("HOLDBACK", "UNRELATED"),
+    "processor_report": ("HOLDBACK", "UNRELATED"),
+}
+REVERSE_MIN_CREDITS = 3  # D6 flag: fixed-cadence same-amount credits from a finance-word sender
 MONTHS = ("January February March April May June July August September October November December").split()
 
 
@@ -1077,6 +1083,7 @@ class _Engine:
         self.build_positions()
         self.apply_documents()
         self.gate_and_attribute()
+        self.reverse_consolidation_flags()
         self.revenue()
         self.crosscheck_exparsed()
         self.streams()
@@ -1561,7 +1568,8 @@ class _Engine:
         for d in self.docs.values():
             if d["kind"] in DOC_QUESTION_KINDS:
                 qs.append(dict(question_id=qid("document", [self.sha, d["doc_id"]]), type="document",
-                               doc_id=d["doc_id"], kind=d["kind"], txn_ids=[], default="UNRELATED"))
+                               doc_id=d["doc_id"], kind=d["kind"], txn_ids=[], allowed=list(DOC_QUESTION_KINDS[d["kind"]]),
+                               default="UNRELATED"))
         rev = defaultdict(D)
         for t in self.txns:
             if t.dir == "credit" and t.tag.startswith("REV_"):
@@ -1711,7 +1719,7 @@ class _Engine:
     def read_document_answer(self, q, a, what):
         """L11/L13: contract or payoff terms. The quote must sit in the document and print the amount and date."""
         tag = a.get("tag")
-        require(tag in DOC_TAGS, f"{what}: tag {tag!r} not in {DOC_TAGS}")
+        require(tag in q["allowed"], f"{what}: tag {tag!r} not in {tuple(q['allowed'])}")
         ans = dict(tag=tag, doc_id=q["doc_id"], reason=str(a.get("reason", ""))[:300])
         if tag == "UNRELATED":
             return ans
@@ -1727,7 +1735,7 @@ class _Engine:
         ev = self.verify_quote(dict(kind="document", doc_id=q["doc_id"], quote=terms.get("quote", "")), [], what)
         require(states_amount(ev["quote"], amt), f"{what}: quote does not state amount {amt}")
         ans.update(funder=funder.upper(), amount=amt, quote=ev["quote"])
-        if tag == "CONTRACT":
+        if tag in ("CONTRACT", "HOLDBACK"):
             freq = terms.get("frequency")
             require(freq in CADENCE_FACTOR, f"{what}: terms.frequency must be one of {tuple(CADENCE_FACTOR)}")
             ans.update(frequency=freq, monthly=amt * CADENCE_FACTOR[freq])
@@ -1744,10 +1752,14 @@ class _Engine:
 
     def apply_documents(self):
         """L11: the stack carries the higher of observed and contract cost. L13: a payoff note, never closure."""
-        first = next(iter(self.accts))
+        first, self.offbank = next(iter(self.accts)), []
         for q in self.questions:
             a = self.answers.get(q["question_id"])
             if q["type"] != "document" or not a or a["tag"] == "UNRELATED":
+                continue
+            if a["tag"] == "HOLDBACK":
+                self.offbank.append(dict(funder=a["funder"], amount=a["amount"], frequency=a["frequency"],
+                                         monthly=a["monthly"], doc_id=q["doc_id"]))
                 continue
             tok = funder_tokens(a["funder"])
             hits = [p for p in self.positions if not p.watch and tok & funder_tokens(p.funder)]
@@ -1767,6 +1779,21 @@ class _Engine:
                 p.cost = a["monthly"]
             elif p.live_status == "U" and p.scenario is not None and a["monthly"] > p.scenario:
                 p.scenario = a["monthly"]
+
+    def reverse_consolidation_flags(self):
+        """D6: fixed-cadence same-amount credits from a finance-word sender. A Table 1 note only, no cost."""
+        by = defaultdict(list)
+        for t in self.txns:
+            if t.dir == "credit" and t.tag not in HARD_STRIP and (MCA_WORD.search(t.norm) or MCA_WORD_INSIDE.search(t.norm)):
+                by[(t.acct, t.norm, t.amt)].append(t)
+        for (acct, name, amt), ts in sorted(by.items()):
+            gaps = [gap_class(self.cal.diff(a.date, b.date)) for a, b in zip(ts, ts[1:])]
+            cad = Counter(gaps).most_common(1)[0][0] if gaps else None
+            if len(ts) >= REVERSE_MIN_CREDITS and cad in ("daily", "weekly", "biweekly"):
+                self.notes[acct].append(
+                    f"possible reverse consolidation: {len(ts)} {cad} credits of {usd(amt)} from {name} "
+                    f"{mdy(ts[0].date)} to {mdy(ts[-1].date)}; not proof, no cost added"
+                )
 
     def apply_debit_answers(self):
         for q in self.questions:
@@ -2643,7 +2670,7 @@ class _Engine:
         return r, headline, conservative
 
     def capacity(self):
-        self.stack = sum((p.cost for p in self.positions if p.live), D(0))
+        self.stack = sum((p.cost for p in self.positions if p.live), D(0)) + sum((o["monthly"] for o in self.offbank), D(0))
         w = self.month_rows[self.worst_month]["true"] if self.worst_month else None
         self.room, self.headline, self.conservative = self.rooms(self.basis, w, self.stack)
         r = self.room
@@ -3285,8 +3312,8 @@ class _Engine:
             ),
         )
         ok(
-            "live stack = sum of live position costs",
-            self.stack == sum((p.cost for p in self.positions if p.live), D(0)),
+            "live stack = sum of live position and off-bank costs",
+            self.stack == sum((p.cost for p in self.positions if p.live), D(0)) + sum((o["monthly"] for o in self.offbank), D(0)),
         )
         ok(
             "non-live positions cost 0",
@@ -3568,6 +3595,7 @@ class _Engine:
             ),
             streams=self.stream_rows,
             positions=[position(p) for p in self.positions],
+            offbank=self.offbank,
             backward_searches=self.searches,
             forward_searches=self.forward,
             pending_observations=self.pending,
@@ -3911,7 +3939,11 @@ def tables(a):
         )
         for e in p["events"]:
             t4.append([f"↳ {mdy(e['date'])} {e['kind']}", dash, dash, e["change"], dash, dash, e["detail"], dash])
-    if not positions:
+    at = next((i for i, r in enumerate(t4) if r[5] in ("U", "N")), len(t4))
+    t4[at:at] = [[f"{o['funder']} (off-bank)", "Not found", dash, f"{o['frequency'].title()} {usd(o['amount'])}", "Off-bank", "Y",
+                  f"Processor holdback per {o['doc_id']}; off-bank collection (D6), not seen as bank debits", usd(o["monthly"])]
+                 for o in a.get("offbank", [])]
+    if not t4:
         t4.append(["None"] + [dash] * 7)
     stack, basis = cap["live_stack"], cap["basis"]
     hold = stack / basis if basis and basis > 0 else None
@@ -4838,13 +4870,12 @@ Pick one tag:
 
 ### `document`
 
-One supplied funding contract or payoff letter (`doc_id`, `kind`). Read it in `documents`. Pick one tag:
-
-`CONTRACT`, `PAYOFF`, `UNRELATED`, `unsure`.
+One supplied funding contract, payoff letter or processor statement (`doc_id`, `kind`). Read it in `documents`. Pick one tag from the question's `allowed` list, or `unsure`:
 
 - `CONTRACT`: the document sets a payment for one funder. Give `funder` (the funder's name as it appears in the debit payees) and `terms`: `amount` (payment per period), `frequency` (`daily`, `weekly`, `biweekly` or `monthly`) and `quote`, an exact passage of the document that prints the amount.
 - `PAYOFF`: the document states a payoff balance for one funder. Give `funder` and `terms`: `amount` (payoff balance), `quote` printing it, and, when the document states one, `good_through` (YYYY-MM-DD) with `date_quote`, an exact passage that prints that date.
-- `UNRELATED`: the document holds no payment or payoff terms for a funder.
+- `HOLDBACK` (processor statements only): the processor withheld money for a funder before paying the merchant. Give `funder` and `terms`: `amount` withheld per period, `frequency` of that period, and `quote` printing the amount. The engine adds it to the stack as an off-bank position.
+- `UNRELATED`: the document holds no payment, payoff or holdback terms for a funder.
 
 The engine ties the document to the one position whose funder shares a name word with `funder`; with none or several, it notes the document and does not apply it. A contract payment above the observed cost replaces it in the stack. A payoff is shown in Table 4 and never closes a position.
 
