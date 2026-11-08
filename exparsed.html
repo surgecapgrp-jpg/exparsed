@@ -505,7 +505,7 @@ from pathlib import Path
 
 D = Decimal
 ENGINE_VERSION = "3.4"
-POLICY_VERSION = "V1.8b6"
+POLICY_VERSION = "V1.8b7"
 
 # Policy parameters (V2.2 values with the V1.7 changes marked). Changing any value is a policy change: bump POLICY_VERSION.
 BUSINESS_DAYS_PER_MONTH = D(20)
@@ -3007,7 +3007,8 @@ class _Engine:
         cq = next((q for q in self.questions if q["type"] == "character"), None)
         ca = self.answers.get(cq["question_id"]) if cq else None
         if ca:
-            will = (f"Character {ca['tag']}; failure-mode evidence {ca['failure_mode']} (model reading of engine "
+            who = "underwriter" if ca["reason"] == "underwriter" else "model"  # the review queue sets reason "underwriter"
+            will = (f"Character {ca['tag']}; failure-mode evidence {ca['failure_mode']} ({who} reading of engine "
                     f"evidence; capacity verdict independent). {ca['text']} Counts: {will}")
         else:
             will = f"Character INDETERMINATE; failure-mode evidence INDETERMINATE (not assessed). Counts: {will}"
@@ -9801,9 +9802,15 @@ Add `reason`: one sentence naming the fact you relied on. It is stored in the au
     function uwQueue(r){
       if(!r || !r.ok || !r.questions) return [];
       var open={}; (r.audit && r.audit.questions_open || []).forEach(function(id){ open[id]=true; });
-      // snip: the character labels are not in the review queue yet; add when underwriters need to override them
-      return r.questions.questions.filter(function(q){ return open[q.question_id] && q.type!=='character'; }).map(function(q){
+      // V1.8: the character question is listed whenever it exists, answered or not, so an underwriter can override the labels.
+      return r.questions.questions.filter(function(q){ return open[q.question_id] || q.type==='character'; }).map(function(q){
         var credit=q.type==='credit', core=q.type==='core_operation';
+        if(q.type==='character'){
+          var will=String(((r.audit||{}).narrative||{}).will||'');
+          return { question_id:q.question_id, type:q.type, default:q.default, why:[], title:'Character read',
+            tags:(q.allowed||{}).character||[], modes:(q.allowed||{}).failure_mode||[],
+            lines:['now: '+will.split(' Counts:')[0]] };
+        }
         return { question_id:q.question_id, type:q.type, default:q.default, why:q.why||[],
           title: core ? 'What does the business do?' : credit ? 'Credit '+(q.txn_ids||[]).length+' transaction(s)' : 'Debits to '+q.descriptor+' ('+(q.txn_ids||[]).length+')',
           tags: core ? [] : credit ? UW_CREDIT_TAGS.slice() : UW_DEBIT_TAGS.slice(),
@@ -9816,7 +9823,11 @@ Add `reason`: one sentence naming the fact you relied on. It is stored in the au
       var mine={}, out=[];
       picks.forEach(function(p){
         var a={ question_id:p.question_id };
-        if(p.text){ a.text=String(p.text).trim(); }
+        if(p.type==='character'){
+          if(!p.tag) return;
+          a.tag=p.tag; a.failure_mode=p.failure_mode||''; a.text=String(p.text||'').trim(); a.reason='underwriter';
+        }
+        else if(p.text){ a.text=String(p.text).trim(); }
         else if(p.tag){
           a.tag=p.tag;
           if(p.tag==='MCA') a.funder=String(p.funder||'').trim();
@@ -11340,7 +11351,8 @@ Add `reason`: one sentence naming the fact you relied on. It is stored in the au
       $uwQueue.textContent=''; $uwQueue.hidden=!items.length;
       if(!items.length) return;
       var head=document.createElement('div'); head.className='uwbar';
-      var cap=document.createElement('span'); cap.className='uwstatus'; cap.textContent='Review queue: '+items.length+' open question(s). Leave a row blank to keep the current answer.';
+      var nOpen=items.filter(function(it){ return it.type!=='character'; }).length;
+      var cap=document.createElement('span'); cap.className='uwstatus'; cap.textContent='Review queue: '+nOpen+' open question(s). Leave a row blank to keep the current answer.';
       var apply=document.createElement('button'); apply.type='button'; apply.className='act primary small'; apply.textContent='Apply answers';
       head.appendChild(cap); head.appendChild(apply); $uwQueue.appendChild(head);
       var rows=items.map(function(it){
@@ -11350,7 +11362,16 @@ Add `reason`: one sentence naming the fact you relied on. It is stored in the au
         var f=document.createElement('div'); f.className='uwqf'; d.appendChild(f);
         var row={ question_id:it.question_id };
         function input(ph){ var x=document.createElement('input'); x.type='text'; x.placeholder=ph; x.setAttribute('aria-label', ph); f.appendChild(x); return x; }
-        if(!it.tags.length){ row.text=input('one line on what the business does'); }
+        if(it.type==='character'){
+          row.type='character';
+          var cs=document.createElement('select'), ms=document.createElement('select');
+          cs.setAttribute('aria-label', 'character risk'); ms.setAttribute('aria-label', 'failure-mode evidence');
+          ['','unsure'].concat(it.tags).forEach(function(v){ var o=document.createElement('option'); o.value=v; o.textContent=v||'(keep)'; cs.appendChild(o); });
+          it.modes.forEach(function(v){ var o=document.createElement('option'); o.value=v; o.textContent=v; ms.appendChild(o); });
+          f.appendChild(cs); f.appendChild(ms); row.tag=cs; row.mode=ms;
+          row.text=input('2 or 3 sentences: strongest fact, alternative explanation, data gap');
+        }
+        else if(!it.tags.length){ row.text=input('one line on what the business does'); }
         else {
           var sel=document.createElement('select'); sel.setAttribute('aria-label', 'tag for '+it.question_id);
           ['','unsure'].concat(it.tags).forEach(function(v){ var o=document.createElement('option'); o.value=v; o.textContent=v||'(keep)'; sel.appendChild(o); });
@@ -11363,7 +11384,7 @@ Add `reason`: one sentence naming the fact you relied on. It is stored in the au
       });
       apply.addEventListener('click', function(){
         if(uw.busy || !uw.result) return;
-        var picks=rows.map(function(r){ return { question_id:r.question_id, tag:r.tag&&r.tag.value, funder:r.funder&&r.funder.value, quote:r.quote&&r.quote.value, text:r.text&&r.text.value }; });
+        var picks=rows.map(function(r){ return { question_id:r.question_id, type:r.type, tag:r.tag&&r.tag.value, funder:r.funder&&r.funder.value, quote:r.quote&&r.quote.value, text:r.text&&r.text.value, failure_mode:r.mode&&r.mode.value }; });
         var j=uwReviewJudgments(uw.judgments, uw.result.questions.ledger_sha256, picks);
         var r=uwEngine(uw.ledgerText)(JSON.stringify(j));
         if(!r.ok){ uwSetStatus('err', 'Answers rejected: '+r.error+' (report unchanged)'); return; }

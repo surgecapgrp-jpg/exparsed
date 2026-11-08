@@ -18,7 +18,7 @@ underwrites the merchant for MCA capacity under policy V1.8.
 | Underwriting engine | Experiment. Policy V1.7 batches 1 to 4 and V1.8 batch 1 merged. Run on 1 real ledger and 1 synthetic ledger. |
 | Underwrite button and chat | Built and tested with a mocked browser run. Never run in real Chrome with real Pyodide and a real key. |
 | UI | Surge Capital theme (PR #9, merged 2026-11-04). |
-| Tests | 261 JS tests, 97 engine tests, 18 end-to-end page checks: all pass on `main`. |
+| Tests | 265 JS tests, 104 engine tests, 19 end-to-end page checks: all pass on `main`. |
 
 The next step is a real Chrome run on 3 to 5 real merchant files (section 9, item 1).
 
@@ -120,7 +120,7 @@ naming its funder.
 
 ### 5.2 Policy V1.7 coverage
 
-`ENGINE_VERSION` 3.4, `POLICY_VERSION` V1.8b1. The matrix tracks 150 rules:
+`ENGINE_VERSION` 3.4, `POLICY_VERSION` V1.8b7. The matrix tracks 150 rules:
 
 | Status | Rows |
 | :--- | ---: |
@@ -185,6 +185,7 @@ the return-word scan log (R1), the character pass (B1 to B5) and the extra Table
 | #38 | `5663a39` | V1.8 batch 3: character evidence, `audit.character_evidence` (policy V1.8b3) |
 | #39 | `96987be` | V1.8 batch 4: character and failure-mode labels, judge `character` question (policy V1.8b4) |
 | #40 | `eb6865b` | V1.8 batch 5: Table 4 return and collection notes, Table 9 sweep detail, sweep window signed off (policy V1.8b5) |
+| #41 | `203e041` | V1.8 batch 6: a daily MCA return is cured only by an extra pull (policy V1.8b6) |
 
 Rollback point before all underwriting work: `283bc50`.
 
@@ -273,14 +274,14 @@ All 22 matrix interpretations B1 to B22 are signed off. Waiting for sign-off: th
 
 ## 7. Verification
 
-| Check | Result on `main` after PR #35 |
+| Check | Result on `main` after V1.8 batch 7 |
 | :--- | :--- |
-| `node tests/run-node.js` | 261 passed, 0 failed (`ocr.js` adds 44) |
+| `node tests/run-node.js` | 265 passed, 0 failed (`ocr.js` adds 44) |
 | `tests/batch/run.js` on `tests/samples` (pdf.js stubbed: the cloud session cannot reach cdnjs) | 3 non-PDF files read through the page; `compare` reports a planted downgrade and exits 1 |
-| `python3 -m unittest discover -s tests` in `underwriting/` | 97 passed |
+| `python3 -m unittest discover -s tests` in `underwriting/` | 104 passed |
 | Engine self-checks per run | 17 pass on the sample |
 | Report checker on every rendered report | PASS |
-| End-to-end page run (headless Chromium, real engine behind a local server, mocked Pyodide and model, 3-month CSV) | 18 of 18 |
+| End-to-end page run (headless Chromium, real engine behind a local server, mocked Pyodide and model, 3-month CSV) | 19 of 19 (Q1 and Q3 now expect the character row; Q4 checks an underwriter override) |
 | Real ledger gross credits per month against the page's `computed` figures | Equal to the cent, 13 of 13 months |
 | `bash tests/run.sh` (macOS JavaScriptCore) | Not run since PR #4 |
 | Real Chrome, real Pyodide, real Claude or OpenRouter key | Never run |
