@@ -1,11 +1,11 @@
 # exparsed handoff
 
-Code state on 2026-11-07 at the merge of PR #35 (the last code change). Later commits that only
+Code state on 2026-11-08 at the merge of PR #42 (the last code change). Later commits that only
 edit this file are not listed. Repo: https://github.com/surgecapgrp-jpg/exparsed (private).
 This file replaces the 2026-10-26 handoff. The underwriting design detail is in `underwriting/docs/HANDOFF.md`,
 and the policy compliance detail is in `underwriting/docs/V1_7_MATRIX.md`. Policy V1.8 (MCA Capacity V1.8
 Character Returns Enhanced) replaced V1.7 on 2026-11-07. Its capacity rules match V1.7; it adds return and
-character rules, tracked in the matrix section "V1.8 batch 1".
+character rules, tracked in the matrix sections "V1.8 batch 1" to "V1.8 batch 7".
 
 ## 1. Summary
 
@@ -15,7 +15,7 @@ underwrites the merchant for MCA capacity under policy V1.8.
 | Part | State |
 | :--- | :--- |
 | Statement reader | In use. 140 of 244 Desktop-set files verify from text; 29 of 42 scans verify through Mac OCR. |
-| Underwriting engine | Experiment. Policy V1.7 batches 1 to 4 and V1.8 batch 1 merged. Run on 1 real ledger and 1 synthetic ledger. |
+| Underwriting engine | Experiment. Policy V1.7 batches 1 to 4 and V1.8 batches 1 to 7 merged. Run on 1 real ledger and 1 synthetic ledger. |
 | Underwrite button and chat | Built and tested with a mocked browser run. Never run in real Chrome with real Pyodide and a real key. |
 | UI | Surge Capital theme (PR #9, merged 2026-11-04). |
 | Tests | 265 JS tests, 104 engine tests, 19 end-to-end page checks: all pass on `main`. |
@@ -186,6 +186,7 @@ the return-word scan log (R1), the character pass (B1 to B5) and the extra Table
 | #39 | `96987be` | V1.8 batch 4: character and failure-mode labels, judge `character` question (policy V1.8b4) |
 | #40 | `eb6865b` | V1.8 batch 5: Table 4 return and collection notes, Table 9 sweep detail, sweep window signed off (policy V1.8b5) |
 | #41 | `203e041` | V1.8 batch 6: a daily MCA return is cured only by an extra pull (policy V1.8b6) |
+| #42 | `4b7748d` | V1.8 batch 7: character labels in the review queue; "underwriter reading" in WILL-PAY (policy V1.8b7) |
 
 Rollback point before all underwriting work: `283bc50`.
 
@@ -274,7 +275,7 @@ All 22 matrix interpretations B1 to B22 are signed off. Waiting for sign-off: th
 
 ## 7. Verification
 
-| Check | Result on `main` after V1.8 batch 7 |
+| Check | Result on `main` after PR #42 |
 | :--- | :--- |
 | `node tests/run-node.js` | 265 passed, 0 failed (`ocr.js` adds 44) |
 | `tests/batch/run.js` on `tests/samples` (pdf.js stubbed: the cloud session cannot reach cdnjs) | 3 non-PDF files read through the page; `compare` reports a planted downgrade and exits 1 |
@@ -344,9 +345,13 @@ All 22 matrix interpretations B1 to B22 are signed off. Waiting for sign-off: th
     Merged, safe to delete: `b18-block-yes-only`, `b22-signoff`, `date-and-export-fixes`, `design-review-fixes`, `handoff-2026-11-05`,
     `handoff-anchor`, `handoff-pr14` to `handoff-pr24`, `handoff-update`, `model-call-module`, `review-queue`, `stage-manifest`,
     `tdd-open-items`, `underwriting-in-page`, `v17-batch1` to `v17-batch4`, `v17-credit-coverage`, `v17-debit-side`, `v17-records`,
-    `batch-harness-merge`, `signoff-b1-b6`, `signoff-b7-b12`, `signoff-b13-b21`, `handoff-pr33`, `v18-returns` and `handoff-pr35`. GitHub's "Automatically delete head branches" setting stops new ones piling up.
+    `batch-harness-merge`, `signoff-b1-b6`, `signoff-b7-b12`, `signoff-b13-b21`, `handoff-pr33`, `v18-returns`, `handoff-pr35`, `v18-return-scan`, `v18-character`,
+    `v18-character-labels`, `v18-table-detail`, `v18-cure-extra-pull`, `v18-queue-character` and `handoff-pr42`. GitHub's "Automatically delete head branches" setting stops new ones piling up.
 14. **Desktop set rerun after PR #12.** The stricter date check drops any row whose printed date is impossible. Rerun the 244 files and compare against section 4.
-15. **V1.8 remaining.** Batch 1 done in PR #35; the return-word scan log (V1.8 R1) in PR #37; character evidence part 1 (B1 to B3, audit only) in PR #38; character labels (B4, B5) in PR #39; `SWEEP_RETURN_BD` signed off and the Table 4 and Table 9 detail in batch 5. Next: a live model run of the character question, character labels in the review queue,. The cure rule for daily pulls changed in batch 6 (extra pull, signed off 2026-11-08).
+15. **V1.8.** Done in PRs #35 to #42 (policy V1.8b1 to V1.8b7): return tiers and cures (#35), return-word scan log
+    (#37), character evidence (#38), character and failure-mode labels from the judge (#39), Table 4 and Table 9
+    detail with `SWEEP_RETURN_BD` 5 signed off (#40), extra-pull cure for daily MCA (#41), label override in the
+    review queue (#42). Next: a live model run of the character question (with item 1).
 
 ## 10. Rules for the next engineer
 
