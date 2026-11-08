@@ -505,7 +505,7 @@ from pathlib import Path
 
 D = Decimal
 ENGINE_VERSION = "3.4"
-POLICY_VERSION = "V1.8b4"
+POLICY_VERSION = "V1.8b5"
 
 # Policy parameters (V2.2 values with the V1.7 changes marked). Changing any value is a policy change: bump POLICY_VERSION.
 BUSINESS_DAYS_PER_MONTH = D(20)
@@ -527,7 +527,7 @@ PAYBACK_FACTOR = D("1.4")
 HOLDBACK_SHARE = D("0.60")
 FLIGHT_SHARE = D("0.30")
 FLIGHT_DAYS = 2
-SWEEP_RETURN_BD = 5  # V1.8 B3 (interpretation, needs sign-off): outflow up to 5 bd before the returned attempt
+SWEEP_RETURN_BD = 5  # V1.8 B3, signed off 2026-11-07: outflow up to 5 bd before the returned attempt
 THIN_DAY_COUNT = 5  # V1.8 B2: lowest valid EOD dates per account
 # V1.8 B4, B5: labels the judge picks from the character evidence. They never change capacity.
 CHARACTER_LABELS = ("LOW", "ELEVATED", "HIGH", "INDETERMINATE")
@@ -3741,6 +3741,7 @@ def tables(a):
         for r in a["streams"]
     ] or [["None", dash, dash, dash, dash]]
     t4 = []
+    coll = {r["pid"]: r for r in a["character_evidence"]["collections"]}
     for p in positions:
         f = p["fundings"][-1] if p["fundings"] else None
         fdate = mdy(f["credit_date"]) if f else "Not found"
@@ -3761,6 +3762,18 @@ def tables(a):
             rem = f["credit_amount"] * PAYBACK_FACTOR - p["paid_since_latest_funding"]
             notes.append(f"SCENARIO est. remaining {usd(rem)} (1.4x model); not closure evidence")
         notes += [n for n in p["notes"] if not n.startswith("Provisional")]
+        # V1.8 Table 4: verified returns and cures, and the expected-versus-cleared gap where it is defensible.
+        rets = [e for e in a["returns"] if e["cls"] == "A" and e["attempts"][0] in p["debit_ids"]]
+        if rets:
+            tr = Counter(e["tier"] for e in rets)
+            cu = Counter(e["cured"].split(" ")[0] for e in rets)
+            notes.append(f"Returns: {len(rets)} Class A (" + ", ".join(f"{k} {v}" for k, v in sorted(tr.items()))
+                         + f"); cured {cu['Y']}, uncured {cu['N']}, unknown {cu['UNKNOWN']}")
+        c = coll.get(p["pid"])
+        if c and c["expected"] is not None:
+            notes.append(f"Collections {c['cleared_days']} of {c['expected']} expected {c['cadence']} pulls "
+                         f"{mdy(c['first'])} to {mdy(c['last'])}"
+                         + (f"; {c['missing']} missing, cause unknown (not a return)" if c["missing"] else ""))
         t4.append(
             [
                 p["display"],
@@ -3862,10 +3875,22 @@ def tables(a):
         [
             "FLIGHT events",
             str(len(flights)),
-            f"largest: {mdy(big['date'])}, {usd(big['inflow'])} in, {usd(big['outflow'])} out" if big else "None",
+            (f"largest: {mdy(big['date'])}, {usd(big['inflow'])} in, {usd(big['outflow'])} out" if big else "None")
+            + sweep_detail(a["character_evidence"]["sweeps"]),
         ],
     ]
     return [t1, t2, t3, t4, t4b, t5, t6, t7, t8, t9]
+
+
+def sweep_detail(sweeps):
+    """V1.8 Table 9 FLIGHT detail: deposit, outflow and returned finance attempt dates. Timing only."""
+    if not sweeps:
+        return "; sweep-to-return: none"
+    s = "; ".join(f"{mdy(x['deposit_date'])} {usd(x['deposit_amount'])} in, {mdy(x['outflow_date'])} "
+                  f"{usd(x['outflow_amount'])} out ({x['destination']}), return of {mdy(x['attempt_date'])} attempt"
+                  for x in sweeps[:3])
+    more = f"; {len(sweeps) - 3} more" if len(sweeps) > 3 else ""
+    return f"; sweep-to-return {len(sweeps)}: {s}{more}; timing only, intent not shown"
 
 
 def render(a):

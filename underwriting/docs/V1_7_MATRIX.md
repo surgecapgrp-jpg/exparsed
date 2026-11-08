@@ -471,3 +471,17 @@ V1.8 B4 and B5: the judge picks the character and failure-mode labels from the b
 | Run | Effect |
 | :--- | :--- |
 | All 4 saved runs | Only the WILL-PAY line changes: "Character INDETERMINATE ... (not assessed). Counts: ..." The saved judgments hold no character answer |
+
+## V1.8 batch 5: report detail (2026-11-07; policy V1.8b5)
+
+`SWEEP_RETURN_BD` = 5 signed off 2026-11-07, kept as written.
+
+- Table 4 Notes, per position: "Returns: N Class A (tiers); cured, uncured, unknown" when the position has a verified return. "Collections X of Y expected <cadence> pulls <first> to <last>" when batch 3 computed an expected count, with "N missing, cause unknown (not a return)" when pulls are missing.
+- Table 9 FLIGHT detail: "sweep-to-return N:" with deposit, outflow and returned-attempt dates for up to 3 sequences, then "timing only, intent not shown". With none: "sweep-to-return: none".
+
+| Run | Effect |
+| :--- | :--- |
+| Real, saved answers | 7 positions gain a Collections note; Accord 49 of 50 and MS Equities 57 of 58 show 1 missing each. FLIGHT detail ends "sweep-to-return: none" |
+| Sample | BlueOak 6 of 7 (1 missing), CFG 4 of 4, SunCap 19 of 19 |
+
+Found, not changed: the cure rule (K8) accepts any later debit to the same payee of equal or higher amount within 2 bd. For a daily MCA, the next scheduled pull counts as the cure of a returned pull. V1.8 R4 asks for a re-presentment of the same obligation.
