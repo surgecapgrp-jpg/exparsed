@@ -4444,6 +4444,15 @@ STATUS = {
     "unparsed": "Unverified",
     "needs-ocr": "Unverified",
 }
+# Page document kinds the engine reads as evidence (gaps D6, L11, L13). Other kinds (applications,
+# credit reports, IDs) carry personal data and no financing terms, so they stay out.
+DOC_KINDS = {
+    "funding contract": "funding_contract",
+    "payoff / funder letter": "payoff_letter",
+    "merchant processing statement": "processor_statement",
+    "payment processor report": "processor_report",
+}
+DOC_TEXT_CAP = 40000  # characters per document sent to the model; quotes are checked against the same text
 # Federal Reserve holidays. Saturday holidays are not observed by the Fed. Extend each year.
 HOLIDAYS = [
     "2025-01-01",
@@ -4522,7 +4531,7 @@ def convert(src, owners):
         fail(f"expected format ledger-v1, got {src.get('format')!r}")
     import uw
 
-    by_acct, unread = defaultdict(list), []
+    by_acct, unread, documents = defaultdict(list), [], []
     # V1.7 R1: one SOURCE record per supplied file, read or not, in export order.
     sources = {
         id(f): dict(
@@ -4538,6 +4547,11 @@ def convert(src, owners):
         # V1.7 section 1: every supplied file stays in the inventory, read or not.
         if f.get("docKind"):
             unread.append(dict(name=f["name"], reason=f"{f['docKind']}; not a bank statement", statement=False))
+            text = f.get("markdown") or ""
+            if f["docKind"] in DOC_KINDS and text.strip():
+                doc_id = f["name"] if f["name"] not in {d["doc_id"] for d in documents} else f"{f['name']} #{len(documents) + 1}"
+                documents.append(dict(doc_id=doc_id, kind=DOC_KINDS[f["docKind"]], text=text[:DOC_TEXT_CAP],
+                                      truncated=len(text) > DOC_TEXT_CAP))
             continue
         if not f.get("rows") or f.get("status") in ("needs-ocr", "unparsed"):
             unread.append(dict(name=f["name"], reason=f"Exparsed status {f.get('status', 'no rows')}", statement=True))
@@ -4650,7 +4664,7 @@ def convert(src, owners):
         # V1.7 S7: identical rows stay distinct transactions; this lists them with their source rows.
         duplicate_crosswalk=[dict(txn_ids=ids, note="identical rows kept as distinct transactions")
                              for ids in same_key.values() if len(ids) > 1],
-        documents=[],
+        documents=documents,
         # Exparsed's own gross credits per month; the engine cross-checks its sums against them.
         exparsed_computed=[
             dict(account=c["account"], month=m["month"], gross_inflows=m["grossInflows"], partial=m.get("partial", False))

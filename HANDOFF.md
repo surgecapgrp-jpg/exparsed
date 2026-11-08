@@ -18,7 +18,7 @@ underwrites the merchant for MCA capacity under policy V1.8.
 | Underwriting engine | Experiment. Policy V1.7 batches 1 to 4 and V1.8 batches 1 to 7 and sign-offs P15, M9 and readings 1 to 19 merged. Run on 1 real ledger and 1 synthetic ledger. |
 | Underwrite button and chat | Built and tested with a mocked browser run. Never run in real Chrome with real Pyodide and a real key. |
 | UI | Surge Capital theme (PR #9, merged 2026-11-04). |
-| Tests | 265 JS tests, 107 engine tests, 19 end-to-end page checks: all pass on `main`. |
+| Tests | 265 JS tests, 108 engine tests, 19 end-to-end page checks: all pass on `main`. |
 
 The next step is a real Chrome run on 3 to 5 real merchant files (section 9, item 1).
 
@@ -291,7 +291,7 @@ All 22 matrix interpretations B1 to B22 and all 19 readings in `underwriting/doc
 | :--- | :--- |
 | `node tests/run-node.js` | 265 passed, 0 failed (`ocr.js` adds 44) |
 | `tests/batch/run.js` on `tests/samples` (pdf.js stubbed: the cloud session cannot reach cdnjs) | 3 non-PDF files read through the page; `compare` reports a planted downgrade and exits 1 |
-| `python3 -m unittest discover -s tests` in `underwriting/` | 107 passed |
+| `python3 -m unittest discover -s tests` in `underwriting/` | 108 passed |
 | Engine self-checks per run | 17 pass on the sample |
 | Report checker on every rendered report | PASS |
 | End-to-end page run (headless Chromium, real engine behind a local server, mocked Pyodide and model, 3-month CSV) | 19 of 19 (Q1 and Q3 now expect the character row; Q4 checks an underwriter override) |
@@ -330,8 +330,8 @@ All 22 matrix interpretations B1 to B22 and all 19 readings in `underwriting/doc
    judgments and chat. The 3 `prov==='claude'` branches in `aiRequest`, `aiParse` and `aiToolResults` stay: each
    builds a different provider's message shape. Streaming OCR and non-streaming judgments keep separate request code.
 7. **V1.7 gaps D6, L11, L13** and the partial rows (section 5.2). B5 (PR #20) closed C2 and A2; B6 (PR #22)
-   closed D8, M14 and D11; B7 (PR #24) closed R1, R3, R7, S3 and S7; 8 partial rows remain. Next: the document-based
-   gaps (L11, L13, D6), which need the page to pass documents to the engine. P15 and M9 are signed off (policy V1.8b8).
+   closed D8, M14 and D11; B7 (PR #24) closed R1, R3, R7, S3 and S7; 8 partial rows remain. Document-based gaps run in 3 PRs. Part A, the adapter passing tagged contracts, payoff letters and
+   processor statements as `documents`, follows #45. Next: part B (L11, L13), then part C (D6). P15 and M9 are signed off (policy V1.8b8).
 8. **Stage manifest.** Done in PR #28. `audit.stages` holds one entry per V1.7 execution-order stage (11):
    status COMPLETE or NEEDS_REVIEW, input hash (chained from the ledger hash), policy hash (`POLICY_HASH`,
    over every policy constant and rule pattern), counts, output hash and the material items to review.

@@ -525,3 +525,14 @@ Signed off 2026-11-08, "extra pull". A daily position's next scheduled pull no l
 | :--- | :--- |
 | Sample, defaults and saved answers | Same reports |
 | Real ledger, defaults and saved answers | Not rerun: the ledger is not in this session. Defaults may find more positions; saved answers already settle each payee the model was asked about |
+
+## Gaps D6, L11, L13, part A: document path (2026-11-08; policy V1.8b9)
+
+- The adapter passes 4 page document kinds to the engine as `documents`: funding contract, payoff / funder letter, merchant processing statement and payment processor report. Each document's text is the page's markdown, cut at 40,000 characters (`DOC_TEXT_CAP`, flag `truncated`). Applications, credit reports, IDs and the other kinds stay out.
+- The engine already sends `documents` to the model in `questions.json` and checks every document quote against the same text. Nothing reads contract terms yet; parts B (L11, L13) and C (D6) add that.
+- No policy constant changes, so `POLICY_VERSION` stays V1.8b9.
+
+| Run | Effect |
+| :--- | :--- |
+| Sample, defaults and saved answers | Same reports. The sample has no documents |
+| Real ledger | Same: the saved export has no tagged documents. Not rerun here |
