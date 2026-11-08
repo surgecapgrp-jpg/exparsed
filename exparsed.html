@@ -9771,18 +9771,19 @@ Add `reason`: one sentence naming the fact you relied on. It is stored in the au
     }
     // One decision for the file list, the status dot, the output pane and the auto-OCR queue.
     //   state:  reading | read-error | ocring | queued | ocr-done | ocr-failed | damaged | image |
-    //           scanned | image-pages-verified | scanned-pages | broken-text | broken-pages | readable
+    //           scanned | image-pages-verified | scanned-pages | broken-text | broken-pages |
+    //           unreadable-text (the ledger says needs-ocr: header-only pages, scrambled figures) | readable
     //   button: the OCR button label for that state, or null when OCR is not offered
     //   dot:    busy | err | warn | ok, read from the state (red: nothing usable until OCR runs;
     //           amber: part of the file is unread; green: readable as it stands)
     //   autoOcr: the batch queue sends this file to OCR on its own (nothing readable without OCR)
     //   brokenBanner: the output pane shows the raw text under a "text layer broken" warning
-    // The ledger is read only for a partly scanned or partly unreadable file, the two states
-    // where a reconciling text layer means OCR is not needed.
+    // The ledger is read for a partly scanned or partly unreadable file (a reconciling text layer
+    // means OCR is not needed) and for a file every earlier check calls readable.
     var OCR_NEED_DOT={ reading:'busy', 'read-error':'err', ocring:'busy', queued:'busy', 'ocr-done':'ok', 'ocr-failed':'err',
       damaged:'err', image:'err', scanned:'err', 'image-pages-verified':'ok', 'scanned-pages':'warn',
-      'broken-text':'err', 'broken-pages':'warn', readable:'ok' };
-    var OCR_NEED_AUTO={ damaged:1, image:1, scanned:1, 'broken-text':1 };
+      'broken-text':'err', 'broken-pages':'warn', 'unreadable-text':'err', readable:'ok' };
+    var OCR_NEED_AUTO={ damaged:1, image:1, scanned:1, 'broken-text':1, 'unreadable-text':1 };
     function fileOcrNeed(f){
       var verified=function(){ return lgFileLedger(f).status==='verified'; };
       var allScanned=f.scanned>0 && f.scanned===f.pages.length;
@@ -9801,6 +9802,8 @@ Add `reason`: one sentence naming the fact you relied on. It is stored in the au
       else if(f.scanned>0){ state='scanned-pages'; button='OCR full doc'; }
       else if(broken==='whole'){ state='broken-text'; button='Run OCR'; }
       else if(broken!=='none' && !verified()){ state='broken-pages'; button='OCR full doc'; }
+      // lgDocKind found header-only pages or scrambled figures: nothing reads until OCR runs
+      else if(lgFileLedger(f).status==='needs-ocr'){ state='unreadable-text'; button='Run OCR'; }
       else state='readable';
       return { state:state, button:button, dot:OCR_NEED_DOT[state],
         autoOcr: !f.removed && f.status==='done' && !!OCR_NEED_AUTO[state],
