@@ -969,6 +969,12 @@ class V17Batch4(unittest.TestCase):
         self.assertEqual([(x["deposit"], x["outflow"], x["destination"]) for x in s], [("SW0", "SW1", "outside or unknown")])
         day = next(d for d in ev["thin_days"] if d["date"] == date(2026, 8, 6))
         self.assertEqual((day["why"], day["returns"]), ("return date", ["SW2"]))
+        # V1.8 report detail: the position's Table 4 notes carry the return; Table 9 FLIGHT lists the sequence.
+        rapid = next(l for l in r.report.splitlines() if l.startswith("| RAPIDFUND"))
+        self.assertIn("Returns: 1 Class A (T2 1); cured 1, uncured 0, unknown 0", rapid)
+        flight = next(l for l in r.report.splitlines() if l.startswith("| FLIGHT events"))
+        self.assertIn("sweep-to-return 1: 08/03/26 $9,000 in, 08/04/26 $6,000 out (outside or unknown), "
+                      "return of 08/05/26 attempt; timing only, intent not shown", flight)
 
     def char_q(self, r):
         return next((x for x in r.questions["questions"] if x["type"] == "character"), None)

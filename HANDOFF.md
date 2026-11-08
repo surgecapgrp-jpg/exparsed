@@ -183,6 +183,7 @@ the return-word scan log (R1), the character pass (B1 to B5) and the extra Table
 | #35 | `2c70239` | V1.8 batch 1: T1 only on finance, unclear tier n/a, cure UNKNOWN (policy V1.8b1) |
 | #37 | `d3c0ca9` | V1.8 batch 2: return-word scan log, `audit.return_scan` (policy V1.8b2) |
 | #38 | `5663a39` | V1.8 batch 3: character evidence, `audit.character_evidence` (policy V1.8b3) |
+| #39 | `96987be` | V1.8 batch 4: character and failure-mode labels, judge `character` question (policy V1.8b4) |
 
 Rollback point before all underwriting work: `283bc50`.
 
@@ -343,7 +344,7 @@ All 22 matrix interpretations B1 to B22 are signed off. Waiting for sign-off: th
     `tdd-open-items`, `underwriting-in-page`, `v17-batch1` to `v17-batch4`, `v17-credit-coverage`, `v17-debit-side`, `v17-records`,
     `batch-harness-merge`, `signoff-b1-b6`, `signoff-b7-b12`, `signoff-b13-b21`, `handoff-pr33`, `v18-returns` and `handoff-pr35`. GitHub's "Automatically delete head branches" setting stops new ones piling up.
 14. **Desktop set rerun after PR #12.** The stricter date check drops any row whose printed date is impossible. Rerun the 244 files and compare against section 4.
-15. **V1.8 remaining.** Batch 1 done in PR #35; the return-word scan log (V1.8 R1) in PR #37; character evidence part 1 (B1 to B3, audit only) in PR #38; character labels (B4, B5) in batch 4. Next: `SWEEP_RETURN_BD` sign-off, a live model run of the character question, then the extra Table 4 notes and Table 9 detail.
+15. **V1.8 remaining.** Batch 1 done in PR #35; the return-word scan log (V1.8 R1) in PR #37; character evidence part 1 (B1 to B3, audit only) in PR #38; character labels (B4, B5) in PR #39; `SWEEP_RETURN_BD` signed off and the Table 4 and Table 9 detail in batch 5. Next: a live model run of the character question, character labels in the review queue, and a sign-off on the cure rule for daily MCA pulls (matrix section "V1.8 batch 5").
 
 ## 10. Rules for the next engineer
 
