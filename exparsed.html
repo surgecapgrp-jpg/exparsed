@@ -8079,6 +8079,43 @@ Add `reason`: one sentence naming the fact you relied on. It is stored in the au
     // a statement whose debit sections were never recognised used to show as reconciled.
     // 'review' results (unread lines, assumed directions) are listed but never change the status.
     /* @test-begin finalize */
+    /**
+     * Ledger record L: what lgFileLedger(f) returns for one file, read by render, export, computed,
+     * the integrity report, chat and the engine export. Readers: lgBuild and its per-format readers
+     * (statement: columnar, OCR tables, camt, OFX; printout: activity, JSON, XML, decisionlogic text);
+     * lgFinalize; lgFileLedger; the cross-file link step (linkedAccount, link, oldestDayComplete).
+     * A field is set only by the readers listed, so a missing one means "not applicable", not "zero".
+     * @typedef {Object} LedgerRecord
+     * @property {'statement'|'printout'|'unparsed'} cls  every reader
+     * @property {string} layout  reader name, e.g. 'columnar', 'ocr-tables', 'camt.053', 'ofx', 'activity-printout'
+     * @property {{start:string,end:string}|null} period  ISO dates; null when no period was found
+     * @property {string|null} account  last four as '****1234', or a name; null when not found
+     * @property {Array<Object>} rows  one per transaction: iso, section, signed, balance, page, desc, type, signSource
+     * @property {{beginning:number,ending:number,sections:Object}|null} summary  statement totals; null on printouts
+     * @property {Object<string,{cents:number,page:number}>|null} daily  per-day balances keyed by ISO date; null on printouts
+     * @property {Array<Object>} pageMarks  columnar only: page boundaries used by the page citations
+     * @property {Array<Object>} unclaimed  lines with a date and an amount that no reader turned into a row
+     * @property {Array<{check:string,result:'pass'|'break'|'review'|string,page?:number}>} checks  set by lgFinalize
+     * @property {'verified'|'partial'|'breaks'|'untestable'|'unparsed'} status  set by lgFinalize (unparsed by lgBuild)
+     * @property {number[]} reviewPages  pages with a failed check; set by lgFinalize
+     * @property {string} [note]  one-line reason shown to the user; set by several readers and lgFileLedger
+     * @property {string} [error]  set only on unparsed records
+     * @property {string} [docKind]  unparsed PDFs: the document kind lgDocKind recognised
+     * @property {string[]} [coverageFlags]  printouts: what the reader could not see
+     * @property {Object<string,string>} [headerBalances]  printouts: balances from the header block
+     * @property {string} [filter]  printouts: 'credits-only' or 'debits-only' when the report filtered rows
+     * @property {boolean} [truncated]  printouts: the report was cut off
+     * @property {Object} [viewMeta]  printouts: report metadata shown in the page
+     * @property {Object} [printed]  lgPrintedExtras output for printouts printed from a statement
+     * @property {Object} [provenance]  where the file came from, copied from the import
+     * @property {string} [accountSource]  how the account was identified, e.g. 'account heading'
+     * @property {string} [fileName]  set by lgFileLedger
+     * @property {string} [linkedAccount]  statement linked to the printout that shares its account
+     * @property {Object} [link]  { account, statement, opening, firstDate } for a linked printout
+     * @property {boolean} [oldestDayComplete]  the oldest day of the printout covers the whole day
+     * @property {Object} [carry]  export re-import only: checks and status carried from rows left out
+     * @property {Array<Object>} [carriedOmission]  export re-import only: rows omitted as duplicates
+     */
     function lgFinalize(L){
       L.checks=lgIntegrity(L);
       if(L.unclaimed && L.unclaimed.length) L.checks.push({ check:'lines with a date and an amount not read as rows', result:'review',

@@ -13,7 +13,7 @@ The two core modules are deep and stay as they are: the statement reader behind 
 | 3 | Engine silently recomputed Exparsed's `computed` figures | Done in PR #5. The adapter passes `exparsed_computed` and the engine cross-checks it | |
 | 4 | Three parsers for one row string | Done in PR #5. `uwLedgerRows` is deleted | |
 | 5 | Tests cut the page at heading text | Done in PR #5. `tests/extract.py` reads 10 `@test-begin` regions | |
-| 6 | Ledger record `L` has no written shape | Open | Finding B |
+| 6 | Ledger record `L` has no written shape | Done: `LedgerRecord` typedef above `lgFinalize` | |
 | 7 | `page_run` could raise; engine works twice per Run | First half done in PR #5. Second half open | Finding C |
 | 8 | Labels have one owner, the engine | Holds. PR #52 moved the last page copy of engine tags out | |
 | 9 | UI wiring | No change. Still one UI and no second one planned | |
@@ -55,7 +55,7 @@ Tests: `tests/ai.js` already drives request and reply shapes through a fake `fet
 
 Verify: one real scanned PDF through Claude OCR and one through OpenRouter, before and after, give the same ledger status and row count. About 1 day. Medium risk, because it touches working OCR.
 
-### B. The ledger record `L` has no written shape
+### B. The ledger record `L` has no written shape (done)
 
 `lgFileLedger` returns an object whose 30 distinct fields are read as `L.x` across the page. Most are optional and read as `L.x||default`. Each consumer (render, export, computed, integrity report) must know which reader leaves which field empty. That knowledge lives only in the code.
 
