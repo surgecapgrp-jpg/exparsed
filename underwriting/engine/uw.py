@@ -2655,7 +2655,8 @@ class _Engine:
         require(mode in allowed["failure_mode"],
                 f"{what}: failure_mode {mode!r} not allowed by the evidence ({', '.join(allowed['failure_mode'])})")
         text = re.sub(r"\s+", " ", str(a.get("text", ""))).strip()
-        require(0 < len(text) <= CHARACTER_TEXT_MAX, f"{what}: text must be 1 to {CHARACTER_TEXT_MAX} characters")
+        require(text, f"{what}: text is missing; character needs text, 2 or 3 sentences")
+        require(len(text) <= CHARACTER_TEXT_MAX, f"{what}: text is {len(text)} characters; at most {CHARACTER_TEXT_MAX}")
         self.answers[q["question_id"]] = dict(tag=tag, failure_mode=mode, text=text, reason=str(a.get("reason", ""))[:300])
 
     # ---- 11. narrative (deterministic except Core Operation) --------------------------------------

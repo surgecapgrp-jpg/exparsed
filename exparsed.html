@@ -3114,7 +3114,8 @@ class _Engine:
         require(mode in allowed["failure_mode"],
                 f"{what}: failure_mode {mode!r} not allowed by the evidence ({', '.join(allowed['failure_mode'])})")
         text = re.sub(r"\s+", " ", str(a.get("text", ""))).strip()
-        require(0 < len(text) <= CHARACTER_TEXT_MAX, f"{what}: text must be 1 to {CHARACTER_TEXT_MAX} characters")
+        require(text, f"{what}: text is missing; character needs text, 2 or 3 sentences")
+        require(len(text) <= CHARACTER_TEXT_MAX, f"{what}: text is {len(text)} characters; at most {CHARACTER_TEXT_MAX}")
         self.answers[q["question_id"]] = dict(tag=tag, failure_mode=mode, text=text, reason=str(a.get("reason", ""))[:300])
 
     # ---- 11. narrative (deterministic except Core Operation) --------------------------------------
@@ -4883,7 +4884,7 @@ The engine ties the document to the one position whose funder shares a name word
 
 Asked in a second round, after your other answers are applied. `facts` holds the engine's evidence: Class A returns with tier and cure, expected versus cleared collections per position, the lowest-balance days and return dates with what cleared that day, deposit-then-outflow-then-return sequences, overdraft days and coverage limits. `allowed` lists the labels the evidence can support; the engine rejects any other.
 
-Answer `tag` (character risk) and `failure_mode`, each from `allowed`, plus `text`: 2 or 3 sentences, at most 400 characters.
+Answer `tag` (character risk) and `failure_mode`, each from `allowed`, plus `text`: 2 or 3 sentences, at most 400 characters. `text` is required; an answer without it is rejected.
 
 - `tag`: `LOW` when finance payments cleared in the observed intervals, no T1 return, and thin-day priorities held. `ELEVATED` for strained finance payments, unexplained missing pulls, recurring T2 returns or adverse priorities without proof of intent. `HIGH` for repeated finance-specific stops or blocks, an uncured T1 with no servicing explanation, or recurring deposit-then-return sequences. `INDETERMINATE` when accounts, attempt history or balances are missing.
 - `failure_mode`: `CAPACITY` when shortfalls hit essential payments broadly or cures and injections show recovery. `POSSIBLE VOLITIONAL` only when finance returns coincide with discretionary outflows while funds were available. `MIXED` when both hold. `INDETERMINATE` otherwise.
@@ -10033,8 +10034,14 @@ Add `reason`: one sentence naming the fact you relied on. It is stored in the au
         question_id:{ type:'string' }, tag:{ type:'string' }, funder:{ type:'string' }, evidence:UW_EVIDENCE_SCHEMA,
         terminated:UW_EVIDENCE_SCHEMA, terms:UW_TERMS_SCHEMA, text:{ type:'string' }, reason:{ type:'string' },
         failure_mode:{ type:'string', 'enum':['CAPACITY','POSSIBLE VOLITIONAL','MIXED','INDETERMINATE'] } } } } } };
-    function uwJudgeOnce(prov, cfg, judgePrompt, history, callFn){
-      return callFn(prov, cfg, { system:judgePrompt, history:history, schema:UW_JUDGMENTS_SCHEMA }).catch(function(e){
+    // The character round's own schema: with text optional, a live run (2026-11-08) left it out on every try.
+    var UW_CHARACTER_SCHEMA={ type:'object', additionalProperties:false, required:['ledger_sha256','answers'], properties:{
+      ledger_sha256:{ type:'string' },
+      answers:{ type:'array', items:{ type:'object', additionalProperties:false, required:['question_id','tag','failure_mode','text'], properties:{
+        question_id:{ type:'string' }, tag:{ type:'string' }, text:{ type:'string' }, reason:{ type:'string' },
+        failure_mode:UW_JUDGMENTS_SCHEMA.properties.answers.items.properties.failure_mode } } } } };
+    function uwJudgeOnce(prov, cfg, judgePrompt, history, callFn, schema){
+      return callFn(prov, cfg, { system:judgePrompt, history:history, schema:schema||UW_JUDGMENTS_SCHEMA }).catch(function(e){
         if(e.status===400) return callFn(prov, cfg, { system:judgePrompt, history:history });   // model without structured outputs
         throw e;
       }).then(function(r){
@@ -10061,12 +10068,21 @@ Add `reason`: one sentence naming the fact you relied on. It is stored in the au
         onStep('asking '+cfg.model+' for the character read');
         history.push(aiUser(JSON.stringify({ ledger_sha256:qs.ledger_sha256, questions:[cq] })));
         var keep=function(why){ return { result:r, judgments:j, note:'character read not applied ('+why+'); WILL-PAY shows counts only' }; };
-        return uwJudgeOnce(prov, cfg, judgePrompt, history, callFn).then(function(jc){
+        function merge(jc){
           var mine=(jc.answers||[]).filter(function(a){ return a.question_id===cq.question_id; });
-          var merged={ ledger_sha256:qs.ledger_sha256, answers:j.answers.filter(function(a){ return a.question_id!==cq.question_id; }).concat(mine) };
-          var rc=run(JSON.stringify(merged));
-          return rc.ok ? { result:rc, judgments:merged } : keep(rc.error);
-        }, function(e){ return keep(e.message); });
+          return { ledger_sha256:qs.ledger_sha256, answers:j.answers.filter(function(a){ return a.question_id!==cq.question_id; }).concat(mine) };
+        }
+        // One retry with the engine's error, as for the first answers (a live run broke the 400-character text limit).
+        return uwJudgeOnce(prov, cfg, judgePrompt, history, callFn, UW_CHARACTER_SCHEMA).then(function(jc){
+          var merged=merge(jc), rc=run(JSON.stringify(merged));
+          if(rc.ok) return { result:rc, judgments:merged };
+          onStep('engine rejected the character read ('+rc.error+'); asking once more');
+          history.push(aiUser('The engine rejected that answer: '+rc.error+'\nReturn corrected JSON for this question only: tag and failure_mode from allowed, and text, which is required (2 or 3 sentences, at most 400 characters).'));
+          return uwJudgeOnce(prov, cfg, judgePrompt, history, callFn, UW_CHARACTER_SCHEMA).then(function(jc2){
+            var merged2=merge(jc2), rc2=run(JSON.stringify(merged2));
+            return rc2.ok ? { result:rc2, judgments:merged2 } : keep(rc2.error);
+          });
+        }).catch(function(e){ return keep(e.message); });
       }
       onStep('asking '+cfg.model+' '+qs.questions.length+' questions');
       return uwJudgeOnce(prov, cfg, judgePrompt, history, callFn).then(function(j){

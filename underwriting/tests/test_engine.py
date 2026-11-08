@@ -1008,7 +1008,10 @@ class V17Batch4(unittest.TestCase):
         cid = self.char_q(run(None, with_judgments(r0, [])))["question_id"]
         bad = [(dict(tag="HIGH", failure_mode="CAPACITY"), "character 'HIGH' not allowed"),
                (dict(tag="ELEVATED", failure_mode="POSSIBLE VOLITIONAL"), "failure_mode 'POSSIBLE VOLITIONAL' not allowed"),
-               (dict(tag="LOW", failure_mode="CAPACITY", question_id="Q-character-0000000000"), "stale")]
+               (dict(tag="LOW", failure_mode="CAPACITY", question_id="Q-character-0000000000"), "stale"),
+               # A live run (2026-11-08) left text out; the error must say it is missing, not only give a length range.
+               (dict(tag="ELEVATED", failure_mode="CAPACITY", text=""), "text is missing"),
+               (dict(tag="ELEVATED", failure_mode="CAPACITY", text="x" * 401), "text is 401 characters; at most 400")]
         for extra, msg in bad:
             a = dict(dict(question_id=cid, text="x" * 20), **extra)
             with self.assertRaisesRegex(uw.UWError, msg):
