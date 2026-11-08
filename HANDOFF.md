@@ -38,7 +38,7 @@ The next step is a real Chrome run on 3 to 5 real merchant files (section 9, ite
 | `underwriting/docs/HANDOFF.md` | Engine design, contracts, trust boundary, interpretations 1 to 19. |
 | `underwriting/docs/V1_7_MATRIX.md` | 150 V1.7 rules mapped to code, interpretations B1 to B21, effect of each batch on saved runs. |
 | `tests/` | JS unit tests for the page (`run-node.js` or `run.sh`), `extract.py`, synthetic samples, batch harness `batch/run.js`. |
-| `DESIGN_REVIEW.md` | The 2026-11-02 architecture review. Changes 2 to 5 are done; change 1 is open. |
+| `DESIGN_REVIEW.md` | The 2026-11-08 architecture review. Open: one model-call path for OCR and chat (A), the ledger record shape (B). |
 | `underwriting/legacy/` | Empty except a cache folder. Safe to delete. |
 | `tests/families.js.removed` | Old payee-grouping tests. Not run. |
 
