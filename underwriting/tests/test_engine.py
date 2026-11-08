@@ -996,7 +996,9 @@ class V17Batch4(unittest.TestCase):
         a = dict(question_id=cid, tag="ELEVATED", failure_mode="CAPACITY",
                  text="One payroll return cured in 1 day; BlueOak missed 1 of 7 weekly pulls.", reason="evidence")
         r = run(None, with_judgments(r0, [a]))
-        self.assertTrue(r.audit["narrative"]["will"].startswith("Character ELEVATED; failure-mode evidence CAPACITY"))
+        self.assertTrue(r.audit["narrative"]["will"].startswith("Character ELEVATED; failure-mode evidence CAPACITY (model reading"))
+        u = run(None, with_judgments(r0, [dict(a, reason="underwriter")]))
+        self.assertIn("(underwriter reading of engine evidence", u.audit["narrative"]["will"])
         self.assertIn("Counts: 1 Class A return chain(s)", r.audit["narrative"]["will"])
         self.assertEqual(self.char_q(r)["question_id"], cid)  # the answer does not change the evidence
         self.assertEqual(r.audit["capacity"], run(None, with_judgments(r0, [])).audit["capacity"])

@@ -493,3 +493,14 @@ Signed off 2026-11-08, "extra pull". A daily position's next scheduled pull no l
 | Run | Effect |
 | :--- | :--- |
 | All 4 saved runs | Same reports. No saved run has a return on a daily position |
+
+## V1.8 batch 7: character labels in the review queue (2026-11-08; policy V1.8b7)
+
+- The review queue lists a "Character read" row whenever the character question exists, answered or not. It shows the current WILL-PAY labels, a character menu and a failure-mode menu limited to the engine's allowed labels, and a text box.
+- A pick replaces the model's character answer in the judgments file; a blank character menu keeps it. The engine still checks the labels against the evidence.
+- WILL-PAY names who set the labels: "(model reading ...)" or "(underwriter reading ...)" when the answer's reason is "underwriter".
+- The open-question count leaves the character row out.
+
+| Run | Effect |
+| :--- | :--- |
+| All 4 saved runs | Same reports |

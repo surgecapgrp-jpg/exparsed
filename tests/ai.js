@@ -130,8 +130,18 @@ uwUnderwrite('claude', cfgC, 'P', engineChar(true), fakeJudge([good, charAns]), 
   T('A14d a rejected character read keeps the first result with a note',
     o.result.report==='counts only' && o.judgments.answers.length===1 && /character read not applied/.test(o.note) && /HIGH/.test(o.note), o);
 });
-T('A14e review queue leaves out the character question',
-  uwQueue({ ok:true, questions:{ questions:[{ question_id:'Q-character-1', type:'character' }] }, audit:{ questions_open:['Q-character-1'] } }).length===0);
+// A14e-A14f V1.8 character row: listed even when answered, with the engine's allowed labels; picks become one answer
+var cq=uwQueue({ ok:true, questions:{ questions:[{ question_id:'Q-character-1', type:'character', default:'INDETERMINATE',
+  allowed:{ character:['LOW','ELEVATED'], failure_mode:['CAPACITY','INDETERMINATE'] } }] },
+  audit:{ questions_open:[], narrative:{ will:'Character ELEVATED; failure-mode evidence CAPACITY (model). Counts: 0 Class A' } } });
+T('A14e review queue lists the answered character question with its allowed labels',
+  cq.length===1 && cq[0].type==='character' && cq[0].tags.join()==='LOW,ELEVATED' && cq[0].modes.join()==='CAPACITY,INDETERMINATE'
+  && cq[0].lines[0]==='now: Character ELEVATED; failure-mode evidence CAPACITY (model).', cq);
+var cj=uwReviewJudgments({ answers:[{ question_id:'Q-character-1', tag:'ELEVATED', failure_mode:'CAPACITY', text:'model' }] }, 'abc',
+  [{ question_id:'Q-character-1', type:'character', tag:'LOW', failure_mode:'CAPACITY', text:' cleared every pull ' },
+   { question_id:'Q-character-2', type:'character', tag:'', failure_mode:'CAPACITY', text:'x' }]);
+T('A14f an underwriter character pick replaces the model answer; a blank pick keeps it',
+  cj.answers.length===1 && cj.answers[0].tag==='LOW' && cj.answers[0].failure_mode==='CAPACITY' && cj.answers[0].text==='cleared every pull' && cj.answers[0].reason==='underwriter', cj);
 
 // A15 structured output rejected by an older model: same request again without the schema
 var withSchema=[];

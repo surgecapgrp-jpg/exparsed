@@ -46,7 +46,7 @@ from pathlib import Path
 
 D = Decimal
 ENGINE_VERSION = "3.4"
-POLICY_VERSION = "V1.8b6"
+POLICY_VERSION = "V1.8b7"
 
 # Policy parameters (V2.2 values with the V1.7 changes marked). Changing any value is a policy change: bump POLICY_VERSION.
 BUSINESS_DAYS_PER_MONTH = D(20)
@@ -2548,7 +2548,8 @@ class _Engine:
         cq = next((q for q in self.questions if q["type"] == "character"), None)
         ca = self.answers.get(cq["question_id"]) if cq else None
         if ca:
-            will = (f"Character {ca['tag']}; failure-mode evidence {ca['failure_mode']} (model reading of engine "
+            who = "underwriter" if ca["reason"] == "underwriter" else "model"  # the review queue sets reason "underwriter"
+            will = (f"Character {ca['tag']}; failure-mode evidence {ca['failure_mode']} ({who} reading of engine "
                     f"evidence; capacity verdict independent). {ca['text']} Counts: {will}")
         else:
             will = f"Character INDETERMINATE; failure-mode evidence INDETERMINATE (not assessed). Counts: {will}"
