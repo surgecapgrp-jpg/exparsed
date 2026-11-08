@@ -15,7 +15,7 @@ Status values:
 
 Batch 2 covered debit-first discovery (D1 to D5), WATCH rows, the ±30-day two-way match, evidence levels and position identity. Rows still marked B2 in the Fix column were deferred: off-bank collections, contractual cost, payoff ties and variable adverse scenarios. **B3** covers accounts, commingling, missing-account requests, the V1.7 ten-table format and its checker.
 
-Count: 150 rows. 19 B1, 33 B2, 23 B3, 8 B4, 2 B5, 3 B6, 5 B7, 7 V1.8, 38 Met, 8 Partial, 1 Gap, 3 Page.
+Count: 150 rows. 19 B1, 33 B2, 23 B3, 8 B4, 2 B5, 3 B6, 5 B7, 8 V1.8, 38 Met, 8 Partial, 0 Gap, 3 Page.
 
 ## Contract hard rules
 
@@ -107,7 +107,7 @@ Count: 150 rows. 19 B1, 33 B2, 23 B3, 8 B4, 2 B5, 3 B6, 5 B7, 7 V1.8, 38 Met, 8 
 | D3 | Amount pass across changed descriptors and rails | A payee with 2+ debits at an MCA series' level within 30 days of the series (B9 signed off 2026-11-07: the half-of-payee rule is gone) | B2 | — |
 | D4 | Funding-linked pass: rescan debits after a suspected funding credit | A new payee within 30 days after an explicit financing credit, when it repeats at daily/weekly/biweekly gaps or shares a word with the sender | B2 | Sign-off B8 |
 | D5 | Exception pass: returns, stop-pays, fees, processor net settlements, missing-account transfers | Returned attempts of finance-word payees are nominated (D5). Hidden collections are not recovered. | Partial | Recover collections behind failed attempts |
-| D6 | Reverse consolidations, processor splits, off-bank deductions | None | Gap | B2 |
+| D6 | Reverse consolidations, processor splits, off-bank deductions | Judge HOLDBACK answer on a processor statement adds an off-bank Y row to Table 4 and its monthly cost to the stack. 3+ same-amount daily, weekly or biweekly credits from a finance-word sender get a Table 1 "possible reverse consolidation" note, no cost (V1.8b11) | V1.8 | — |
 | D7 | Generic descriptors cannot join payments | Grouping is by normalized description | Partial | B2 |
 | D8 | Concurrent schedules under one funder are separate positions | Split when 3+ days hold same-day debits differing by >10%, or when same-amount doubles fall on 3 consecutive debit days. An isolated same-amount double (the day after a holiday) is a catch-up. | B6 | — (B22 signed off 2026-11-07) |
 | D9 | Series: 3+ cleared; EARLY FINANCE for 1 to 2 with finance evidence; others WATCH | CONFIRMED, PROBABLE, U for provisional cadence, and UNRESOLVED WATCH rows | B2 | — |
@@ -550,3 +550,15 @@ Signed off 2026-11-08, "extra pull". A daily position's next scheduled pull no l
 | :--- | :--- |
 | Sample, defaults and saved answers | Same reports. The sample document is kind `funding_agreement`, which gets no question |
 | Real ledger | Same: no tagged documents. Not rerun here |
+
+## Gap D6, part C: off-bank holdbacks and reverse consolidations (2026-11-08; policy V1.8b11)
+
+- Merchant processing statements and payment processor reports get a `document` question with allowed tags HOLDBACK and UNRELATED. Contracts and payoff letters keep CONTRACT, PAYOFF and UNRELATED.
+- A HOLDBACK answer gives funder, the amount withheld per period, the period and a quote printing the amount. The engine adds "FUNDER (off-bank)" to Table 4 as a Y row: Last Debit "Off-bank", Funding Date Not found. Its monthly cost (amount x cadence factor) goes into the stack, and so into Room C and HEADLINE.
+- Off-bank rows sit outside `positions`, in `audit.offbank`. Peak, returns and character evidence do not see them, because no bank debit exists.
+- Flag: 3 or more same-amount credits from one sender with a finance word, at a daily, weekly or biweekly cadence, get a Table 1 note "possible reverse consolidation ... not proof, no cost added" (`REVERSE_MIN_CREDITS`).
+
+| Run | Effect |
+| :--- | :--- |
+| Sample, defaults and saved answers | Same reports. No processor document and no flagged credit series |
+| Real ledger | Not rerun: no processor documents. The flag may add Table 1 notes if a finance-word sender pays fixed credits |
