@@ -51,6 +51,18 @@ Pick one tag:
 - `AMBIGUOUS_<LABEL>` (for example `AMBIGUOUS_CARD_PAYMENT`) is a recurring obligation whose nature is unclear. It is shown in Table 5 and kept out of the obligation total.
 - Add `terminated` only when a document or a transaction description proves the position was paid off or closed. Use the same `kind`/`quote`/`doc_id` shape as `evidence`. A `bank_text` quote must appear on one transaction of this payee or one naming its funder; cleared debits after that transaction keep the position open. An estimated payoff is not proof. Without `terminated`, a position whose debits stopped is reported U (unresolved) with a scenario cost, and a material U position blocks a YES verdict.
 
+### `document`
+
+One supplied funding contract or payoff letter (`doc_id`, `kind`). Read it in `documents`. Pick one tag:
+
+`CONTRACT`, `PAYOFF`, `UNRELATED`, `unsure`.
+
+- `CONTRACT`: the document sets a payment for one funder. Give `funder` (the funder's name as it appears in the debit payees) and `terms`: `amount` (payment per period), `frequency` (`daily`, `weekly`, `biweekly` or `monthly`) and `quote`, an exact passage of the document that prints the amount.
+- `PAYOFF`: the document states a payoff balance for one funder. Give `funder` and `terms`: `amount` (payoff balance), `quote` printing it, and, when the document states one, `good_through` (YYYY-MM-DD) with `date_quote`, an exact passage that prints that date.
+- `UNRELATED`: the document holds no payment or payoff terms for a funder.
+
+The engine ties the document to the one position whose funder shares a name word with `funder`; with none or several, it notes the document and does not apply it. A contract payment above the observed cost replaces it in the stack. A payoff is shown in Table 4 and never closes a position.
+
 ### `character`
 
 Asked in a second round, after your other answers are applied. `facts` holds the engine's evidence: Class A returns with tier and cure, expected versus cleared collections per position, the lowest-balance days and return dates with what cleared that day, deposit-then-outflow-then-return sequences, overdraft days and coverage limits. `allowed` lists the labels the evidence can support; the engine rejects any other.

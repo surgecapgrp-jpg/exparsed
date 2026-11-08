@@ -46,7 +46,7 @@ from pathlib import Path
 
 D = Decimal
 ENGINE_VERSION = "3.4"
-POLICY_VERSION = "V1.8b9"
+POLICY_VERSION = "V1.8b10"
 
 # Policy parameters (V2.2 values with the V1.7 changes marked). Changing any value is a policy change: bump POLICY_VERSION.
 BUSINESS_DAYS_PER_MONTH = D(20)
@@ -164,6 +164,27 @@ CADENCE_FACTOR = {
     "biweekly": BIWEEKS_PER_MONTH,
     "monthly": D(1),
 }
+# Gaps L11 and L13 (2026-11-08, V1.8b10): the model reads terms from these document kinds, one question each.
+DOC_QUESTION_KINDS = ("funding_contract", "payoff_letter")
+DOC_TAGS = ("CONTRACT", "PAYOFF", "UNRELATED")
+MONTHS = ("January February March April May June July August September October November December").split()
+
+
+def states_amount(text, amt):
+    """True when `text` prints `amt` (commas and $ ignored; whole dollars may omit the cents)."""
+    s = text.replace(",", "")
+    whole = rf"|{int(amt)}(?!\d|\.\d)" if amt == amt.to_integral_value() else ""
+    return bool(re.search(rf"(?<![\d.])(?:{re.escape(str(amt.quantize(D('0.01'))))}(?!\d){whole})", s))
+
+
+def states_date(text, d):
+    """True when `text` prints date `d` as m/d/yyyy, m/d/yy, yyyy-mm-dd, 'Month d, yyyy' or 'd Month yyyy'."""
+    t = re.sub(r"\s+", " ", text.upper())
+    mon = MONTHS[d.month - 1].upper()
+    forms = {d.isoformat()} | {f"{m}/{dd}/{y}" for m in (str(d.month), f"{d.month:02d}") for dd in (str(d.day), f"{d.day:02d}")
+                                for y in (str(d.year), f"{d.year % 100:02d}")}
+    forms |= {f"{n} {d.day}, {d.year}" for n in (mon, mon[:3], mon[:3] + ".")} | {f"{d.day} {mon} {d.year}"}
+    return any(re.search(rf"(?<![\d/]){re.escape(f)}(?![\d/])", t) for f in forms)
 
 
 def rx(*alts):
@@ -491,6 +512,8 @@ class Position:
     triggers: list = field(default_factory=list)
     fundings: list = field(default_factory=list)
     notes: list = field(default_factory=list)
+    contract: dict | None = None  # L11: quoted contract payment, frequency and monthly cost
+    payoff: dict | None = None  # L13: quoted payoff balance and good-through date
 
 
 def usd(x):
@@ -593,6 +616,7 @@ class _Engine:
         self.answers = self.read_judgments(judgments)
         self.apply_debit_answers()
         self.build_positions()
+        self.apply_documents()
         self.gate_and_attribute()
         self.revenue()
         self.crosscheck_exparsed()
@@ -1075,6 +1099,10 @@ class _Engine:
                     default="MCA" if g["default_mca"] else g["tag"],
                 )
             )
+        for d in self.docs.values():
+            if d["kind"] in DOC_QUESTION_KINDS:
+                qs.append(dict(question_id=qid("document", [self.sha, d["doc_id"]]), type="document",
+                               doc_id=d["doc_id"], kind=d["kind"], txn_ids=[], default="UNRELATED"))
         rev = defaultdict(D)
         for t in self.txns:
             if t.dir == "credit" and t.tag.startswith("REV_"):
@@ -1160,6 +1188,9 @@ class _Engine:
             tag = a.get("tag")
             if tag == "unsure":
                 continue
+            if q["type"] == "document":
+                out[q["question_id"]] = self.read_document_answer(q, a, what)
+                continue
             texts = [self.by_id[i].desc for i in q["txn_ids"]]
             if q["type"] == "credit":
                 require(tag in CREDIT_TAGS, f"{what}: tag {tag!r} not a credit tag")
@@ -1217,6 +1248,66 @@ class _Engine:
                         ans["terminated"]["date"] = hits[-1].date
                 out[q["question_id"]] = ans
         return out
+
+    def read_document_answer(self, q, a, what):
+        """L11/L13: contract or payoff terms. The quote must sit in the document and print the amount and date."""
+        tag = a.get("tag")
+        require(tag in DOC_TAGS, f"{what}: tag {tag!r} not in {DOC_TAGS}")
+        ans = dict(tag=tag, doc_id=q["doc_id"], reason=str(a.get("reason", ""))[:300])
+        if tag == "UNRELATED":
+            return ans
+        funder = re.sub(r"[^A-Za-z0-9 &.\-]", "", str(a.get("funder", ""))).strip()[:40]
+        require(funder_tokens(funder), f"{what}: {tag} needs a funder name")
+        terms = a.get("terms") or {}
+        require(isinstance(terms, dict), f"{what}: terms must be an object")
+        try:
+            amt = D(str(terms.get("amount", "")).replace(",", "").replace("$", "")).quantize(D("0.01"))
+        except InvalidOperation:
+            amt = D(0)
+        require(amt > 0, f"{what}: terms.amount must be a positive number")
+        ev = self.verify_quote(dict(kind="document", doc_id=q["doc_id"], quote=terms.get("quote", "")), [], what)
+        require(states_amount(ev["quote"], amt), f"{what}: quote does not state amount {amt}")
+        ans.update(funder=funder.upper(), amount=amt, quote=ev["quote"])
+        if tag == "CONTRACT":
+            freq = terms.get("frequency")
+            require(freq in CADENCE_FACTOR, f"{what}: terms.frequency must be one of {tuple(CADENCE_FACTOR)}")
+            ans.update(frequency=freq, monthly=amt * CADENCE_FACTOR[freq])
+        elif terms.get("good_through"):
+            try:
+                gt = date.fromisoformat(str(terms["good_through"]))
+            except ValueError:
+                gt = None
+            require(gt is not None, f"{what}: terms.good_through must be YYYY-MM-DD")
+            dq = self.verify_quote(dict(kind="document", doc_id=q["doc_id"], quote=terms.get("date_quote", "")), [], what)
+            require(states_date(dq["quote"], gt), f"{what}: date_quote does not state {gt.isoformat()}")
+            ans.update(good_through=gt)
+        return ans
+
+    def apply_documents(self):
+        """L11: the stack carries the higher of observed and contract cost. L13: a payoff note, never closure."""
+        first = next(iter(self.accts))
+        for q in self.questions:
+            a = self.answers.get(q["question_id"])
+            if q["type"] != "document" or not a or a["tag"] == "UNRELATED":
+                continue
+            tok = funder_tokens(a["funder"])
+            hits = [p for p in self.positions if not p.watch and tok & funder_tokens(p.funder)]
+            if len(hits) != 1:
+                self.notes[first].append(
+                    f"{a['tag'].lower()} {q['doc_id']} for {a['funder']} matched {len(hits)} positions; not applied"
+                )
+                continue
+            p = hits[0]
+            if a["tag"] == "PAYOFF":
+                p.payoff = dict(amount=a["amount"], good_through=a.get("good_through"), doc_id=q["doc_id"],
+                                stale=bool(a.get("good_through") and a["good_through"] < self.end))
+                continue
+            p.contract = dict(amount=a["amount"], frequency=a["frequency"], monthly=a["monthly"], doc_id=q["doc_id"])
+            if p.live_status == "Y" and a["monthly"] > p.cost:
+                p.notes.append(f"Stack uses CONTRACTUAL {usd(a['monthly'])}/mo over observed {usd(p.cost)}/mo")
+                p.cost = a["monthly"]
+            elif p.live_status == "U" and p.scenario is not None and a["monthly"] > p.scenario:
+                p.scenario = a["monthly"]
 
     def apply_debit_answers(self):
         for q in self.questions:
@@ -2960,6 +3051,8 @@ class _Engine:
                 fundings=fundings,
                 possible_fundings=possible,
                 notes=p.notes,
+                contract=p.contract,
+                payoff=p.payoff,
             )
 
         low = min(
@@ -3322,7 +3415,14 @@ def tables(a):
             notes.append(
                 f"SCENARIO {usd(p['scenario_cost'])}/mo, not in stack" + ("; material" if p["material"] else "")
             )
-        if f and st != "N":
+        if p.get("contract"):
+            k = p["contract"]
+            notes.append(f"CONTRACTUAL {usd(k['amount'])} {k['frequency']} = {usd(k['monthly'])}/mo ({k['doc_id']})")
+        if p.get("payoff") and st != "N":
+            k = p["payoff"]
+            notes.append(f"PAYOFF {usd(k['amount'])}" + (f" good through {mdy(k['good_through'])}" if k["good_through"] else "")
+                         + f" ({k['doc_id']}); not closure evidence" + ("; stale" if k["stale"] else ""))
+        elif f and st != "N":
             rem = f["credit_amount"] * PAYBACK_FACTOR - p["paid_since_latest_funding"]
             notes.append(f"SCENARIO est. remaining {usd(rem)} (1.4x model); not closure evidence")
         notes += [n for n in p["notes"] if not n.startswith("Provisional")]

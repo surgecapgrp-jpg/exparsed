@@ -73,6 +73,7 @@ The engine's interface is one function: `underwrite(raw, judgments=None) -> Resu
 - An evidence `quote` is not a verbatim substring of the transaction description, or of the named document.
 - A `document` used for `STRIP_FUNDING` does not state the credit's amount.
 - A `terminated` claim has no verbatim quote.
+- A `document` answer (CONTRACT or PAYOFF) has no funder, a quote not in the document, a quote that does not print the amount, or a `date_quote` that does not print `good_through` (L11, L13).
 
 Bank descriptions reach the LLM as data. Whatever text the LLM writes, only enums, short funder names and one 240-character Core Operation sentence reach the report, and `cell()` strips pipes, braces and line breaks from all of them.
 
