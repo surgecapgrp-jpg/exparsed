@@ -1,6 +1,6 @@
 # exparsed handoff
 
-Code state on 2026-11-08 at the merge of PR #44 (the last code change). Later commits that only
+Code state on 2026-11-08 at the merge of PR #45 (the last code change). Later commits that only
 edit this file are not listed. Repo: https://github.com/surgecapgrp-jpg/exparsed (private).
 This file replaces the 2026-10-26 handoff. The underwriting design detail is in `underwriting/docs/HANDOFF.md`,
 and the policy compliance detail is in `underwriting/docs/V1_7_MATRIX.md`. Policy V1.8 (MCA Capacity V1.8
@@ -15,7 +15,7 @@ underwrites the merchant for MCA capacity under policy V1.8.
 | Part | State |
 | :--- | :--- |
 | Statement reader | In use. 140 of 244 Desktop-set files verify from text; 29 of 42 scans verify through Mac OCR. |
-| Underwriting engine | Experiment. Policy V1.7 batches 1 to 4 and V1.8 batches 1 to 7 and sign-offs P15, M9 merged. Run on 1 real ledger and 1 synthetic ledger. |
+| Underwriting engine | Experiment. Policy V1.7 batches 1 to 4 and V1.8 batches 1 to 7 and sign-offs P15, M9 and readings 1 to 19 merged. Run on 1 real ledger and 1 synthetic ledger. |
 | Underwrite button and chat | Built and tested with a mocked browser run. Never run in real Chrome with real Pyodide and a real key. |
 | UI | Surge Capital theme (PR #9, merged 2026-11-04). |
 | Tests | 265 JS tests, 107 engine tests, 19 end-to-end page checks: all pass on `main`. |
@@ -188,6 +188,7 @@ the return-word scan log (R1), the character pass (B1 to B5) and the extra Table
 | #41 | `203e041` | V1.8 batch 6: a daily MCA return is cured only by an extra pull (policy V1.8b6) |
 | #42 | `4b7748d` | V1.8 batch 7: character labels in the review queue; "underwriter reading" in WILL-PAY (policy V1.8b7) |
 | #44 | `268e1f6` | Sign-offs P15 (FLIGHT on every external credit 3x median) and M9 (model-named sender is not financing proof) (policy V1.8b8) |
+| #45 | `dbe1131` | Sign-offs on readings 1 to 19 in `underwriting/docs/HANDOFF.md` 4.1; reading 1 changed: default MCA at 60% same-amount (policy V1.8b9) |
 
 Rollback point before all underwriting work: `283bc50`.
 
@@ -286,7 +287,7 @@ All 22 matrix interpretations B1 to B22 and all 19 readings in `underwriting/doc
 
 ## 7. Verification
 
-| Check | Result on `main` after PR #44 |
+| Check | Result on `main` after PR #45 |
 | :--- | :--- |
 | `node tests/run-node.js` | 265 passed, 0 failed (`ocr.js` adds 44) |
 | `tests/batch/run.js` on `tests/samples` (pdf.js stubbed: the cloud session cannot reach cdnjs) | 3 non-PDF files read through the page; `compare` reports a planted downgrade and exits 1 |
