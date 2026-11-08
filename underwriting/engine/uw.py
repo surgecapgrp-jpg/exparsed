@@ -1067,6 +1067,7 @@ class _Engine:
                     transactions=[self.txn_view(t)],
                     why=why + near,
                     default="STRIP_UNRESOLVED",
+                    allowed=list(CREDIT_TAGS),
                 )
             )
         unclear = defaultdict(list)
@@ -1083,6 +1084,7 @@ class _Engine:
                     count=len(ts),
                     why=["transfer wording; sending account not supplied"],
                     default="STRIP_UNRESOLVED",
+                    allowed=list(CREDIT_TAGS),
                 )
             )
         for name, g in sorted(self.groups.items()):
@@ -1104,6 +1106,7 @@ class _Engine:
                     sample_descriptions=sorted({t.desc for t in ts})[:3],
                     why=g["passes"],
                     default="MCA" if g["default_mca"] else g["tag"],
+                    allowed=list(DEBIT_TAGS),
                 )
             )
         for d in self.docs.values():

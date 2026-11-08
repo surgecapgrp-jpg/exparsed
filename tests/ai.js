@@ -183,8 +183,8 @@ aiCall('claude', cfgC, { system:'S', history:[] }, function(){
 
 // A17-A18 review queue: open questions for an underwriter, answers in the judgments format
 var RQ={ ok:true, questions:{ ledger_sha256:'abc', questions:[
-  { question_id:'Q-credit-1', type:'credit', txn_ids:['T1'], transactions:[{ date:'2026-09-01', amount:'30000.00', description:'WIRE IN JKL' }], why:['wire'], default:'STRIP_UNRESOLVED' },
-  { question_id:'Q-debit-1', type:'debit_group', descriptor:'BLUEOAK ADV', txn_ids:['T2','T3'], sample_descriptions:['BLUEOAK ADV ACH DEBIT'], why:['D1'], default:'MCA' },
+  { question_id:'Q-credit-1', type:'credit', txn_ids:['T1'], transactions:[{ date:'2026-09-01', amount:'30000.00', description:'WIRE IN JKL' }], why:['wire'], default:'STRIP_UNRESOLVED', allowed:['REV_WIRE','STRIP_FUNDING'] },
+  { question_id:'Q-debit-1', type:'debit_group', descriptor:'BLUEOAK ADV', txn_ids:['T2','T3'], sample_descriptions:['BLUEOAK ADV ACH DEBIT'], why:['D1'], default:'MCA', allowed:['MCA','OTHER'] },
   { question_id:'Q-core-1', type:'core_operation', txn_ids:[], default:'text written by engine' },
   { question_id:'Q-debit-2', type:'debit_group', descriptor:'AMEX', txn_ids:['T4'], sample_descriptions:['AMEX'], why:['D2'], default:'OTHER' } ] },
   audit:{ questions_open:['Q-core-1','Q-credit-1','Q-debit-1'] } };
