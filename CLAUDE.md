@@ -1,0 +1,5 @@
+## exparsed workflow
+- After ANY change to exparsed.html, run the full regression suite: `node tests/run-node.js`, `python3 -m unittest discover -s underwriting/tests`, and `python3 tests/harness/run.py --corpus` (outside the sandbox: it binds a local port). Report the reconciliation count (e.g. 130/136) and list any file that got worse compared with before the change.
+- Weekly loop. The inbox `/Users/springfunding/Desktop/test files for exparsed` holds new files that fail; look there first for parser work. `python3 tests/harness/run.py` (no flags) tests the inbox and prints a FAIL line per file. Fix the parsers, check `--corpus` shows no WORSE lines, then `--promote` copies the inbox into the permanent REGRESSION folder and saves the baseline. The user then empties the inbox.
+- The baseline (`tests/harness/results/baseline.json`) covers only the permanent corpus: FUNDED + REGRESSION under `/Users/springfunding/JuniMyAgentVault/02_Library_Reference/pdf-vision-ocr/test-statements/`. Never delete files there.
+- When I ask for 'the link', give ONLY the link (local file path and/or published URL) in one line. Add no explanation unless I ask.

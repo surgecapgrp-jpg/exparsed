@@ -155,25 +155,28 @@ Tests for these are E13 to E15 in `tests/edge.js`.
 - Chat reads row objects from `uwChatData`; the export and chat share `lgOwnRows`, so both drop the same duplicate printout rows.
 - Not verified: Pyodide loading in a real browser, and live Claude or OpenRouter calls. A headless-Chrome run with mocked Pyodide (the real engine behind a local server), mocked Claude endpoints and a 3-month CSV passed 15 of 15 checks.
 
-## Test harness (not in the repo)
+## Test harness (`tests/harness/`)
 
-The batch runs used a local harness in the Claude session scratchpad:
-`/private/tmp/claude-501/-Users-springfunding-JuniMyAgentVault-03-Agent-Wiki-pdf-vision-ocr/926417a5-725d-41c0-9db0-152f7581fc1c/scratchpad/run`.
-That folder is temporary and may be gone. What it did:
-
-- `serve.py` served the page with `hook.js` injected and the test files under `/funded/<name>`.
-  `ONLY=<list>` limited the run to listed files. Results were appended as JSON lines.
-- `hook.js` called `readFileContent` (the page's real path, including the account split) and reported
-  one result per child ledger. With `&ocr=1` it ran `doOcrMac` on scans first.
-- `supervise.py` ran 4 headless Chrome workers through the Chrome DevTools Protocol.
-- `inx.py` / `inxo.py` ran JavaScript in the page for single-file checks (`inxo.py` with OCR).
-- Inside the Claude Code sandbox, binding a local port fails with EPERM. Those commands ran outside the
-  sandbox, or set `sandbox.network.allowLocalBinding: true`.
+- `run.py` serves the page with `hook.js` injected and runs headless Chrome workers (`--workers`,
+  default 8). Python standard library only, no CDP. Weekly loop:
+  - no flags: test the inbox `~/Desktop/test files for exparsed` (new failing files); one FAIL line per file.
+  - `--corpus`: test the permanent corpus, FUNDED + REGRESSION under `test-statements/`.
+  - `--promote`: copy the inbox into REGRESSION, test the corpus, save the baseline if nothing got worse.
+    Then empty the inbox.
+- `hook.js` calls the page's own `readFileContent`, `recFromContent` and `lgBuild` (the drop path,
+  including the account split) and reports one result per ledger, with the failed checks.
+  A run through `addFiles` (the real drop) gave the same status on the 3 files tried.
+- Results go to `tests/harness/results/last.json` (git-ignored, it holds customer file names).
+  `--save-baseline` (corpus runs only) stores a run as `baseline.json`; later runs print `WORSE` lines and exit 1, and list
+  ledgers missing from the baseline as `NEW`.
+- `--limit N` runs the first N files (not with `--corpus`). `--page PATH` tests another copy of the page.
+- Baseline on 2026-11-11: 3,672 of 8,396 ledgers verified (not-statement excluded), 7,509 files.
+- It binds a local port, so it runs outside the Claude Code sandbox (or set
+  `sandbox.network.allowLocalBinding: true`).
+- No OCR pass: scanned files report needs-ocr.
 
 ## Suggested next steps
 
 1. Look at the 9 partial files, biggest bank groups first.
 2. Fix the upside-down check in `Bank_Statement_5`.
 3. Rerun the FUNDED set and compare against the last FUNDED results.
-4. Commit the harness (`serve.py`, `hook.js`, `supervise.py`, `inx*.py`) to this repo so batch runs
-   can be repeated.
